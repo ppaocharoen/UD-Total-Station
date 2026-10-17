@@ -1,0 +1,1974 @@
+{
+ "schema_version": "0.1",
+ "meta": {
+  "name": "อาคารตัวอย่าง 1 ชั้น",
+  "owner": "เทศบาลนครอุดรธานี",
+  "province": "อุดรธานี",
+  "district": "เมืองอุดรธานี",
+  "occupancy": "สำนักงาน",
+  "design_method": "WSD",
+  "wind_method": "1311_appC",
+  "has_construction_std": true,
+  "work_group": "building",
+  "drawings": [
+   {
+    "sheet": "A-02",
+    "title": "แปลนพื้นชั้น 1"
+   },
+   {
+    "sheet": "S-01",
+    "title": "แปลนฐานราก"
+   },
+   {
+    "sheet": "S-02",
+    "title": "แปลนเสา"
+   },
+   {
+    "sheet": "S-03",
+    "title": "แปลนคาน"
+   },
+   {
+    "sheet": "S-04",
+    "title": "แปลนโครงหลังคา"
+   }
+  ],
+  "units": {
+   "length": "m",
+   "force": "kgf",
+   "stress": "ksc"
+  },
+  "notes": [
+   "ไฟล์ตัวอย่างประกอบ schema v0.1 — ค่าน้ำหนักและ combo เป็นตัวอย่าง ไม่ใช่ผลคำนวณตามกฎหมาย"
+  ]
+ },
+ "site": {
+  "v50": 25,
+  "terrain": "A",
+  "seismic_zone": "none",
+  "site_class": "D",
+  "status": "assumed",
+  "note": "ไม่มีผลเจาะสำรวจดิน",
+  "field_status": {
+   "v50": {
+    "status": "computed",
+    "ref": "มยผ.1311-50 อุดรธานี"
+   },
+   "seismic_zone": {
+    "status": "computed",
+    "ref": "กฎกระทรวง 2564"
+   }
+  },
+  "existing": {
+   "boundary": [
+    [
+     -5,
+     -5
+    ],
+    [
+     13,
+     -5
+    ],
+    [
+     13,
+     9
+    ],
+    [
+     -5,
+     9
+    ]
+   ],
+   "structures": [
+    {
+     "id": "EX-1",
+     "kind": "ลานคอนกรีตเดิม",
+     "outline": [
+      [
+       1,
+       1
+      ],
+      [
+       6,
+       1
+      ],
+      [
+       6,
+       5
+      ],
+      [
+       1,
+       5
+      ]
+     ],
+     "demolish": true,
+     "status": "from_survey",
+     "src": "สำรวจ 2026-10-10"
+    }
+   ]
+  }
+ },
+ "grids": [
+  {
+   "name": "1",
+   "axis": "X",
+   "coord": 0.0
+  },
+  {
+   "name": "2",
+   "axis": "X",
+   "coord": 4.0
+  },
+  {
+   "name": "3",
+   "axis": "X",
+   "coord": 8.0
+  },
+  {
+   "name": "A",
+   "axis": "Y",
+   "coord": 0.0
+  },
+  {
+   "name": "B",
+   "axis": "Y",
+   "coord": 4.0
+  }
+ ],
+ "levels": [
+  {
+   "name": "FOOT",
+   "z": -1.5,
+   "desc": "ท้องฐานราก"
+  },
+  {
+   "name": "GL",
+   "z": 0.0
+  },
+  {
+   "name": "1F",
+   "z": 0.3
+  },
+  {
+   "name": "ROOF",
+   "z": 3.3,
+   "desc": "หลังคานหลังคา"
+  },
+  {
+   "name": "RIDGE",
+   "z": 4.0279
+  }
+ ],
+ "materials": [
+  {
+   "id": "C240",
+   "kind": "concrete",
+   "fc": 240,
+   "unit_weight": 2400,
+   "status": "user",
+   "note": "Earth กำหนด"
+  },
+  {
+   "id": "SD40",
+   "kind": "rebar",
+   "fy": 4000,
+   "status": "assumed",
+   "note": "ค่าสมมติตามข้อตกลง (แบบไม่ระบุ)"
+  },
+  {
+   "id": "SR24",
+   "kind": "rebar",
+   "fy": 2400,
+   "status": "assumed",
+   "note": "ค่าสมมติตามข้อตกลง (แบบไม่ระบุ)"
+  },
+  {
+   "id": "SSC400",
+   "kind": "cold_formed",
+   "fy": 2450,
+   "grade": "SSC400",
+   "status": "from_drawing",
+   "src": "S-04"
+  }
+ ],
+ "sections": [
+  {
+   "id": "RC-20x20",
+   "kind": "rc_rect",
+   "b": 0.2,
+   "h": 0.2,
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "RC-20x40",
+   "kind": "rc_rect",
+   "b": 0.2,
+   "h": 0.4,
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "C100x50x20x2.3",
+   "kind": "cold_formed",
+   "shape": "lipped_C",
+   "name": "C100x50x20x2.3",
+   "kg_m": 4.06,
+   "table": "มอก.1228",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "C75x45x15x2.3",
+   "kind": "cold_formed",
+   "shape": "lipped_C",
+   "name": "C75x45x15x2.3",
+   "kg_m": 3.25,
+   "table": "มอก.1228",
+   "status": "from_drawing",
+   "src": "S-04"
+  }
+ ],
+ "nodes": [
+  {
+   "id": "N-1A-B",
+   "x": 0.0,
+   "y": 0.0,
+   "z": -1.15,
+   "grid": "1/A"
+  },
+  {
+   "id": "N-1A-1F",
+   "x": 0.0,
+   "y": 0.0,
+   "z": 0.3,
+   "grid": "1/A",
+   "level": "1F"
+  },
+  {
+   "id": "N-1A-R",
+   "x": 0.0,
+   "y": 0.0,
+   "z": 3.3,
+   "grid": "1/A",
+   "level": "ROOF"
+  },
+  {
+   "id": "N-1B-B",
+   "x": 0.0,
+   "y": 4.0,
+   "z": -1.15,
+   "grid": "1/B"
+  },
+  {
+   "id": "N-1B-1F",
+   "x": 0.0,
+   "y": 4.0,
+   "z": 0.3,
+   "grid": "1/B",
+   "level": "1F"
+  },
+  {
+   "id": "N-1B-R",
+   "x": 0.0,
+   "y": 4.0,
+   "z": 3.3,
+   "grid": "1/B",
+   "level": "ROOF"
+  },
+  {
+   "id": "N-1-RIDGE",
+   "x": 0.0,
+   "y": 2.0,
+   "z": 4.0279,
+   "grid": "1/AB",
+   "level": "RIDGE"
+  },
+  {
+   "id": "N-2A-B",
+   "x": 4.0,
+   "y": 0.0,
+   "z": -1.15,
+   "grid": "2/A"
+  },
+  {
+   "id": "N-2A-1F",
+   "x": 4.0,
+   "y": 0.0,
+   "z": 0.3,
+   "grid": "2/A",
+   "level": "1F"
+  },
+  {
+   "id": "N-2A-R",
+   "x": 4.0,
+   "y": 0.0,
+   "z": 3.3,
+   "grid": "2/A",
+   "level": "ROOF"
+  },
+  {
+   "id": "N-2B-B",
+   "x": 4.0,
+   "y": 4.0,
+   "z": -1.15,
+   "grid": "2/B"
+  },
+  {
+   "id": "N-2B-1F",
+   "x": 4.0,
+   "y": 4.0,
+   "z": 0.3,
+   "grid": "2/B",
+   "level": "1F"
+  },
+  {
+   "id": "N-2B-R",
+   "x": 4.0,
+   "y": 4.0,
+   "z": 3.3,
+   "grid": "2/B",
+   "level": "ROOF"
+  },
+  {
+   "id": "N-2-RIDGE",
+   "x": 4.0,
+   "y": 2.0,
+   "z": 4.0279,
+   "grid": "2/AB",
+   "level": "RIDGE"
+  },
+  {
+   "id": "N-3A-B",
+   "x": 8.0,
+   "y": 0.0,
+   "z": -1.15,
+   "grid": "3/A"
+  },
+  {
+   "id": "N-3A-1F",
+   "x": 8.0,
+   "y": 0.0,
+   "z": 0.3,
+   "grid": "3/A",
+   "level": "1F"
+  },
+  {
+   "id": "N-3A-R",
+   "x": 8.0,
+   "y": 0.0,
+   "z": 3.3,
+   "grid": "3/A",
+   "level": "ROOF"
+  },
+  {
+   "id": "N-3B-B",
+   "x": 8.0,
+   "y": 4.0,
+   "z": -1.15,
+   "grid": "3/B"
+  },
+  {
+   "id": "N-3B-1F",
+   "x": 8.0,
+   "y": 4.0,
+   "z": 0.3,
+   "grid": "3/B",
+   "level": "1F"
+  },
+  {
+   "id": "N-3B-R",
+   "x": 8.0,
+   "y": 4.0,
+   "z": 3.3,
+   "grid": "3/B",
+   "level": "ROOF"
+  },
+  {
+   "id": "N-3-RIDGE",
+   "x": 8.0,
+   "y": 2.0,
+   "z": 4.0279,
+   "grid": "3/AB",
+   "level": "RIDGE"
+  }
+ ],
+ "members": [
+  {
+   "id": "C1-1A-1",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-1A-B",
+   "j": "N-1A-1F",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-1A-2",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-1A-1F",
+   "j": "N-1A-R",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-1B-1",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-1B-B",
+   "j": "N-1B-1F",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-1B-2",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-1B-1F",
+   "j": "N-1B-R",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-2A-1",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-2A-B",
+   "j": "N-2A-1F",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-2A-2",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-2A-1F",
+   "j": "N-2A-R",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-2B-1",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-2B-B",
+   "j": "N-2B-1F",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-2B-2",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-2B-1F",
+   "j": "N-2B-R",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-3A-1",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-3A-B",
+   "j": "N-3A-1F",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-3A-2",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-3A-1F",
+   "j": "N-3A-R",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-3B-1",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-3B-B",
+   "j": "N-3B-1F",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "C1-3B-2",
+   "mark": "C1",
+   "type": "column",
+   "i": "N-3B-1F",
+   "j": "N-3B-R",
+   "section": "RC-20x20",
+   "material": "C240",
+   "status": "from_drawing",
+   "src": "S-02"
+  },
+  {
+   "id": "GB1-1F-01",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-1A-1F",
+   "j": "N-2A-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "GB1-1F-02",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-2A-1F",
+   "j": "N-3A-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "GB1-1F-03",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-1B-1F",
+   "j": "N-2B-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "GB1-1F-04",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-2B-1F",
+   "j": "N-3B-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "GB1-1F-05",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-1A-1F",
+   "j": "N-1B-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "GB1-1F-06",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-2A-1F",
+   "j": "N-2B-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "GB1-1F-07",
+   "mark": "GB1",
+   "type": "tie_beam",
+   "i": "N-3A-1F",
+   "j": "N-3B-1F",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "1F",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-01",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-1A-R",
+   "j": "N-2A-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-02",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-2A-R",
+   "j": "N-3A-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-03",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-1B-R",
+   "j": "N-2B-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-04",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-2B-R",
+   "j": "N-3B-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-05",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-1A-R",
+   "j": "N-1B-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-06",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-2A-R",
+   "j": "N-2B-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "B1-ROOF-07",
+   "mark": "B1",
+   "type": "beam",
+   "i": "N-3A-R",
+   "j": "N-3B-R",
+   "section": "RC-20x40",
+   "material": "C240",
+   "level": "ROOF",
+   "status": "from_drawing",
+   "src": "S-03"
+  },
+  {
+   "id": "RF1-1A",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-1A-R",
+   "j": "N-1-RIDGE",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "releases": {
+    "i": [
+     "M2",
+     "M3"
+    ]
+   },
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "RF1-1B",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-1B-R",
+   "j": "N-1-RIDGE",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "releases": {
+    "i": [
+     "M2",
+     "M3"
+    ]
+   },
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "RF1-2A",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-2A-R",
+   "j": "N-2-RIDGE",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "releases": {
+    "i": [
+     "M2",
+     "M3"
+    ]
+   },
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "RF1-2B",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-2B-R",
+   "j": "N-2-RIDGE",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "releases": {
+    "i": [
+     "M2",
+     "M3"
+    ]
+   },
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "RF1-3A",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-3A-R",
+   "j": "N-3-RIDGE",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "releases": {
+    "i": [
+     "M2",
+     "M3"
+    ]
+   },
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "RF1-3B",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-3B-R",
+   "j": "N-3-RIDGE",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "releases": {
+    "i": [
+     "M2",
+     "M3"
+    ]
+   },
+   "status": "from_drawing",
+   "src": "S-04"
+  }
+ ],
+ "supports": [
+  {
+   "id": "F1-1A",
+   "mark": "F1",
+   "node": "N-1A-B",
+   "kind": "spread",
+   "b": 1.0,
+   "d": 1.0,
+   "h": 0.35,
+   "bottom": -1.5,
+   "material": "C240",
+   "fixity": "fixed",
+   "status": "from_drawing",
+   "src": "S-01"
+  },
+  {
+   "id": "F1-1B",
+   "mark": "F1",
+   "node": "N-1B-B",
+   "kind": "spread",
+   "b": 1.0,
+   "d": 1.0,
+   "h": 0.35,
+   "bottom": -1.5,
+   "material": "C240",
+   "fixity": "fixed",
+   "status": "from_drawing",
+   "src": "S-01"
+  },
+  {
+   "id": "F1-2A",
+   "mark": "F1",
+   "node": "N-2A-B",
+   "kind": "spread",
+   "b": 1.0,
+   "d": 1.0,
+   "h": 0.35,
+   "bottom": -1.5,
+   "material": "C240",
+   "fixity": "fixed",
+   "status": "from_drawing",
+   "src": "S-01"
+  },
+  {
+   "id": "F1-2B",
+   "mark": "F1",
+   "node": "N-2B-B",
+   "kind": "spread",
+   "b": 1.0,
+   "d": 1.0,
+   "h": 0.35,
+   "bottom": -1.5,
+   "material": "C240",
+   "fixity": "fixed",
+   "status": "from_drawing",
+   "src": "S-01"
+  },
+  {
+   "id": "F1-3A",
+   "mark": "F1",
+   "node": "N-3A-B",
+   "kind": "spread",
+   "b": 1.0,
+   "d": 1.0,
+   "h": 0.35,
+   "bottom": -1.5,
+   "material": "C240",
+   "fixity": "fixed",
+   "status": "from_drawing",
+   "src": "S-01"
+  },
+  {
+   "id": "F1-3B",
+   "mark": "F1",
+   "node": "N-3B-B",
+   "kind": "spread",
+   "b": 1.0,
+   "d": 1.0,
+   "h": 0.35,
+   "bottom": -1.5,
+   "material": "C240",
+   "fixity": "fixed",
+   "status": "from_drawing",
+   "src": "S-01"
+  }
+ ],
+ "slabs": [
+  {
+   "id": "S1-1F",
+   "mark": "S1",
+   "kind": "ground",
+   "t": 0.1,
+   "top": 0.3,
+   "level": "1F",
+   "polygon": [
+    [
+     0,
+     0
+    ],
+    [
+     8,
+     0
+    ],
+    [
+     8,
+     4
+    ],
+    [
+     0,
+     4
+    ]
+   ],
+   "material": "C240",
+   "use": "สำนักงาน",
+   "status": "from_drawing",
+   "src": "S-03"
+  }
+ ],
+ "walls": [
+  {
+   "id": "W-A12",
+   "kind": "brick_mon",
+   "t": 0.1,
+   "path": [
+    [
+     0,
+     0
+    ],
+    [
+     4,
+     0
+    ]
+   ],
+   "bottom": 0.3,
+   "top": 2.9,
+   "finish_sides": 2,
+   "plaster": true,
+   "paint": true,
+   "exterior": true,
+   "status": "from_drawing",
+   "src": "A-02",
+   "on_member": "GB1-1F-01"
+  },
+  {
+   "id": "W-A23",
+   "kind": "brick_mon",
+   "t": 0.1,
+   "path": [
+    [
+     4,
+     0
+    ],
+    [
+     8,
+     0
+    ]
+   ],
+   "bottom": 0.3,
+   "top": 2.9,
+   "finish_sides": 2,
+   "plaster": true,
+   "paint": true,
+   "exterior": true,
+   "status": "from_drawing",
+   "src": "A-02",
+   "on_member": "GB1-1F-02"
+  },
+  {
+   "id": "W-3AB",
+   "kind": "brick_mon",
+   "t": 0.1,
+   "path": [
+    [
+     8,
+     0
+    ],
+    [
+     8,
+     4
+    ]
+   ],
+   "bottom": 0.3,
+   "top": 2.9,
+   "finish_sides": 2,
+   "plaster": true,
+   "paint": true,
+   "exterior": true,
+   "status": "from_drawing",
+   "src": "A-02",
+   "on_member": "GB1-1F-07"
+  },
+  {
+   "id": "W-B23",
+   "kind": "brick_mon",
+   "t": 0.1,
+   "path": [
+    [
+     8,
+     4
+    ],
+    [
+     4,
+     4
+    ]
+   ],
+   "bottom": 0.3,
+   "top": 2.9,
+   "finish_sides": 2,
+   "plaster": true,
+   "paint": true,
+   "exterior": true,
+   "status": "from_drawing",
+   "src": "A-02",
+   "on_member": "GB1-1F-04"
+  },
+  {
+   "id": "W-B12",
+   "kind": "brick_mon",
+   "t": 0.1,
+   "path": [
+    [
+     4,
+     4
+    ],
+    [
+     0,
+     4
+    ]
+   ],
+   "bottom": 0.3,
+   "top": 2.9,
+   "finish_sides": 2,
+   "plaster": true,
+   "paint": true,
+   "exterior": true,
+   "status": "from_drawing",
+   "src": "A-02",
+   "on_member": "GB1-1F-03"
+  },
+  {
+   "id": "W-1AB",
+   "kind": "brick_mon",
+   "t": 0.1,
+   "path": [
+    [
+     0,
+     4
+    ],
+    [
+     0,
+     0
+    ]
+   ],
+   "bottom": 0.3,
+   "top": 2.9,
+   "finish_sides": 2,
+   "plaster": true,
+   "paint": true,
+   "exterior": true,
+   "status": "from_drawing",
+   "src": "A-02",
+   "on_member": "GB1-1F-05"
+  }
+ ],
+ "opening_types": {
+  "D1": {
+   "w": 0.9,
+   "h": 2.0,
+   "sill": 0.0,
+   "kind": "door",
+   "desc": "ประตูไม้อัดสัก"
+  },
+  "W1": {
+   "w": 1.2,
+   "h": 1.1,
+   "sill": 0.9,
+   "kind": "window",
+   "desc": "หน้าต่างบานเลื่อนอลูมิเนียม"
+  }
+ },
+ "openings": [
+  {
+   "id": "D1-1",
+   "type": "D1",
+   "wall": "W-A12",
+   "at": 2.0,
+   "status": "from_drawing",
+   "src": "A-02"
+  },
+  {
+   "id": "W1-1",
+   "type": "W1",
+   "wall": "W-B23",
+   "at": 2.0,
+   "status": "from_drawing",
+   "src": "A-02"
+  },
+  {
+   "id": "W1-2",
+   "type": "W1",
+   "wall": "W-B12",
+   "at": 2.0,
+   "status": "from_drawing",
+   "src": "A-02"
+  }
+ ],
+ "roofs": [
+  {
+   "id": "R1",
+   "form": "gable",
+   "ridge": "X",
+   "outline": [
+    [
+     -0.8,
+     -0.8
+    ],
+    [
+     8.8,
+     -0.8
+    ],
+    [
+     8.8,
+     4.8
+    ],
+    [
+     -0.8,
+     4.8
+    ]
+   ],
+   "eave": 3.0088,
+   "pitch": 20.0,
+   "overhang": 0.8,
+   "cover": "metal_sheet",
+   "rafter": {
+    "section": "C100x50x20x2.3",
+    "spacing": 4.0
+   },
+   "purlin": {
+    "section": "C75x45x15x2.3",
+    "spacing": 0.8
+   },
+   "gutter": false,
+   "status": "from_drawing",
+   "src": "S-04"
+  }
+ ],
+ "finishes": [
+  {
+   "id": "FN-FL1",
+   "kind": "floor",
+   "spec": "กระเบื้องแกรนิตโต้ 60x60 ซม.",
+   "level": "1F",
+   "z": 0.3,
+   "rects": [
+    [
+     0.05,
+     0.05,
+     7.95,
+     3.95
+    ]
+   ],
+   "status": "from_drawing",
+   "src": "A-05 รายการประกอบแบบ"
+  },
+  {
+   "id": "FN-CL1",
+   "kind": "ceiling",
+   "spec": "ฝ้ายิปซัมบอร์ด 9 มม. ฉาบเรียบ โครงคร่าวเหล็กชุบสังกะสี",
+   "z": 3.0,
+   "rects": [
+    [
+     0.05,
+     0.05,
+     7.95,
+     3.95
+    ]
+   ],
+   "status": "from_drawing",
+   "src": "A-05 รายการประกอบแบบ"
+  }
+ ],
+ "mep": {
+  "electrical": {
+   "route_height": 2.85,
+   "wire_type": "THW",
+   "conduit": "PVC 1/2\"",
+   "panels": [
+    {
+     "id": "LC",
+     "xyz": [
+      0.2,
+      1.0,
+      1.9000000000000001
+     ],
+     "ways": 6,
+     "main": "MCB 2P 32A"
+    }
+   ],
+   "point_types": {
+    "L": {
+     "kind": "light",
+     "desc": "ดาวน์ไลท์ LED 12W"
+    },
+    "S": {
+     "kind": "switch"
+    },
+    "P": {
+     "kind": "outlet"
+    }
+   },
+   "circuits": [
+    {
+     "id": "a",
+     "panel": "LC",
+     "desc": "แสงสว่าง",
+     "breaker": "MCB 1P 16A",
+     "wire_size": 1.5,
+     "conductors": 2
+    },
+    {
+     "id": "b",
+     "panel": "LC",
+     "desc": "เต้ารับ",
+     "breaker": "MCB 1P 20A",
+     "wire_size": 2.5,
+     "conductors": 3
+    }
+   ],
+   "points": [
+    {
+     "type": "L",
+     "xyz": [
+      2.0,
+      2.0,
+      3.0
+     ],
+     "circuit": "a"
+    },
+    {
+     "type": "L",
+     "xyz": [
+      6.0,
+      2.0,
+      3.0
+     ],
+     "circuit": "a"
+    },
+    {
+     "type": "S",
+     "xyz": [
+      1.2,
+      0.1,
+      1.5
+     ],
+     "circuit": "a"
+    },
+    {
+     "type": "P",
+     "xyz": [
+      7.9,
+      2.0,
+      0.6
+     ],
+     "circuit": "b"
+    }
+   ]
+  }
+ },
+ "loads": {
+  "patterns": [
+   {
+    "id": "DL",
+    "kind": "dead",
+    "self_weight": true
+   },
+   {
+    "id": "SDL",
+    "kind": "super_dead"
+   },
+   {
+    "id": "LR",
+    "kind": "roof_live"
+   },
+   {
+    "id": "WX",
+    "kind": "wind"
+   }
+  ],
+  "area_loads": [
+   {
+    "id": "AL-R1-SDL",
+    "pattern": "SDL",
+    "targets": [
+     "R1"
+    ],
+    "value": 10,
+    "status": "assumed",
+    "note": "ตัวอย่าง: แผ่นหลังคาเหล็ก + แป"
+   },
+   {
+    "id": "AL-R1-LR",
+    "pattern": "LR",
+    "targets": [
+     "R1"
+    ],
+    "value": 50,
+    "status": "computed",
+    "ref": "ตัวอย่าง — ต้องตรวจกับกฎกระทรวง 2566"
+   }
+  ],
+  "member_loads": [
+   {
+    "id": "ML-WALL-W-A12",
+    "pattern": "SDL",
+    "member": "GB1-1F-01",
+    "kind": "uniform",
+    "value": 468.0,
+    "dir": "gravity",
+    "source": "wall",
+    "status": "computed",
+    "ref": "ตัวอย่าง: ผนังก่ออิฐครึ่งแผ่นฉาบสองด้าน 180 กก./ตร.ม."
+   },
+   {
+    "id": "ML-WALL-W-A23",
+    "pattern": "SDL",
+    "member": "GB1-1F-02",
+    "kind": "uniform",
+    "value": 468.0,
+    "dir": "gravity",
+    "source": "wall",
+    "status": "computed",
+    "ref": "ตัวอย่าง: ผนังก่ออิฐครึ่งแผ่นฉาบสองด้าน 180 กก./ตร.ม."
+   },
+   {
+    "id": "ML-WALL-W-3AB",
+    "pattern": "SDL",
+    "member": "GB1-1F-07",
+    "kind": "uniform",
+    "value": 468.0,
+    "dir": "gravity",
+    "source": "wall",
+    "status": "computed",
+    "ref": "ตัวอย่าง: ผนังก่ออิฐครึ่งแผ่นฉาบสองด้าน 180 กก./ตร.ม."
+   },
+   {
+    "id": "ML-WALL-W-B23",
+    "pattern": "SDL",
+    "member": "GB1-1F-04",
+    "kind": "uniform",
+    "value": 468.0,
+    "dir": "gravity",
+    "source": "wall",
+    "status": "computed",
+    "ref": "ตัวอย่าง: ผนังก่ออิฐครึ่งแผ่นฉาบสองด้าน 180 กก./ตร.ม."
+   },
+   {
+    "id": "ML-WALL-W-B12",
+    "pattern": "SDL",
+    "member": "GB1-1F-03",
+    "kind": "uniform",
+    "value": 468.0,
+    "dir": "gravity",
+    "source": "wall",
+    "status": "computed",
+    "ref": "ตัวอย่าง: ผนังก่ออิฐครึ่งแผ่นฉาบสองด้าน 180 กก./ตร.ม."
+   },
+   {
+    "id": "ML-WALL-W-1AB",
+    "pattern": "SDL",
+    "member": "GB1-1F-05",
+    "kind": "uniform",
+    "value": 468.0,
+    "dir": "gravity",
+    "source": "wall",
+    "status": "computed",
+    "ref": "ตัวอย่าง: ผนังก่ออิฐครึ่งแผ่นฉาบสองด้าน 180 กก./ตร.ม."
+   },
+   {
+    "id": "ML-WX-RF1-1A",
+    "pattern": "WX",
+    "member": "RF1-1A",
+    "kind": "uniform",
+    "value": -45.0,
+    "dir": "local2",
+    "source": "wind",
+    "wind_zone": "1",
+    "status": "computed",
+    "ref": "ตัวอย่าง — มยผ.1311 ภาคผนวก ค"
+   }
+  ],
+  "wind": {
+   "method": "1311_appC",
+   "table": "ค-1",
+   "H": 4.03,
+   "Ds": 4.0,
+   "directions": [
+    "X+",
+    "Y+"
+   ],
+   "status": "computed",
+   "note": "ตัวอย่าง"
+  }
+ },
+ "combos": [
+  {
+   "id": "W1",
+   "method": "WSD",
+   "factors": {
+    "DL": 1.0,
+    "SDL": 1.0,
+    "LR": 1.0
+   },
+   "ref": "ตัวอย่าง — skill น้ำหนักบรรทุกจะสร้างตามกฎกระทรวง 2566"
+  }
+ ],
+ "design": {
+  "members": {
+   "C1-1A-1": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-1A-2": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-1B-1": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-1B-2": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-2A-1": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-2A-2": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-2B-1": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-2B-2": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-3A-1": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-3A-2": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-3B-1": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "C1-3B-2": {
+    "rebar": {
+     "main": [
+      4,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-01": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-02": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-03": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-04": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-05": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-06": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "GB1-1F-07": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-01": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-02": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-03": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-04": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-05": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-06": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   },
+   "B1-ROOF-07": {
+    "rebar": {
+     "top": [
+      2,
+      12
+     ],
+     "bot": [
+      2,
+      12
+     ],
+     "stirrup": [
+      6,
+      0.15,
+      0.1
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05 รายละเอียด"
+   }
+  },
+  "supports": {
+   "F1-1A": {
+    "rebar": {
+     "bars_x": [
+      6,
+      12
+     ],
+     "bars_y": [
+      6,
+      12
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05"
+   },
+   "F1-1B": {
+    "rebar": {
+     "bars_x": [
+      6,
+      12
+     ],
+     "bars_y": [
+      6,
+      12
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05"
+   },
+   "F1-2A": {
+    "rebar": {
+     "bars_x": [
+      6,
+      12
+     ],
+     "bars_y": [
+      6,
+      12
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05"
+   },
+   "F1-2B": {
+    "rebar": {
+     "bars_x": [
+      6,
+      12
+     ],
+     "bars_y": [
+      6,
+      12
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05"
+   },
+   "F1-3A": {
+    "rebar": {
+     "bars_x": [
+      6,
+      12
+     ],
+     "bars_y": [
+      6,
+      12
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05"
+   },
+   "F1-3B": {
+    "rebar": {
+     "bars_x": [
+      6,
+      12
+     ],
+     "bars_y": [
+      6,
+      12
+     ]
+    },
+    "status": "from_drawing",
+    "src": "S-05"
+   }
+  }
+ },
+ "demolition": [
+  {
+   "id": "DM-1",
+   "wage_code": "ARC-2.9.17-a",
+   "qty": 20.0,
+   "unit": "ตร.ม.",
+   "structure": "EX-1",
+   "survey_points": [
+    "P12",
+    "P13",
+    "P14",
+    "P15"
+   ],
+   "status": "from_survey",
+   "note": "รื้อพื้น คสล. วางบนดิน หนา 10-15 ซม. (รื้อกอง)"
+  }
+ ],
+ "quantities": {
+  "stale": true,
+  "items": []
+ },
+ "history": [
+  {
+   "at": "2026-10-18T03:00:00+07:00",
+   "by": "gen_sample.py",
+   "sections": [
+    "*"
+   ],
+   "note": "สร้างไฟล์ตัวอย่าง"
+  }
+ ]
+}

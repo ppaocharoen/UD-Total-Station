@@ -1,0 +1,2345 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ppaocharoen.github.io/UD-Total-Station/schema/bm.schema.json",
+  "title": "UD Building Model (.bm.json)",
+  "description": "โมเดลกลางของโครงการ ไฟล์เดียวต่อโครงการ ทุก skill และทุกเว็บอ่าน/เขียนผ่านไฟล์นี้ หน่วย: ม. / กก.(kgf) / กก./ตร.ม. / กก./ม. / ksc พิกัด X ตามกริดตัวเลข Y ตามกริดตัวอักษร Z ขึ้น",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "meta",
+    "grids",
+    "levels"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.1"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "site": {
+      "$ref": "#/$defs/site"
+    },
+    "grids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/grid"
+      }
+    },
+    "levels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/level"
+      }
+    },
+    "materials": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/material"
+      }
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/section"
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      }
+    },
+    "members": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/member"
+      }
+    },
+    "supports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/support"
+      }
+    },
+    "slabs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/slab"
+      }
+    },
+    "walls": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/wall"
+      }
+    },
+    "opening_types": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/openingType"
+      }
+    },
+    "openings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/opening"
+      }
+    },
+    "roofs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/roof"
+      }
+    },
+    "stairs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/stair"
+      }
+    },
+    "finishes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finish"
+      }
+    },
+    "mep": {
+      "$ref": "#/$defs/mep"
+    },
+    "loads": {
+      "$ref": "#/$defs/loads"
+    },
+    "combos": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/combo"
+      }
+    },
+    "results": {
+      "$ref": "#/$defs/results"
+    },
+    "design": {
+      "$ref": "#/$defs/design"
+    },
+    "demolition": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/demolitionItem"
+      }
+    },
+    "quantities": {
+      "$ref": "#/$defs/quantities"
+    },
+    "history": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/historyEntry"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[^\\s]+$",
+      "description": "รหัสไม่ซ้ำทั้งไฟล์ ไม่มีช่องว่าง"
+    },
+    "num": {
+      "type": "number"
+    },
+    "pos": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "nonneg": {
+      "type": "number",
+      "minimum": 0
+    },
+    "xy": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "xyz": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "polygon": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/xy"
+      },
+      "minItems": 3
+    },
+    "rect": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 4,
+      "maxItems": 4,
+      "description": "[x1, y1, x2, y2]"
+    },
+    "bars": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "integer",
+          "minimum": 1
+        },
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[จำนวน, ขนาด มม.]"
+    },
+    "stirrup": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "[ขนาด มม., ระยะกลางช่วง ม., ระยะปลายช่วง ม.]"
+    },
+    "mesh": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "integer",
+          "minimum": 1
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "[ขนาด มม., ระยะ ม., จำนวนชั้น]"
+    },
+    "status": {
+      "enum": [
+        "from_drawing",
+        "from_survey",
+        "user",
+        "assumed",
+        "computed",
+        "missing"
+      ]
+    },
+    "statusInfo": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "src": {
+          "type": "string",
+          "description": "แผ่นแบบ เลเยอร์ จุดสำรวจ หรือ skill ที่คำนวณ"
+        },
+        "note": {
+          "type": "string",
+          "description": "เหตุผลที่สมมติ หรือคำถามที่ต้องถาม"
+        },
+        "ref": {
+          "type": "string",
+          "description": "ข้อกำหนดที่ใช้ เช่น กฎ 2566 ข้อ 5"
+        }
+      }
+    },
+    "tracked": {
+      "description": "ฟิลด์สถานะที่ทุกชิ้นมี: status รวม + field_status สำหรับค่าที่ต่างออกไป",
+      "type": "object",
+      "properties": {
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "src": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "field_status": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/statusInfo"
+          }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "owner": {
+          "type": "string"
+        },
+        "agency": {
+          "type": "string"
+        },
+        "province": {
+          "type": "string"
+        },
+        "district": {
+          "type": "string"
+        },
+        "occupancy": {
+          "type": "string",
+          "description": "ประเภทการใช้อาคารตามกฎกระทรวง 2566"
+        },
+        "design_method": {
+          "enum": [
+            "WSD",
+            "SDM"
+          ]
+        },
+        "wind_method": {
+          "enum": [
+            "table_2566",
+            "1311_appC",
+            "1311_detailed"
+          ]
+        },
+        "has_construction_std": {
+          "type": "boolean",
+          "description": "งานมีมาตรฐานก่อสร้าง → ใช้ φ ตามกรณีนี้"
+        },
+        "work_group": {
+          "enum": [
+            "building",
+            "road",
+            "bridge",
+            "irrigation"
+          ],
+          "default": "building"
+        },
+        "drawings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "sheet"
+            ],
+            "properties": {
+              "sheet": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "file": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "units": {
+          "const": {
+            "length": "m",
+            "force": "kgf",
+            "stress": "ksc"
+          }
+        },
+        "created": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "site": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "v50": {
+          "$ref": "#/$defs/pos",
+          "description": "ความเร็วลมอ้างอิง ม./วินาที"
+        },
+        "terrain": {
+          "enum": [
+            "A",
+            "B"
+          ]
+        },
+        "seismic_zone": {
+          "enum": [
+            "none",
+            "1",
+            "2",
+            "3"
+          ],
+          "description": "บริเวณตามกฎกระทรวง 2564"
+        },
+        "ss": {
+          "$ref": "#/$defs/nonneg"
+        },
+        "s1": {
+          "$ref": "#/$defs/nonneg"
+        },
+        "site_class": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D",
+            "E",
+            "F"
+          ]
+        },
+        "bearing": {
+          "$ref": "#/$defs/pos",
+          "description": "กำลังแบกทานดินที่ยอมให้ กก./ตร.ม."
+        },
+        "survey_ref": {
+          "type": "string",
+          "description": "ไฟล์ <โครงการ>.survey.json"
+        },
+        "existing": {
+          "type": "object",
+          "properties": {
+            "boundary": {
+              "$ref": "#/$defs/polygon"
+            },
+            "setbacks": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "number"
+              }
+            },
+            "ground_points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "xyz"
+                ],
+                "properties": {
+                  "point": {
+                    "type": "string"
+                  },
+                  "xyz": {
+                    "$ref": "#/$defs/xyz"
+                  }
+                }
+              }
+            },
+            "structures": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "outline"
+                ],
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/tracked"
+                  }
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "outline": {
+                    "$ref": "#/$defs/polygon"
+                  },
+                  "height": {
+                    "$ref": "#/$defs/nonneg"
+                  },
+                  "demolish": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "grid": {
+      "type": "object",
+      "required": [
+        "name",
+        "axis",
+        "coord"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axis": {
+          "enum": [
+            "X",
+            "Y"
+          ]
+        },
+        "coord": {
+          "type": "number"
+        }
+      }
+    },
+    "level": {
+      "type": "object",
+      "required": [
+        "name",
+        "z"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "z": {
+          "type": "number"
+        },
+        "desc": {
+          "type": "string"
+        }
+      }
+    },
+    "material": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "concrete",
+            "rebar",
+            "steel",
+            "cold_formed",
+            "masonry",
+            "timber",
+            "other"
+          ]
+        },
+        "fc": {
+          "$ref": "#/$defs/pos",
+          "description": "ksc (ทรงกระบอก)"
+        },
+        "fy": {
+          "$ref": "#/$defs/pos",
+          "description": "ksc"
+        },
+        "grade": {
+          "type": "string"
+        },
+        "unit_weight": {
+          "$ref": "#/$defs/pos",
+          "description": "กก./ลบ.ม."
+        },
+        "E": {
+          "$ref": "#/$defs/pos",
+          "description": "ksc"
+        }
+      },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "concrete"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "fc"
+        ]
+      }
+    },
+    "section": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "rc_rect",
+            "rc_circle",
+            "steel",
+            "cold_formed",
+            "timber"
+          ]
+        },
+        "b": {
+          "$ref": "#/$defs/pos"
+        },
+        "h": {
+          "$ref": "#/$defs/pos"
+        },
+        "d": {
+          "$ref": "#/$defs/pos",
+          "description": "เส้นผ่านศูนย์กลาง (rc_circle)"
+        },
+        "shape": {
+          "enum": [
+            "H",
+            "I",
+            "C",
+            "lipped_C",
+            "box",
+            "pipe",
+            "angle",
+            "flat",
+            "other"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "description": "ชื่อตามตาราง มอก. เช่น C100x50x20x2.3"
+        },
+        "dims": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "มิติหน้าตัด ม."
+        },
+        "kg_m": {
+          "$ref": "#/$defs/pos"
+        },
+        "table": {
+          "type": "string",
+          "description": "มอก. ที่ใช้"
+        }
+      },
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "rc_rect"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "b",
+          "h"
+        ]
+      },
+      "else": {
+        "if": {
+          "properties": {
+            "kind": {
+              "enum": [
+                "steel",
+                "cold_formed"
+              ]
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "shape",
+            "name",
+            "kg_m"
+          ]
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": [
+        "id",
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        },
+        "grid": {
+          "type": "string",
+          "description": "เช่น 1/A"
+        },
+        "level": {
+          "type": "string"
+        }
+      }
+    },
+    "member": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "i",
+        "j",
+        "section"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "mark": {
+          "type": "string",
+          "description": "ชื่อตามแบบ เช่น B1"
+        },
+        "type": {
+          "enum": [
+            "column",
+            "beam",
+            "tie_beam",
+            "lintel",
+            "stiffener",
+            "steel_column",
+            "steel_beam",
+            "rafter",
+            "purlin",
+            "ridge",
+            "hip",
+            "valley",
+            "truss_chord",
+            "truss_web",
+            "brace",
+            "sag_rod",
+            "other"
+          ]
+        },
+        "i": {
+          "$ref": "#/$defs/id"
+        },
+        "j": {
+          "$ref": "#/$defs/id"
+        },
+        "section": {
+          "$ref": "#/$defs/id"
+        },
+        "material": {
+          "$ref": "#/$defs/id"
+        },
+        "level": {
+          "type": "string"
+        },
+        "angle": {
+          "type": "number",
+          "description": "มุมหมุนแกนท้องถิ่น องศา"
+        },
+        "releases": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "i": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "P",
+                  "V2",
+                  "V3",
+                  "T",
+                  "M2",
+                  "M3"
+                ]
+              },
+              "uniqueItems": true
+            },
+            "j": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "P",
+                  "V2",
+                  "V3",
+                  "T",
+                  "M2",
+                  "M3"
+                ]
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "group": {
+          "type": "string",
+          "description": "กลุ่มสำหรับออกแบบ/ถอดปริมาณ เช่น roof_frame"
+        }
+      }
+    },
+    "support": {
+      "type": "object",
+      "required": [
+        "id",
+        "node",
+        "kind"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "mark": {
+          "type": "string"
+        },
+        "node": {
+          "$ref": "#/$defs/id",
+          "description": "จุดต่อโคนเสาที่ฐานรากรับ"
+        },
+        "kind": {
+          "enum": [
+            "spread",
+            "pile_cap",
+            "strip",
+            "mat",
+            "pin_only"
+          ]
+        },
+        "b": {
+          "$ref": "#/$defs/pos",
+          "description": "ด้านตามแกน X"
+        },
+        "d": {
+          "$ref": "#/$defs/pos",
+          "description": "ด้านตามแกน Y"
+        },
+        "h": {
+          "$ref": "#/$defs/pos"
+        },
+        "bottom": {
+          "type": "number",
+          "description": "ระดับท้องฐานราก ม."
+        },
+        "material": {
+          "$ref": "#/$defs/id"
+        },
+        "piles": {
+          "type": "object",
+          "required": [
+            "n",
+            "type",
+            "length"
+          ],
+          "properties": {
+            "n": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "type": {
+              "type": "string",
+              "description": "เช่น I-0.18x0.18, สี่เหลี่ยมตัน 0.22"
+            },
+            "size": {
+              "$ref": "#/$defs/pos"
+            },
+            "length": {
+              "$ref": "#/$defs/pos"
+            },
+            "capacity": {
+              "$ref": "#/$defs/pos",
+              "description": "กก./ต้น"
+            }
+          }
+        },
+        "fixity": {
+          "enum": [
+            "fixed",
+            "pinned"
+          ],
+          "default": "fixed"
+        }
+      }
+    },
+    "slab": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "t",
+        "top",
+        "polygon"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "mark": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "cast",
+            "precast",
+            "ground"
+          ]
+        },
+        "t": {
+          "$ref": "#/$defs/pos"
+        },
+        "top": {
+          "type": "number",
+          "description": "ระดับหลังพื้น ม."
+        },
+        "level": {
+          "type": "string"
+        },
+        "polygon": {
+          "$ref": "#/$defs/polygon"
+        },
+        "material": {
+          "$ref": "#/$defs/id"
+        },
+        "span_dir": {
+          "enum": [
+            "X",
+            "Y",
+            "two_way"
+          ]
+        },
+        "use": {
+          "type": "string",
+          "description": "การใช้งาน สำหรับเลือกน้ำหนักบรรทุกจรตามกฎหมาย"
+        }
+      }
+    },
+    "wall": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "t",
+        "path",
+        "bottom",
+        "top"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "mark": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "brick_mon",
+            "brick_mon_full",
+            "aac",
+            "block",
+            "block_07",
+            "gypsum",
+            "precast_panel",
+            "other"
+          ]
+        },
+        "t": {
+          "$ref": "#/$defs/pos"
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/xy"
+          },
+          "minItems": 2
+        },
+        "bottom": {
+          "type": "number"
+        },
+        "top": {
+          "type": "number"
+        },
+        "on_member": {
+          "$ref": "#/$defs/id",
+          "description": "คานที่รับผนัง (สำหรับน้ำหนักผนัง)"
+        },
+        "finish_sides": {
+          "enum": [
+            0,
+            1,
+            2
+          ]
+        },
+        "plaster": {
+          "type": "boolean"
+        },
+        "paint": {
+          "type": "boolean"
+        },
+        "exterior": {
+          "type": "boolean"
+        }
+      }
+    },
+    "openingType": {
+      "type": "object",
+      "required": [
+        "w",
+        "h",
+        "kind"
+      ],
+      "properties": {
+        "w": {
+          "$ref": "#/$defs/pos"
+        },
+        "h": {
+          "$ref": "#/$defs/pos"
+        },
+        "sill": {
+          "$ref": "#/$defs/nonneg"
+        },
+        "kind": {
+          "enum": [
+            "door",
+            "window",
+            "opening",
+            "vent"
+          ]
+        },
+        "desc": {
+          "type": "string"
+        },
+        "price_ref": {
+          "$ref": "#/$defs/priceRef"
+        }
+      }
+    },
+    "opening": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "wall",
+        "at"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "type": "string"
+        },
+        "wall": {
+          "$ref": "#/$defs/id"
+        },
+        "at": {
+          "$ref": "#/$defs/nonneg",
+          "description": "ระยะจากจุดเริ่มผนังถึงกึ่งกลางช่องเปิด ม."
+        }
+      }
+    },
+    "roof": {
+      "type": "object",
+      "required": [
+        "id",
+        "form",
+        "outline",
+        "eave",
+        "cover"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "form": {
+          "enum": [
+            "gable",
+            "hip",
+            "shed",
+            "flat",
+            "custom"
+          ]
+        },
+        "outline": {
+          "$ref": "#/$defs/polygon",
+          "description": "ขอบชายคารวมระยะยื่น"
+        },
+        "eave": {
+          "type": "number",
+          "description": "ระดับขอบชายคานอกสุด ม."
+        },
+        "pitch": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 75,
+          "description": "องศา"
+        },
+        "ridge": {
+          "enum": [
+            "X",
+            "Y"
+          ]
+        },
+        "low": {
+          "enum": [
+            "x1",
+            "x2",
+            "y1",
+            "y2"
+          ],
+          "description": "ด้านต่ำของหลังคาเพิง"
+        },
+        "overhang": {
+          "$ref": "#/$defs/nonneg"
+        },
+        "cover": {
+          "enum": [
+            "metal_sheet",
+            "cpac_tile",
+            "ceramic_tile",
+            "fibre_cement",
+            "shingle",
+            "upvc",
+            "polycarbonate",
+            "concrete_deck"
+          ]
+        },
+        "rafter": {
+          "type": "object",
+          "properties": {
+            "section": {
+              "$ref": "#/$defs/id"
+            },
+            "spacing": {
+              "$ref": "#/$defs/pos"
+            }
+          }
+        },
+        "purlin": {
+          "type": "object",
+          "properties": {
+            "section": {
+              "$ref": "#/$defs/id"
+            },
+            "spacing": {
+              "$ref": "#/$defs/pos"
+            }
+          }
+        },
+        "insulation": {
+          "type": "string"
+        },
+        "gutter": {
+          "type": "boolean"
+        },
+        "planes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "pts"
+            ],
+            "properties": {
+              "pts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/xyz"
+                },
+                "minItems": 3
+              }
+            }
+          }
+        }
+      }
+    },
+    "stair": {
+      "type": "object",
+      "required": [
+        "id",
+        "flights"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "mark": {
+          "type": "string"
+        },
+        "main_bar": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[ขนาด มม., ระยะ ม.]"
+        },
+        "dist_bar": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "flights": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "start",
+              "dir",
+              "width",
+              "bottom",
+              "top",
+              "risers",
+              "going"
+            ],
+            "properties": {
+              "start": {
+                "$ref": "#/$defs/xy",
+                "description": "มุมเริ่มต้นที่ขั้นล่างสุด"
+              },
+              "dir": {
+                "enum": [
+                  "+X",
+                  "-X",
+                  "+Y",
+                  "-Y"
+                ]
+              },
+              "width": {
+                "$ref": "#/$defs/pos"
+              },
+              "bottom": {
+                "type": "number"
+              },
+              "top": {
+                "type": "number"
+              },
+              "risers": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "going": {
+                "$ref": "#/$defs/pos"
+              },
+              "waist": {
+                "$ref": "#/$defs/pos"
+              }
+            }
+          }
+        },
+        "landings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "rect",
+              "top",
+              "t"
+            ],
+            "properties": {
+              "rect": {
+                "$ref": "#/$defs/rect"
+              },
+              "top": {
+                "type": "number"
+              },
+              "t": {
+                "$ref": "#/$defs/pos"
+              }
+            }
+          }
+        }
+      }
+    },
+    "finish": {
+      "type": "object",
+      "required": [
+        "id",
+        "kind",
+        "spec"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "kind": {
+          "enum": [
+            "floor",
+            "wall",
+            "ceiling",
+            "skirting",
+            "counter",
+            "railing",
+            "other"
+          ]
+        },
+        "spec": {
+          "type": "string",
+          "description": "รายละเอียดตามรายการประกอบแบบ"
+        },
+        "room": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string"
+        },
+        "z": {
+          "type": "number",
+          "description": "ระดับผิว (ฝ้า = ระดับฝ้า)"
+        },
+        "rects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rect"
+          }
+        },
+        "polygon": {
+          "$ref": "#/$defs/polygon"
+        },
+        "wall": {
+          "$ref": "#/$defs/id",
+          "description": "งานบุผนัง: ผนังที่บุ"
+        },
+        "height": {
+          "$ref": "#/$defs/pos",
+          "description": "งานบุผนัง: ความสูงที่บุ"
+        },
+        "qty": {
+          "$ref": "#/$defs/nonneg",
+          "description": "ใส่เมื่อไม่มีรูปร่าง"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "price_ref": {
+          "$ref": "#/$defs/priceRef"
+        }
+      }
+    },
+    "mep": {
+      "type": "object",
+      "description": "โครงตาม phiso-house-3d (electrical / plumbing) แต่ใช้พิกัดตัวเลข X Y Z",
+      "properties": {
+        "electrical": {
+          "type": "object",
+          "properties": {
+            "route_height": {
+              "$ref": "#/$defs/pos"
+            },
+            "wire_type": {
+              "type": "string"
+            },
+            "conduit": {
+              "type": "string"
+            },
+            "panels": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "xyz"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "xyz": {
+                    "$ref": "#/$defs/xyz"
+                  },
+                  "ways": {
+                    "type": "integer"
+                  },
+                  "main": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "point_types": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "light",
+                      "lamp",
+                      "switch",
+                      "outlet",
+                      "ac",
+                      "heater",
+                      "fan",
+                      "tv",
+                      "data",
+                      "bell",
+                      "pump"
+                    ]
+                  },
+                  "desc": {
+                    "type": "string"
+                  },
+                  "price_ref": {
+                    "$ref": "#/$defs/priceRef"
+                  }
+                }
+              }
+            },
+            "circuits": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "panel"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "panel": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "desc": {
+                    "type": "string"
+                  },
+                  "breaker": {
+                    "type": "string"
+                  },
+                  "wire_size": {
+                    "$ref": "#/$defs/pos"
+                  },
+                  "conductors": {
+                    "type": "integer"
+                  }
+                }
+              }
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "xyz"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "xyz": {
+                    "$ref": "#/$defs/xyz"
+                  },
+                  "circuit": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "service": {
+              "type": "object"
+            }
+          }
+        },
+        "plumbing": {
+          "type": "object",
+          "properties": {
+            "fixture_types": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "wc",
+                      "lavatory",
+                      "sink",
+                      "shower",
+                      "floor_drain",
+                      "faucet",
+                      "spray",
+                      "water_heater",
+                      "washer",
+                      "urinal"
+                    ]
+                  },
+                  "desc": {
+                    "type": "string"
+                  },
+                  "price_ref": {
+                    "$ref": "#/$defs/priceRef"
+                  }
+                }
+              }
+            },
+            "fixtures": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "xyz"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "xyz": {
+                    "$ref": "#/$defs/xyz"
+                  },
+                  "rot": {
+                    "type": "number"
+                  }
+                }
+              }
+            },
+            "pipes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "system",
+                  "dia",
+                  "pts"
+                ],
+                "properties": {
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "system": {
+                    "enum": [
+                      "cw",
+                      "hw",
+                      "waste",
+                      "soil",
+                      "vent",
+                      "rain",
+                      "drain"
+                    ]
+                  },
+                  "dia": {
+                    "type": "string"
+                  },
+                  "material": {
+                    "type": "string"
+                  },
+                  "pts": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/xyz"
+                    },
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "equipment": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "xyz"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "enum": [
+                      "septic_tank",
+                      "grease_trap",
+                      "water_tank",
+                      "pump",
+                      "meter",
+                      "manhole",
+                      "gate_valve",
+                      "check_valve",
+                      "soak_pit"
+                    ]
+                  },
+                  "xyz": {
+                    "$ref": "#/$defs/xyz"
+                  },
+                  "size": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "loads": {
+      "type": "object",
+      "properties": {
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "kind": {
+                "enum": [
+                  "dead",
+                  "super_dead",
+                  "live",
+                  "roof_live",
+                  "wind",
+                  "seismic",
+                  "other"
+                ]
+              },
+              "self_weight": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "area_loads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "pattern",
+              "targets",
+              "value"
+            ],
+            "allOf": [
+              {
+                "$ref": "#/$defs/tracked"
+              }
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "pattern": {
+                "$ref": "#/$defs/id"
+              },
+              "targets": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "minItems": 1,
+                "description": "slab หรือ roof id"
+              },
+              "value": {
+                "type": "number",
+                "description": "กก./ตร.ม."
+              },
+              "dir": {
+                "enum": [
+                  "gravity",
+                  "normal"
+                ],
+                "default": "gravity"
+              }
+            }
+          }
+        },
+        "member_loads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "pattern",
+              "member",
+              "kind",
+              "value"
+            ],
+            "allOf": [
+              {
+                "$ref": "#/$defs/tracked"
+              }
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "pattern": {
+                "$ref": "#/$defs/id"
+              },
+              "member": {
+                "$ref": "#/$defs/id"
+              },
+              "kind": {
+                "enum": [
+                  "uniform",
+                  "trapezoid",
+                  "point"
+                ]
+              },
+              "value": {
+                "description": "uniform: กก./ม., point: กก., trapezoid: [w1, w2]",
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "at": {
+                "description": "point: ระยะจาก i (ม.), trapezoid: [a, b]",
+                "oneOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 2,
+                    "maxItems": 2
+                  }
+                ]
+              },
+              "dir": {
+                "enum": [
+                  "gravity",
+                  "X",
+                  "Y",
+                  "Z",
+                  "local1",
+                  "local2",
+                  "local3"
+                ]
+              },
+              "source": {
+                "enum": [
+                  "wall",
+                  "slab",
+                  "roof",
+                  "wind",
+                  "equipment",
+                  "other"
+                ]
+              },
+              "wind_zone": {
+                "type": "string",
+                "description": "โซนตามรูป/ตาราง มยผ.1311"
+              }
+            }
+          }
+        },
+        "node_loads": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "pattern",
+              "node",
+              "force"
+            ],
+            "allOf": [
+              {
+                "$ref": "#/$defs/tracked"
+              }
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "pattern": {
+                "$ref": "#/$defs/id"
+              },
+              "node": {
+                "$ref": "#/$defs/id"
+              },
+              "force": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 6,
+                "maxItems": 6,
+                "description": "[Fx, Fy, Fz, Mx, My, Mz] กก., กก.-ม."
+              }
+            }
+          }
+        },
+        "wind": {
+          "type": "object",
+          "description": "ข้อมูลที่ใช้คิดลม (ผลลัพธ์อยู่ใน member_loads)",
+          "properties": {
+            "method": {
+              "enum": [
+                "table_2566",
+                "1311_appC",
+                "1311_detailed"
+              ]
+            },
+            "table": {
+              "type": "string",
+              "description": "เช่น ค-3"
+            },
+            "H": {
+              "type": "number"
+            },
+            "Ds": {
+              "type": "number"
+            },
+            "directions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "status": {
+              "$ref": "#/$defs/status"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "combo": {
+      "type": "object",
+      "required": [
+        "id",
+        "method",
+        "factors"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "method": {
+          "enum": [
+            "WSD",
+            "SDM",
+            "service"
+          ]
+        },
+        "factors": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "{pattern id: factor}"
+        },
+        "ref": {
+          "type": "string"
+        }
+      }
+    },
+    "envelope": {
+      "type": "object",
+      "properties": {
+        "max": {
+          "type": "number"
+        },
+        "min": {
+          "type": "number"
+        },
+        "at_max": {
+          "type": "number"
+        },
+        "at_min": {
+          "type": "number"
+        },
+        "combo_max": {
+          "type": "string"
+        },
+        "combo_min": {
+          "type": "string"
+        }
+      }
+    },
+    "results": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "ไฟล์ SAP2000 ที่มา"
+        },
+        "analyzed_at": {
+          "type": "string"
+        },
+        "model_hash": {
+          "type": "string",
+          "description": "hash ของเรขาคณิต+น้ำหนักตอนวิเคราะห์ ถ้าไม่ตรงกับปัจจุบัน = stale"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "members": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "P": {
+                "$ref": "#/$defs/envelope"
+              },
+              "V2": {
+                "$ref": "#/$defs/envelope"
+              },
+              "V3": {
+                "$ref": "#/$defs/envelope"
+              },
+              "T": {
+                "$ref": "#/$defs/envelope"
+              },
+              "M2": {
+                "$ref": "#/$defs/envelope"
+              },
+              "M3": {
+                "$ref": "#/$defs/envelope"
+              }
+            }
+          }
+        },
+        "reactions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 6,
+              "maxItems": 6
+            }
+          },
+          "description": "{node: {combo: [Fx..Mz]}}"
+        },
+        "displacements": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 6
+            }
+          }
+        }
+      }
+    },
+    "rebarSet": {
+      "type": "object",
+      "properties": {
+        "top": {
+          "$ref": "#/$defs/bars"
+        },
+        "bot": {
+          "$ref": "#/$defs/bars"
+        },
+        "extra_top": {
+          "$ref": "#/$defs/bars"
+        },
+        "extra_bot": {
+          "$ref": "#/$defs/bars"
+        },
+        "side": {
+          "$ref": "#/$defs/bars"
+        },
+        "main": {
+          "$ref": "#/$defs/bars",
+          "description": "เสา: เหล็กยืนรวม"
+        },
+        "stirrup": {
+          "$ref": "#/$defs/stirrup"
+        },
+        "double_stirrup": {
+          "type": "boolean"
+        },
+        "bars_x": {
+          "$ref": "#/$defs/bars",
+          "description": "ฐานราก"
+        },
+        "bars_y": {
+          "$ref": "#/$defs/bars"
+        },
+        "mesh": {
+          "$ref": "#/$defs/mesh",
+          "description": "พื้น"
+        },
+        "wire_mesh": {
+          "type": "string"
+        }
+      }
+    },
+    "designEntry": {
+      "type": "object",
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "WSD",
+            "SDM"
+          ]
+        },
+        "ratio": {
+          "$ref": "#/$defs/nonneg"
+        },
+        "pass": {
+          "type": "boolean"
+        },
+        "governing": {
+          "type": "string",
+          "description": "combo/ตำแหน่ง/ผลที่คุม"
+        },
+        "rebar": {
+          "$ref": "#/$defs/rebarSet"
+        },
+        "laps": {
+          "type": "object"
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "properties": {
+        "model_hash": {
+          "type": "string"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "members": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/designEntry"
+          }
+        },
+        "supports": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/designEntry"
+          }
+        },
+        "slabs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/designEntry"
+          }
+        }
+      }
+    },
+    "priceRef": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "comp",
+            "mat",
+            "wage",
+            "user"
+          ],
+          "description": "comp = วัสดุมวลรวม (comp_id), mat = รหัสพาณิชย์, wage = รหัส ว480 คอลัมน์ G, user = กรอกเอง"
+        },
+        "code": {
+          "type": "string"
+        },
+        "wage_code": {
+          "type": "string",
+          "description": "ค่าแรงคู่กับวัสดุ (ถ้ามี)"
+        }
+      }
+    },
+    "demolitionItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "qty",
+        "unit"
+      ],
+      "allOf": [
+        {
+          "$ref": "#/$defs/tracked"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "wage_code": {
+          "type": "string",
+          "pattern": "^(STR|ARC|SN|EE|AC)-",
+          "description": "รหัส ว480 หมวด 2.9 เช่น ARC-2.9.17-a; ไม่มี = งานรื้อนอกบัญชี"
+        },
+        "name": {
+          "type": "string",
+          "description": "จำเป็นเมื่อไม่มี wage_code"
+        },
+        "qty": {
+          "$ref": "#/$defs/nonneg"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "structure": {
+          "$ref": "#/$defs/id",
+          "description": "site.existing.structures"
+        },
+        "survey_points": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "if": {
+        "not": {
+          "required": [
+            "wage_code"
+          ]
+        }
+      },
+      "then": {
+        "required": [
+          "name"
+        ]
+      }
+    },
+    "quantities": {
+      "type": "object",
+      "properties": {
+        "model_hash": {
+          "type": "string"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "generated_by": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "group",
+              "name",
+              "unit",
+              "qty"
+            ],
+            "allOf": [
+              {
+                "$ref": "#/$defs/tracked"
+              }
+            ],
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "group": {
+                "type": "string",
+                "description": "หมวดงานใน ปร.1 (ชั่วคราว จนกว่าจะได้แบบฟอร์ม BOQ ของหน่วยงาน)"
+              },
+              "group_code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              },
+              "qty": {
+                "$ref": "#/$defs/nonneg"
+              },
+              "waste": {
+                "$ref": "#/$defs/nonneg",
+                "description": "สัดส่วนเผื่อ เช่น 0.05 (รวมใน qty แล้วหรือไม่ ดู waste_included)"
+              },
+              "waste_included": {
+                "type": "boolean"
+              },
+              "from": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/id"
+                },
+                "description": "ชิ้นส่วนที่ใช้คิด"
+              },
+              "price_ref": {
+                "$ref": "#/$defs/priceRef"
+              },
+              "task": {
+                "type": "string",
+                "description": "งานในแผนงาน"
+              }
+            }
+          }
+        }
+      }
+    },
+    "historyEntry": {
+      "type": "object",
+      "required": [
+        "at",
+        "by",
+        "sections"
+      ],
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "by": {
+          "type": "string",
+          "description": "skill หรือ user"
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
