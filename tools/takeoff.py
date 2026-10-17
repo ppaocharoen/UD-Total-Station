@@ -126,6 +126,7 @@ class Takeoff:
         self.design = (m.get("design") or {})
         self.rebar_len = defaultdict(lambda: defaultdict(float))   # dia -> member id -> m
         self.backfill = 0.0
+        self.src_task = {}
 
     # ------------------------------------------------------------ accumulate
     def add(self, code, key, name, unit, qty, src=None, waste=0.0, count=False, task=None, note=None):
@@ -138,7 +139,22 @@ class Takeoff:
         it["qty_net"] += qty
         if src and src not in it["from"]:
             it["from"].append(src)
+        # แยกปริมาณตามงานในแผน (ใช้กระจายต้นทุนลง Gantt/S-Curve และโยงชิ้นส่วนกับงาน)
+        part = it.setdefault("parts", {}).setdefault(task or "other", {"q": 0.0, "from": []})
+        part["q"] += qty
+        if src and src not in part["from"]:
+            part["from"].append(src)
+        if src and task and src not in self.src_task:
+            self.src_task[src] = task
         return it
+
+    def lift(self, x):
+        """งานโครงสร้างตามระดับ: lift:<ชื่อระดับ> ของปลายบนชิ้นส่วน (เสาตอม่อไปกับคานคอดิน)"""
+        lv = x.get("level")
+        if not lv:
+            n = max((self.nodes[x["i"]], self.nodes[x["j"]]), key=lambda n: n["z"])
+            lv = n.get("level") or min(self.levels, key=lambda k: abs(self.levels[k] - n["z"]), default="?")
+        return "lift:" + lv
 
     def note(self, msg):
         if msg not in self.notes:
@@ -266,8 +282,8 @@ class Takeoff:
             H = abs(q[2] - p[2])
             b, h = sec["b"], sec["h"]
             name, key = self.conc_name(x.get("material"))
-            self.add("1.1.12", key, name, "ลบ.ม.", b * h * H, x["id"], task="column")
-            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + h) * H, x["id"], task="column")
+            self.add("1.1.12", key, name, "ลบ.ม.", b * h * H, x["id"], task=self.lift(x))
+            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + h) * H, x["id"], task=self.lift(x))
             rb = self.rebar_of("members", x["id"])
             if rb.get("main"):
                 n, dia = rb["main"]; self.rebar(x["id"], dia, n * H)
@@ -314,13 +330,13 @@ class Takeoff:
             sl = self._slab_over(top, ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2))
             hc = h - (sl["t"] if sl else 0)
             name, key = self.conc_name(x.get("material"))
-            self.add("1.1.12", key, name, "ลบ.ม.", b * hc * Ln, x["id"], task="beam")
+            self.add("1.1.12", key, name, "ลบ.ม.", b * hc * Ln, x["id"], task=self.lift(x))
             sides = 2 * hc
             bottom = b if x["type"] != "tie_beam" else b   # คานคอดินหล่อบนแบบเช่นกัน
-            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", (sides + bottom) * Ln, x["id"], task="beam")
+            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", (sides + bottom) * Ln, x["id"], task=self.lift(x))
             if x["type"] == "beam":
                 self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m_beam"] * Ln,
-                         x["id"], count=True, task="beam")
+                         x["id"], count=True, task=self.lift(x))
             rb = self.rebar_of("members", x["id"])
             for k in ("top", "bot", "side"):
                 if rb.get(k):
@@ -342,19 +358,20 @@ class Takeoff:
     def _slabs(self):
         for s in self.m.get("slabs", []):
             A, P, t = poly_area(s["polygon"]), poly_perim(s["polygon"]), s["t"]
+            lt = "lift:" + s["level"] if s.get("level") else "slab"
             name, key = self.conc_name(s.get("material"))
             if s["kind"] == "precast":
-                self.add("1.1.16", "precast_slab", "พื้นคอนกรีตสำเร็จรูป", "ตร.ม.", A, s["id"], task="slab")
-                self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {t*100:g} ซม.", "ตร.ม.", A, s["id"], task="slab")
+                self.add("1.1.16", "precast_slab", "พื้นคอนกรีตสำเร็จรูป", "ตร.ม.", A, s["id"], task=lt)
+                self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {t*100:g} ซม.", "ตร.ม.", A, s["id"], task=lt)
                 continue
-            self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task="slab")
+            self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt)
             if s["kind"] == "cast":
-                self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task="slab")
+                self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task=lt)
                 self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m2_slab"] * A,
-                         s["id"], count=True, task="slab")
+                         s["id"], count=True, task=lt)
             else:   # ground
                 self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * self.s["sand_thk"], s["id"],
-                         waste=self.s["sand_waste"], task="slab")
+                         waste=self.s["sand_waste"], task=lt)
             rb = self.rebar_of("slabs", s["id"])
             if rb.get("mesh"):
                 mh = rb["mesh"]; dia, sp = mh[0], mh[1]; layers = mh[2] if len(mh) > 2 else 1
@@ -364,7 +381,7 @@ class Takeoff:
                 L = ((math.floor(Ly / sp) + 1) * Lx + (math.floor(Lx / sp) + 1) * Ly) * layers * fill
                 self.rebar(s["id"], dia, L)
             elif rb.get("wire_mesh"):
-                self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task="slab")
+                self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task=lt)
             else:
                 self.note(f"พื้น {s['id']}: ยังไม่มีเหล็กเสริม")
 
@@ -433,6 +450,7 @@ class Takeoff:
                           kg, None, task="roof_frame",
                           note=f"ยาวรวม {L:.2f} ม. เผื่อ {w*100:g}% = {pieces} ท่อน × {self.s['steel_piece_len']:g} ม.")
             it["from"] = steel_src[sec_id]
+            it["parts"] = {"roof_frame": {"q": kg, "from": steel_src[sec_id]}}
             it["pieces"] = pieces
         if roof_area:
             self.note("ทาสีกันสนิมโครงหลังคาเหล็ก ยังไม่คำนวณ — ต้องตกลงวิธีคิดพื้นที่ผิวเหล็ก")
@@ -542,6 +560,7 @@ class Takeoff:
     # ------------------------------------------------------------ เหล็กเสริมรวม
     def _rebar_items(self):
         total_kg = 0.0
+        all_parts = {}
         for dia in sorted(self.rebar_len):
             per = self.rebar_len[dia]
             L = sum(per.values())
@@ -552,10 +571,20 @@ class Takeoff:
             it = self.add("1.1.9", f"rebar_{kind}{dia}", f"เหล็กเสริม {grade} ({kind}) Ø {dia} มม.", "กก.", kg, None,
                           waste=w, task="rebar", note=f"ยาวรวม {L:.2f} ม. × {kg_per_m(dia):.3f} กก./ม.")
             it["from"] = list(per.keys())
+            it["parts"] = {}
+            for mid, ln in per.items():
+                t = self.src_task.get(mid, "rebar")
+                pt = it["parts"].setdefault(t, {"q": 0.0, "from": []})
+                pt["q"] += ln * kg_per_m(dia)
+                pt["from"].append(mid)
+                pt_all = all_parts.setdefault(t, {"q": 0.0, "from": []})
+                pt_all["q"] += ln * kg_per_m(dia) * (1 + w)
             total_kg += kg * (1 + w)
         if total_kg:
-            self.add("1.1.9", "tie_wire", "ลวดผูกเหล็ก", "กก.", total_kg * self.s["tie_wire_per_ton"] / 1000.0, None, task="rebar",
-                     note="30 กก. ต่อเหล็กเสริม 1,000 กก. (คิดจากน้ำหนักรวมเผื่อ)")
+            it = self.add("1.1.9", "tie_wire", "ลวดผูกเหล็ก", "กก.", total_kg * self.s["tie_wire_per_ton"] / 1000.0, None,
+                          task="rebar", note="30 กก. ต่อเหล็กเสริม 1,000 กก. (คิดจากน้ำหนักรวมเผื่อ)")
+            f = self.s["tie_wire_per_ton"] / 1000.0
+            it["parts"] = {t: {"q": v["q"] * f, "from": []} for t, v in all_parts.items()}
 
     # ------------------------------------------------------------ output
     def result(self, price_map=None):
@@ -571,6 +600,12 @@ class Takeoff:
                    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)"}
             if it.get("note"):
                 row["note"] = it["note"]
+            parts = it.get("parts") or {}
+            tot = sum(v["q"] for v in parts.values())
+            if tot > 0:
+                row["by_task"] = {t: {"share": round(v["q"] / tot, 4), "from": v["from"]}
+                                  for t, v in sorted(parts.items(), key=lambda kv: -kv[1]["q"])}
+                row["task"] = next(iter(row["by_task"]))
             pr = (price_map or {}).get(it["key"])
             if pr is None and price_map:
                 pr = next((v for k, v in price_map.items() if k.endswith("*") and it["key"].startswith(k[:-1])), None)

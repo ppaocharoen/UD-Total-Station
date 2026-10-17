@@ -22,8 +22,9 @@ const S = {
 };
 function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 15, retention: 10, loanPct: 0 },
-    overrides: {}, survey: {}, custom_rows: [], pr2: [], pr3: [], model_file: '', saved_at: '' };
+    overrides: {}, survey: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
+function newPlan() { return { start: '', workdays: [1, 2, 3, 4, 5, 6], holidays: [], durations: {}, inst: { n: 4, mode: 'auto', assign: {} } }; }
 
 // ------------------------------------------------------------------ util
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 2600); }
@@ -67,7 +68,8 @@ function loadModel(json, name) {
   S.model = m; S.modelName = name;
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('udboq:' + name) || 'null'); } catch (e) { /* */ }
-  S.boq = saved && saved.format === 'ud-boq' ? saved : newBoq();
+  S.boq = saved && saved.format === 'ud-boq' ? Object.assign(newBoq(), saved) : newBoq();
+  S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
   S.boq.model_file = name;
   const p = S.boq.project;
   p.name = p.name || m.meta.name || '';
@@ -92,7 +94,7 @@ function rows() {
 
 // ------------------------------------------------------------------ render
 function renderAll() {
-  renderProject(); renderSurvey(); renderPR1(); renderPR23(); renderSummary();
+  renderProject(); renderSurvey(); renderPR1(); renderPR23(); renderSummary(); renderPlan();
 }
 
 function renderProject() {
@@ -271,12 +273,19 @@ function _renderPR23() {
 const pr3Total = () => r2(S.boq.pr3.reduce((a, r) => a + (+r.amount || 0), 0));
 
 // ------------------------------------------------------------------ สรุป ปร.1(ก) ปร.2(ก) ปร.4
-function renderSummary() { clearTimeout(renderSummary._t); renderSummary._t = setTimeout(_renderSummary, 0); }
+function renderSummary() { clearTimeout(renderSummary._t); renderSummary._t = setTimeout(() => { _renderSummary(); renderPlan(); }, 0); }
 function _renderSummary() {
   const box = $('#summary');
   if (!S.model) { box.innerHTML = '<div class="card hint">เปิดโมเดลก่อน</div>'; return; }
+  const T = totals(), pr = T.pr, p = S.boq.project, fc = S.boq.factor;
+  const { secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand } = T;
+  const head = `<div class="head"><span>ชื่อโครงการ ${esc(p.name)}</span><span>สถานที่ก่อสร้าง ${esc(p.location)}</span>
+    <span>แบบเลขที่ ${esc(p.drawing_no || '-')}</span><span>หน่วยงาน ${esc(p.agency)}</span><span>คำนวณราคากลางเมื่อวันที่ ${esc(p.calc_date)}</span><span>หน่วย : บาท</span></div>`;
+  return renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box });
+}
+function totals() {
   const pr = priceAll();
-  const p = S.boq.project, fc = S.boq.factor;
+  const fc = S.boq.factor;
   const secs = SECTIONS.map(([c, n]) => ({ c, n, cost: r2(pr.filter(r => sectionOf(r.group_code) === c).reduce((a, r) => a + r.total, 0)) })).filter(s => s.cost);
   const cost = r2(secs.reduce((a, s) => a + s.cost, 0));
   const ff = FactorF.compute(cost, { advance: +fc.advance, retention: +fc.retention, loanShare: (+fc.loanPct || 0) / 100 });
@@ -287,8 +296,9 @@ function _renderSummary() {
   const ins = r2(p2.reduce((a, c) => a + c.inst, 0)), insV = r2(p2.reduce((a, c) => a + c.instVat, 0));
   const eqTotal = r2(eq + eqV + ins + insV), sp = pr3Total();
   const grand = r2(build + eqTotal + sp);
-  const head = `<div class="head"><span>ชื่อโครงการ ${esc(p.name)}</span><span>สถานที่ก่อสร้าง ${esc(p.location)}</span>
-    <span>แบบเลขที่ ${esc(p.drawing_no || '-')}</span><span>หน่วยงาน ${esc(p.agency)}</span><span>คำนวณราคากลางเมื่อวันที่ ${esc(p.calc_date)}</span><span>หน่วย : บาท</span></div>`;
+  return { pr, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand };
+}
+function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box }) {
   const sig = `<p class="hint" style="margin-top:18px;text-align:center">ประธานกรรมการกำหนดราคากลาง ............................ &nbsp; กรรมการ ............................ &nbsp; กรรมการ ............................</p>`;
   box.innerHTML = `
   <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุปค่าก่อสร้าง ค่างานต้นทุน</h3>${head}
@@ -313,6 +323,118 @@ function _renderSummary() {
     <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr></table>
     <p class="bigtotal" style="margin-top:12px">ราคากลาง ${fmt(grand)} บาท</p>
     <p style="text-align:right">(${esc(BoqCalc.bahtText(grand))})</p>${sig}</div>`;
+}
+
+// ------------------------------------------------------------------ แผนงาน / งวดงาน
+const WD = [['จ', 1], ['อ', 2], ['พ', 3], ['พฤ', 4], ['ศ', 5], ['ส', 6], ['อา', 0]];
+const thDate = s => { if (!s) return ''; const d = Schedule.parse(s); return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }); };
+function planCfg() {
+  const pl = S.boq.plan;
+  if (!pl.start) { const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7)); pl.start = Schedule.iso(d); }
+  return { start: pl.start, workdays: pl.workdays, holidays: pl.holidays, durations: pl.durations };
+}
+function computePlan() {
+  const T = totals();
+  const plan = Schedule.build(T.pr, S.model, planCfg());
+  const fc = S.boq.factor, ins = S.boq.plan.inst;
+  // มูลค่าที่จ่ายตามงวด = ค่าก่อสร้าง (ค่างานต้นทุน × F) + ค่าใช้จ่ายพิเศษ ปร.3; ครุภัณฑ์ ปร.2 จ่ายแยกตามการส่งมอบ
+  const contract = r2(T.build + T.sp);
+  const inst = Schedule.installments(plan, { n: +ins.n || 1, mode: ins.mode, assign: ins.assign, advance: +fc.advance, retention: +fc.retention }, contract);
+  return { T, plan, inst, contract };
+}
+function renderPlan() { clearTimeout(renderPlan._t); renderPlan._t = setTimeout(_renderPlan, 0); }
+function _renderPlan() {
+  const pl = S.boq.plan;
+  $('#pl-wd').innerHTML = WD.map(([n, d]) => `<label class="wd-cb"><input type="checkbox" data-wd="${d}" ${pl.workdays.includes(d) ? 'checked' : ''}>${n}</label>`).join('');
+  $$('#pl-wd [data-wd]').forEach(cb => cb.onchange = () => {
+    const d = +cb.dataset.wd; pl.workdays = cb.checked ? [...new Set(pl.workdays.concat(d))] : pl.workdays.filter(x => x !== d);
+    if (!pl.workdays.length) { pl.workdays = [d]; cb.checked = true; return toast('ต้องมีวันทำงานอย่างน้อย 1 วัน'); }
+    autosave(); renderPlan();
+  });
+  if (!S.model || !S.db) { $('#pl-sum').textContent = S.model ? 'กำลังโหลดราคา…' : 'เปิดโมเดลก่อน'; return; }
+  const { T, plan, inst, contract } = computePlan();
+  S.plan = plan; S.inst = inst;
+  $('#pl-start').value = pl.start; $('#pl-n').value = pl.inst.n; $('#pl-mode').value = pl.inst.mode;
+  $('#pl-hol').value = (pl.holidays || []).join('\n');
+  $('#pl-sum').innerHTML = `<div class="kv">
+    <b>เริ่มงาน</b><span>${thDate(plan.start)}</span><b>แล้วเสร็จ</b><span>${thDate(plan.finish)}</span>
+    <b>ระยะเวลาก่อสร้าง</b><span><b style="color:var(--green)">${plan.calDays} วัน</b> (นับวันปฏิทิน) · ทำงาน ${plan.tasks.reduce((m, t) => Math.max(m, t.ef), 0)} วันทำงาน</span>
+    <b>ค่างานต้นทุน</b><span>${fmt(T.cost)} บาท (ใช้กระจายลงงาน ${fmt(plan.total)})</span>
+    <b>มูลค่าจ่ายตามงวด</b><span>${fmt(contract)} บาท = ค่าก่อสร้าง × F${T.sp ? ' + ปร.3' : ''} (ไม่รวมครุภัณฑ์ ปร.2)</span>
+    <b>งวดงาน</b><span>${inst.list.length} งวด · ${pl.inst.mode === 'manual' ? 'กำหนดตามเนื้องาน' : 'อัตโนมัติตาม % ผลงานสะสม'}</span></div>
+    ${inst.warns.length ? `<p class="alert" style="margin-top:6px">${inst.warns.map(esc).join(' · ')}</p>` : ''}
+    ${Math.abs(plan.total - T.cost) > 1 ? `<p class="alert">ค่างานที่กระจายลงงานไม่ครบ (${fmt(plan.total)} จาก ${fmt(T.cost)})</p>` : ''}`;
+  // ตารางงาน
+  const manual = pl.inst.mode === 'manual';
+  const n = inst.list.length;
+  $('#pl-table').innerHTML = `<tr><th>ลำดับ</th><th>งาน</th><th>วันทำงาน</th><th>เริ่ม</th><th>เสร็จ</th><th>ค่างาน (บาท)</th><th>%</th><th>งวดที่</th></tr>` +
+    plan.tasks.map((t, i) => `<tr class="row" data-task="${esc(t.id)}"><td class="r">${i + 1}</td>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${t.color};margin-right:6px"></span>${esc(t.label)}<span class="src">${esc(t.why)}${t.manual ? ` · ค่าตั้งต้น ${t.auto} วัน` : ''}</span></td>
+      <td class="r"><input class="days ${t.manual ? 'ov' : ''}" data-dur="${esc(t.id)}" value="${t.days}" inputmode="numeric"></td>
+      <td>${thDate(t.start)}</td><td>${thDate(t.finish)}</td><td class="r">${fmt(t.cost)}</td><td class="r">${t.pct.toFixed(2)}</td>
+      <td>${manual ? `<select data-asg="${esc(t.id)}">${Array.from({ length: n }, (_, k) => `<option ${inst.assign[t.id] === k + 1 ? 'selected' : ''}>${k + 1}</option>`).join('')}</select>` : inst.assign[t.id]}</td></tr>`).join('') +
+    `<tr class="total"><td></td><td colspan="4">รวม</td><td class="r">${fmt(plan.total)}</td><td class="r">100.00</td><td></td></tr>`;
+  $$('#pl-table [data-dur]').forEach(el => el.onchange = () => {
+    const v = parseInt(el.value, 10); if (v > 0) pl.durations[el.dataset.dur] = v; else delete pl.durations[el.dataset.dur];
+    autosave(); renderPlan();
+  });
+  $$('#pl-table [data-asg]').forEach(el => el.onchange = () => { pl.inst.assign[el.dataset.asg] = +el.value; autosave(); renderPlan(); });
+  $$('#pl-table tr.row').forEach(tr => tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION'].includes(e.target.tagName)) return; selectTask(tr.dataset.task); }));
+  renderGantt(plan, inst); renderSCurve(plan, inst); renderInst(inst, contract);
+}
+function selectTask(id) {
+  const t = S.plan && S.plan.tasks.find(x => x.id === id); if (!t) return;
+  S.selTask = id;
+  $$('#pl-table tr.row').forEach(x => x.classList.toggle('sel', x.dataset.task === id));
+  $$('#pl-gantt .bar').forEach(b => b.classList.toggle('sel', b.dataset.task === id));
+  if (S.viewer) S.viewer.highlight(t.from);
+  toast(`${t.label}: ${t.from.length} ชิ้นส่วน — ดูในแท็บโมเดล 3D`);
+}
+function renderGantt(plan, inst) {
+  const days = plan.calDays, rowH = 24, left = 250, top = 34, W = Math.max(720, left + days * 12 + 20);
+  const sx = (W - left - 20) / days, H = top + plan.tasks.length * rowH + 10;
+  const x = d => left + Schedule.parse(d).getTime() / 864e5 * sx - Schedule.parse(plan.start).getTime() / 864e5 * sx;
+  let g = `<svg class="gantt" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  // เส้นแบ่งรายสัปดาห์ + เดือน
+  for (let i = 0; i <= days; i++) {
+    const d = Schedule.addDays(Schedule.parse(plan.start), i);
+    if (d.getDay() === 1 || i === 0) { const xx = left + i * sx; g += `<line class="grid" x1="${xx}" y1="${top - 6}" x2="${xx}" y2="${H}"/><text x="${xx + 2}" y="${top - 10}">${d.getDate()}/${d.getMonth() + 1}</text>`; }
+  }
+  g += `<text x="${left}" y="12">วันที่ (สัปดาห์เริ่มวันจันทร์) · รวม ${days} วัน</text>`;
+  plan.tasks.forEach((t, i) => {
+    const y = top + i * rowH, x0 = x(t.start), x1 = x(t.finish) + sx;
+    g += `<text x="6" y="${y + 15}">${esc(t.label.length > 34 ? t.label.slice(0, 33) + '…' : t.label)}</text>
+      <rect class="bar ${S.selTask === t.id ? 'sel' : ''}" data-task="${esc(t.id)}" x="${x0}" y="${y + 4}" width="${Math.max(3, x1 - x0)}" height="${rowH - 9}" rx="3" fill="${t.color}"><title>${esc(t.label)}\n${thDate(t.start)} – ${thDate(t.finish)} (${t.days} วันทำงาน)\n${fmt(t.cost)} บาท (${t.pct}%)</title></rect>`;
+  });
+  inst.list.forEach(c => { if (!c.due) return; const xx = x(c.due) + sx; g += `<line class="cut" x1="${xx}" y1="${top - 4}" x2="${xx}" y2="${H}"/><text class="cutlbl" x="${xx + 2}" y="${H - 2}">งวด ${c.no}</text>`; });
+  $('#pl-gantt').innerHTML = g + '</svg>';
+  $$('#pl-gantt .bar').forEach(b => b.onclick = () => selectTask(b.dataset.task));
+}
+function renderSCurve(plan, inst) {
+  const W = 760, H = 300, l = 44, r = 16, t = 14, b = 34, c = plan.curve;
+  const sx = (W - l - r) / Math.max(1, c.length), sy = (H - t - b) / 100;
+  const X = i => l + i * sx, Y = p => H - b - p * sy;
+  let g = `<svg class="scurve" width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">`;
+  for (let p = 0; p <= 100; p += 20) g += `<line class="grid" x1="${l}" y1="${Y(p)}" x2="${W - r}" y2="${Y(p)}"/><text x="${l - 6}" y="${Y(p) + 4}" text-anchor="end">${p}%</text>`;
+  const step = Math.max(1, Math.round(c.length / 8));
+  for (let i = 0; i < c.length; i += step) g += `<text x="${X(i)}" y="${H - b + 16}" text-anchor="middle">${thDate(c[i].date)}</text>`;
+  g += `<path class="ln" d="M${l},${Y(0)} ${c.map((p, i) => `L${X(i + 1)},${Y(p.pct)}`).join(' ')}"/>`;
+  inst.list.forEach(k => {
+    const i = c.findIndex(p => p.date === k.due); if (i < 0) return;
+    g += `<line class="cut" x1="${X(i + 1)}" y1="${Y(0)}" x2="${X(i + 1)}" y2="${Y(c[i].pct)}"/><circle cx="${X(i + 1)}" cy="${Y(c[i].pct)}" r="3.5" fill="var(--green)"><title>งวด ${k.no} · ${thDate(k.due)} · ผลงานตามแผน ${c[i].pct.toFixed(2)}%</title></circle><text x="${X(i + 1) - 4}" y="${Y(c[i].pct) - 6}" text-anchor="end" style="fill:var(--green)">${c[i].pct.toFixed(1)}%</text>`;
+  });
+  $('#pl-scurve').innerHTML = g + '</svg>';
+}
+function renderInst(inst, contract) {
+  const fc = S.boq.factor, L = inst.list;
+  const sum = k => r2(L.reduce((a, g) => a + g[k], 0));
+  $('#pl-inst').innerHTML = `<tr><th>งวดที่</th><th>เนื้องานที่ต้องแล้วเสร็จ</th><th>กำหนดแล้วเสร็จ</th><th>% งวด</th><th>% สะสม</th><th>จำนวนเงิน</th><th>หักเงินล่วงหน้า ${fc.advance}%</th><th>หักประกันผลงาน ${fc.retention}%</th><th>จ่ายสุทธิ</th></tr>` +
+    L.map(g => `<tr><td class="r">${g.no}</td><td>${g.labels.map(esc).join('<br>') || '<span class="alert">ไม่มีงาน</span>'}</td>
+      <td>${thDate(g.due)}${g.due ? `<span class="src">วันที่ ${Schedule.parse(g.due) - Schedule.parse(S.plan.start) >= 0 ? Math.round((Schedule.parse(g.due) - Schedule.parse(S.plan.start)) / 864e5) + 1 : ''} นับจากเริ่มงาน</span>` : ''}</td>
+      <td class="r">${g.pct.toFixed(2)}</td><td class="r">${g.cumPct.toFixed(2)}</td><td class="r">${fmt(g.amount)}</td><td class="r">${fmt(g.advance)}</td><td class="r">${fmt(g.retention)}</td><td class="r">${fmt(g.net)}</td></tr>`).join('') +
+    `<tr class="total"><td></td><td colspan="2">รวม</td><td class="r">${r2(L.reduce((a, g) => a + g.pct, 0)).toFixed(2)}</td><td></td><td class="r">${fmt(sum('amount'))}</td><td class="r">${fmt(sum('advance'))}</td><td class="r">${fmt(sum('retention'))}</td><td class="r">${fmt(sum('net'))}</td></tr>`;
+  $('#pl-instnote').innerHTML = `% ของงวด = ค่างานของงานในงวด ÷ ค่างานรวม (ปัด 2 ตำแหน่ง งวดสุดท้ายรับเศษให้ครบ 100%) · จำนวนเงิน = ${fmt(contract)} × % งวด ·
+    เงินล่วงหน้าและประกันผลงานใช้ % เดียวกับเงื่อนไข Factor F ในหน้าโครงการ · เงินประกันผลงานคืนตามเงื่อนไขสัญญา (ไม่รวมในตาราง)`;
 }
 
 // ------------------------------------------------------------------ 3D
@@ -347,6 +469,7 @@ function bind() {
       const f = await readFile(e.target); const b = JSON.parse(f.text);
       if (b.format !== 'ud-boq') throw new Error('ไม่ใช่ไฟล์ .boq.json');
       S.boq = Object.assign(newBoq(), b);
+      S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
       if (S.model && b.model_file && b.model_file !== S.modelName) toast(`หมายเหตุ: ไฟล์ BOQ นี้ทำกับ ${b.model_file}`);
       applySurvey(); autosave(); renderAll(); toast('เปิดงาน BOQ แล้ว');
     } catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); }
@@ -372,6 +495,16 @@ function bind() {
   $('#b-addrow').onclick = addCustomRow;
   $('#b-add-pr2').onclick = () => { S.boq.pr2.push({ name: '', qty: 1, unit: 'ชุด', price: 0, install: 0 }); autosave(); renderPR23(); };
   $('#b-add-pr3').onclick = () => { S.boq.pr3.push({ name: '', qty: 1, unit: 'งาน', amount: 0, note: '' }); autosave(); renderPR23(); };
+  $('#pl-start').onchange = e => { S.boq.plan.start = e.target.value; autosave(); renderPlan(); };
+  $('#pl-n').onchange = e => { S.boq.plan.inst.n = Math.max(1, Math.min(24, +e.target.value || 1)); S.boq.plan.inst.assign = {}; autosave(); renderPlan(); };
+  $('#pl-mode').onchange = e => {
+    const ins = S.boq.plan.inst; ins.mode = e.target.value;
+    if (ins.mode === 'manual' && S.inst) ins.assign = Object.assign({}, S.inst.assign);   // เริ่มจากที่แบ่งอัตโนมัติ
+    autosave(); renderPlan();
+  };
+  $('#pl-hol').onchange = e => { S.boq.plan.holidays = e.target.value.split(/\s+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)); autosave(); renderPlan(); };
+  $('#pl-reauto').onclick = () => { const ins = S.boq.plan.inst; ins.assign = {}; if (ins.mode === 'manual' && S.plan) ins.assign = Schedule.autoAssign(S.plan, +ins.n || 1); autosave(); renderPlan(); toast('แบ่งงวดอัตโนมัติใหม่แล้ว'); };
+  $('#pl-resetdur').onclick = () => { S.boq.plan.durations = {}; autosave(); renderPlan(); };
   $('#b-fit').onclick = () => S.viewer && S.viewer.fit();
   $('#b-clear').onclick = () => S.viewer && S.viewer.highlight([]);
 }

@@ -17,6 +17,7 @@
     <div class="nav-tab" data-tab="pr1">ปร.1</div>
     <div class="nav-tab" data-tab="pr23">ปร.2 / ปร.3</div>
     <div class="nav-tab" data-tab="summary">สรุป ปร.4</div>
+    <div class="nav-tab" data-tab="plan">แผนงาน / งวดงาน</div>
   </nav>
   <div class="meta-bar"><div id="meta-proj" class="meta-proj">ยังไม่ได้เปิดโครงการ</div><div id="meta-price" class="meta-price">กำลังโหลดราคา…</div></div>
 </header>
@@ -114,6 +115,31 @@
   <div class="btn-row no-print"><button class="btn" onclick="window.print()">พิมพ์</button></div>
   <div id="summary"></div>
 </section>
+<!-- ================================================================ แผนงาน -->
+<section class="page" id="page-plan">
+  <div class="cols">
+    <div class="card">
+      <h2>ตั้งค่าแผนงาน</h2>
+      <div class="form-grid">
+        <label>วันเริ่มงาน<input type="date" id="pl-start"></label>
+        <label>จำนวนงวด<input type="number" id="pl-n" min="1" max="24"></label>
+        <label>วิธีแบ่งงวด<select id="pl-mode"><option value="auto">อัตโนมัติ (ตาม % ผลงานสะสม)</option><option value="manual">ตามเนื้องาน (กำหนดงวดของแต่ละงานเอง)</option></select></label>
+      </div>
+      <div style="margin-top:10px" class="hint">วันทำงาน <span id="pl-wd"></span></div>
+      <label class="hint" style="display:block;margin-top:8px">วันหยุด (บรรทัดละวัน รูปแบบ 2026-12-31)<textarea id="pl-hol" rows="3" style="width:100%;margin-top:4px"></textarea></label>
+      <div class="btn-row"><button class="btn small" id="pl-reauto">แบ่งงวดอัตโนมัติใหม่</button><button class="btn small" id="pl-resetdur">ล้างระยะเวลาที่แก้เอง</button><button class="btn small" onclick="window.print()">พิมพ์</button></div>
+    </div>
+    <div class="card">
+      <h2>สรุปแผน</h2>
+      <div id="pl-sum" class="hint">เปิดโมเดลก่อน</div>
+    </div>
+  </div>
+  <div class="card"><h2>รายการงานและระยะเวลา</h2><p class="hint">ระยะเวลาเป็นวันทำงาน ค่าตั้งต้นคำนวณจากปริมาณ (สูตรอยู่ใต้ชื่องาน) แก้ในช่องได้ · ค่างานกระจายจาก ปร.1 ตามชิ้นส่วนของแต่ละงาน · คลิกแถวเพื่อไฮไลต์ชิ้นส่วนในโมเดล 3D</p>
+    <div class="table-wrap"><table class="boq" id="pl-table"></table></div></div>
+  <div class="card"><h2>แผนงาน (Gantt)</h2><div class="table-wrap" id="pl-gantt"></div></div>
+  <div class="card"><h2>S-Curve ผลงานสะสมตามแผน</h2><div id="pl-scurve"></div></div>
+  <div class="card"><h2>งวดงานและการจ่ายเงิน</h2><div class="table-wrap"><table class="boq" id="pl-inst"></table></div><div id="pl-instnote" class="hint" style="margin-top:6px"></div></div>
+</section>
 </main>
 
 <div id="toast" class="toast"></div>
@@ -123,6 +149,7 @@
 <script src="../lib/factorf.js"></script>
 <script src="../lib/boqcalc.js"></script>
 <script src="../lib/viewer3d.js"></script>
+<script src="../lib/schedule.js"></script>
 <script>
   // โค้ดคิดราคาใช้ร่วมกับ UD-Cost Hub; ทดสอบในเครื่องใส่ ?pricing=<url>
   (function () {
