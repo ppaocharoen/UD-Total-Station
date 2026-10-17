@@ -11,11 +11,17 @@
 | `examples/gen_sample.py` | สคริปต์สร้างไฟล์ตัวอย่าง |
 | `tools/validate.py` | ตัวตรวจไฟล์: schema, การอ้างอิง id, กฎงาน, ระดับความครบ L0–L3, stale |
 | `tools/test_validate.py` | ชุดทดสอบตัวตรวจ |
+| `tools/takeoff.py` | ถอดปริมาณตามหลักเกณฑ์งานอาคาร 2569 เขียนลง `quantities` (`--write`) |
+| `tools/roofgeom.py` | เรขาคณิตหลังคา (ยกจาก phiso-house-3d) |
+| `tools/price_map.json` | ร่างการผูกรายการกับรหัสราคา UD-Cost Hub (รอตรวจ) |
+| `tools/test_takeoff.py` | ทดสอบตัวถอดปริมาณเทียบค่าคำนวณมือ |
 
 ```
 pip install jsonschema
 python tools/validate.py examples/sample-building.bm.json
 python tools/test_validate.py
+python tools/takeoff.py examples/sample-building.bm.json --write
+python tools/test_takeoff.py
 ```
 
 ## หลักของไฟล์ `.bm.json`

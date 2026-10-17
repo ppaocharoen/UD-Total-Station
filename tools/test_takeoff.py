@@ -1,0 +1,71 @@
+"""ทดสอบตัวถอดปริมาณกับอาคารตัวอย่าง เทียบค่าที่คำนวณมือ
+รัน: python tools/test_takeoff.py
+
+ค่าคาดหวัง (คำนวณมือ, อาคาร 2x1 ช่วง 4x4 ม., เสา 0.20x0.20, คาน 0.20x0.40, ฐาน 1.0x1.0x0.35 ท้อง -1.50):
+  ขุดดิน   6 x 1x1x1.50 x 1.30                                   = 11.70 ลบ.ม.
+  ถมคืน    6 x (1.95 - 0.35 - 0.2x0.2x1.15)                      = 9.32
+  ทรายรอง  6 x 1x1x0.05 x 1.25 = 0.375                           → 0.38
+  คอนกรีต  ฐาน 2.10 + เสา 6x0.04x4.45=1.068 + คานคอดิน 7x0.2x0.3x3.8=1.596
+           + คานหลังคา 7x0.2x0.4x3.8=2.128 + พื้น 8x4x0.10=3.20  = 10.092 → 10.09
+  ไม้แบบ   ฐาน 8.40 + เสา 21.36 + คานคอดิน 7x0.8x3.8=21.28 + คานหลังคา 7x1.0x3.8=26.60 = 77.64
+  ค้ำยัน   7 x 3.8 x 1.5 = 39.9 → 40 ต้น
+  DB12     (เสา 106.8 + คาน 224 + ฐาน 68.4) ม. x 12²/162 x 1.09    = 386.78 กก.
+  RB6      (เสา 31x0.6x6=111.6 + คาน 33x1.0x14=462) ม. x 6²/162 x 1.05 = 133.84 กก.
+  ลวดผูก   (386.78+133.84) x 0.03                                = 15.62
+  ผนัง     ยาวสุทธิ 3.8 x สูง 2.6 x 6 ผนัง − ประตู 1.8 − หน้าต่าง 2x1.32 = 54.84 ตร.ม.
+  หลังคา   9.6x5.6/cos20° = 57.21 ตร.ม.; วัสดุมุง x1.03 = 58.93
+  แป C75   8 เส้น x 9.6 = 76.8 ม. x1.03 /6 = 13.18 → 13 ท่อน x 6 x 3.25 = 253.50 กก.
+"""
+import json, os, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+from takeoff import run, r2, round_pieces  # noqa: E402
+from validate import validate, qty_hash  # noqa: E402
+
+m = json.load(open(os.path.join(HERE, "..", "examples", "sample-building.bm.json"), encoding="utf-8"))
+items, notes, used = run(m)
+by = {it["key"]: it for it in items}
+
+EXPECT = {
+    "excav": 11.70, "backfill": 9.32, "sand_base": 0.38, "sand_slab": 2.00, "lean_conc": 0.30,
+    "conc_C240": 10.09, "formwork": 77.64, "props": 40, "rebar_DB12": 386.78, "rebar_RB6": 133.84,
+    "tie_wire": 15.62, "wall_brick_mon": 54.84, "plaster_wall": 109.68, "lintel": 17.10,
+    "cover_metal_sheet": 58.93, "roof_frame_area": 57.21, "steel_C75x45x15x2.3": 253.50,
+    "steel_C100x50x20x2.3": 48.72, "ridge_cap": 9.89, "open_W1": 2, "open_D1": 1, "paint_ext": 54.84,
+    "demo_ARC-2.9.17-a": 20.00,
+}
+ok = True
+for k, v in EXPECT.items():
+    got = by.get(k, {}).get("qty")
+    good = got is not None and abs(got - v) < 0.005
+    ok &= good
+    print(("PASS" if good else "FAIL"), k, got, "คาด", v)
+
+# กฎปัดเศษ
+for x, y in ((0.375, 0.38), (1.005, 1.01), (2.675, 2.68), (10.124, 10.12)):
+    good = r2(x) == y; ok &= good
+    print(("PASS" if good else "FAIL"), "r2", x, "→", r2(x))
+for x, y in ((13.18, 13), (13.5, 14), (13.49, 13)):
+    good = round_pieces(x) == y; ok &= good
+    print(("PASS" if good else "FAIL"), "ท่อน", x, "→", round_pieces(x))
+
+# ปริมาณที่พิมพ์ต้องเป็นทศนิยมไม่เกิน 2 ตำแหน่ง
+bad = [it["key"] for it in items if abs(it["qty"] * 100 - round(it["qty"] * 100)) > 1e-6]
+ok &= not bad
+print(("PASS" if not bad else "FAIL"), "ทศนิยม 2 ตำแหน่ง", bad)
+
+# เขียนลงไฟล์แล้วต้องผ่านตัวตรวจ และไม่ stale
+m2 = json.loads(json.dumps(m))
+m2["quantities"] = {"model_hash": qty_hash(m2), "stale": False, "generated_by": "test", "settings": used, "notes": notes, "items": items}
+r = validate(m2)
+good = not r["errors"] and not r["stale"]["quantities"]
+ok &= good
+print(("PASS" if good else "FAIL"), "validate หลังเขียน quantities", r["errors"][:3], r["stale"])
+m2["walls"][0]["t"] = 0.20
+good = validate(m2)["stale"]["quantities"]
+ok &= good
+print(("PASS" if good else "FAIL"), "แก้ผนังแล้ว quantities ต้อง stale")
+
+print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
+sys.exit(0 if ok else 1)

@@ -107,6 +107,10 @@ def check_refs(m, rep):
     otypes = m.get("opening_types", {}) or {}
     existing = {s.get("id") for s in ((m.get("site") or {}).get("existing") or {}).get("structures", []) or []}
     all_elem = set(seen)
+    mep = m.get("mep") or {}
+    for grp, keys in (("electrical", ("panels", "points")), ("plumbing", ("fixtures", "pipes", "equipment"))):
+        for k in keys:
+            all_elem |= {x.get("id") for x in (mep.get(grp) or {}).get(k, []) if x.get("id")}
 
     def need(where, ref, pool, what):
         if ref is not None and ref not in pool:

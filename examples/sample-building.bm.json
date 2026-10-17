@@ -1958,8 +1958,850 @@
   }
  ],
  "quantities": {
-  "stale": true,
-  "items": []
+  "model_hash": "9a7b6c83c992b8b5",
+  "stale": false,
+  "generated_by": "tools/takeoff.py",
+  "settings": {
+   "cover": 0.025,
+   "lean_thk": 0.05,
+   "sand_thk": 0.05,
+   "sand_waste": 0.25,
+   "excav_waste": 0.3,
+   "excav_deep": 2.0,
+   "excav_deep_margin": 0.5,
+   "tie_wire_per_ton": 30.0,
+   "props_per_m_beam": 1.5,
+   "props_per_m2_slab": 1.5,
+   "steel_piece_len": 6.0,
+   "lintel_extra": 0.3
+  },
+  "notes": [
+   "ทรายรอง 5 ซม. และคอนกรีตหยาบ 5 ซม. ใต้ฐานราก เป็นค่าตั้งต้น (แบบไม่ระบุ)",
+   "เหล็กยืนคานวัดศูนย์ถึงศูนย์ ไม่รวมระยะทาบและงอขอ; ปลอกวัดเส้นรอบรูป 2(b+h) − 8×ระยะหุ้ม ไม่รวมขอ",
+   "พื้น S1-1F: ยังไม่มีเหล็กเสริม",
+   "ทาสีกันสนิมโครงหลังคาเหล็ก ยังไม่คำนวณ — ต้องตกลงวิธีคิดพื้นที่ผิวเหล็ก",
+   "เสาเอ็น-ทับหลัง: คิดเฉพาะรอบช่องเปิด (ทับหลัง+ธรณี ยาว w+2×0.30 และเสาเอ็น 2 ข้างสูง h) ยังไม่รวมเสาเอ็นกลางผนัง/ปลายผนัง",
+   "งานระบบรอบแรกนับเฉพาะจุดและอุปกรณ์ ยังไม่คิดความยาวสาย/ท่อ (รอหลักเกณฑ์ข้อ 4.3–4.4)"
+  ],
+  "items": [
+   {
+    "key": "demo_ARC-2.9.17-a",
+    "group_code": "1.1.0",
+    "group": "งานรื้อถอน",
+    "name": "รื้อพื้น คสล. วางบนดิน หนา 10-15 ซม. (รื้อกอง)",
+    "unit": "ตร.ม.",
+    "qty": 20.0,
+    "qty_net": 20.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "DM-1"
+    ],
+    "task": "prep",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "wage",
+     "code": "ARC-2.9.17-a"
+    }
+   },
+   {
+    "key": "excav",
+    "group_code": "1.1.2",
+    "group": "งานขุดดิน",
+    "name": "งานขุดดิน (ลึกไม่เกิน 2.00 ม.)",
+    "unit": "ลบ.ม.",
+    "qty": 11.7,
+    "qty_net": 9.0,
+    "waste": 0.3,
+    "waste_included": true,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B"
+    ],
+    "task": "footing",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "wage",
+     "code": "STR-1.3.1-c",
+     "wage_tiers": {
+      "STR-1.3.1-a": "มากกว่า 100 ลบ.ม. หรือลึก ≤ 1.00 ม.",
+      "STR-1.3.1-b": "25–100 ลบ.ม. หรือลึก 1.00–1.50 ม.",
+      "STR-1.3.1-c": "น้อยกว่า 25 ลบ.ม. หรือลึก > 1.50 ม."
+     },
+     "note": "ค่าแรง 1.3 = ขุดหลุมฐานรากแล้วถมกลับ (รวมถมคืนแล้ว) ดินทั่วไป; เลือกขั้นตามปริมาณ/ความลึก"
+    }
+   },
+   {
+    "key": "backfill",
+    "group_code": "1.1.3",
+    "group": "งานถมคืน",
+    "name": "งานถมคืน",
+    "unit": "ลบ.ม.",
+    "qty": 9.32,
+    "qty_net": 9.32,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B"
+    ],
+    "task": "footing",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "note": "ค่าแรงถมคืนรวมอยู่ใน 1.3 งานขุดหลุมฐานรากแล้วถม — ถ้าใช้แถวนี้ด้วยจะนับซ้ำ ต้องตัดสิน"
+    }
+   },
+   {
+    "key": "sand_base",
+    "group_code": "1.1.4",
+    "group": "งานวัสดุรองฐานราก",
+    "name": "ทรายรองใต้ฐานราก (บดอัดแรงคน)",
+    "unit": "ลบ.ม.",
+    "qty": 0.38,
+    "qty_net": 0.3,
+    "waste": 0.25,
+    "waste_included": true,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B"
+    ],
+    "task": "footing",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "wage_code": "STR-1.5-b",
+     "note": "ทรายไม่มีในราคาพาณิชย์ 7 จังหวัด ต้องกรอกราคาสืบ; ค่าแรงใส่ทรายรองก้นหลุม"
+    }
+   },
+   {
+    "key": "sand_slab",
+    "group_code": "1.1.4",
+    "group": "งานวัสดุรองฐานราก",
+    "name": "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)",
+    "unit": "ลบ.ม.",
+    "qty": 2.0,
+    "qty_net": 1.6,
+    "waste": 0.25,
+    "waste_included": true,
+    "from": [
+     "S1-1F"
+    ],
+    "task": "slab",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "wage_code": "STR-1.4",
+     "note": "ทรายกรอกราคาสืบ; ค่าแรงถมทรายปรับระดับ"
+    }
+   },
+   {
+    "key": "formwork",
+    "group_code": "1.1.7",
+    "group": "งานไม้แบบหล่อคอนกรีต",
+    "name": "ไม้แบบหล่อคอนกรีต",
+    "unit": "ตร.ม.",
+    "qty": 77.64,
+    "qty_net": 77.64,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B",
+     "C1-1A-1",
+     "C1-1A-2",
+     "C1-1B-1",
+     "C1-1B-2",
+     "C1-2A-1",
+     "C1-2A-2",
+     "C1-2B-1",
+     "C1-2B-2",
+     "C1-3A-1",
+     "C1-3A-2",
+     "C1-3B-1",
+     "C1-3B-2",
+     "GB1-1F-01",
+     "GB1-1F-02",
+     "GB1-1F-03",
+     "GB1-1F-04",
+     "GB1-1F-05",
+     "GB1-1F-06",
+     "GB1-1F-07",
+     "B1-ROOF-01",
+     "B1-ROOF-02",
+     "B1-ROOF-03",
+     "B1-ROOF-04",
+     "B1-ROOF-05",
+     "B1-ROOF-06",
+     "B1-ROOF-07"
+    ],
+    "task": "footing",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "12.3",
+     "wage_code": "STR-1.8.1-b",
+     "wage_tiers": {
+      "STR-1.8.1-a": "ตั้งแต่ 5,000 ตร.ม.",
+      "STR-1.8.1-b": "น้อยกว่า 5,000 ตร.ม."
+     }
+    }
+   },
+   {
+    "key": "props",
+    "group_code": "1.1.7",
+    "group": "งานไม้แบบหล่อคอนกรีต",
+    "name": "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)",
+    "unit": "ต้น",
+    "qty": 40,
+    "qty_net": 39.9,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "B1-ROOF-01",
+     "B1-ROOF-02",
+     "B1-ROOF-03",
+     "B1-ROOF-04",
+     "B1-ROOF-05",
+     "B1-ROOF-06",
+     "B1-ROOF-07"
+    ],
+    "task": "beam",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "note": "ไม้ยูคาลิปตัส Ø3\" ยาว 3 ม. ไม่มีในราคาพาณิชย์"
+    }
+   },
+   {
+    "key": "rebar_RB6",
+    "group_code": "1.1.9",
+    "group": "งานเหล็กเสริมคอนกรีต",
+    "name": "เหล็กเสริม SR24 (RB) Ø 6 มม.",
+    "unit": "กก.",
+    "qty": 133.84,
+    "qty_net": 127.47,
+    "waste": 0.05,
+    "waste_included": true,
+    "from": [
+     "C1-1A-1",
+     "C1-1A-2",
+     "C1-1B-1",
+     "C1-1B-2",
+     "C1-2A-1",
+     "C1-2A-2",
+     "C1-2B-1",
+     "C1-2B-2",
+     "C1-3A-1",
+     "C1-3A-2",
+     "C1-3B-1",
+     "C1-3B-2",
+     "GB1-1F-01",
+     "GB1-1F-02",
+     "GB1-1F-03",
+     "GB1-1F-04",
+     "GB1-1F-05",
+     "GB1-1F-06",
+     "GB1-1F-07",
+     "B1-ROOF-01",
+     "B1-ROOF-02",
+     "B1-ROOF-03",
+     "B1-ROOF-04",
+     "B1-ROOF-05",
+     "B1-ROOF-06",
+     "B1-ROOF-07"
+    ],
+    "task": "rebar",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวรวม 573.60 ม. × 0.222 กก./ม.",
+    "price_ref": {
+     "kind": "mat",
+     "code": "0401010101500000",
+     "wage_code": "STR-1.10.1"
+    }
+   },
+   {
+    "key": "rebar_DB12",
+    "group_code": "1.1.9",
+    "group": "งานเหล็กเสริมคอนกรีต",
+    "name": "เหล็กเสริม SD40 (DB) Ø 12 มม.",
+    "unit": "กก.",
+    "qty": 386.78,
+    "qty_net": 354.84,
+    "waste": 0.09,
+    "waste_included": true,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B",
+     "C1-1A-1",
+     "C1-1A-2",
+     "C1-1B-1",
+     "C1-1B-2",
+     "C1-2A-1",
+     "C1-2A-2",
+     "C1-2B-1",
+     "C1-2B-2",
+     "C1-3A-1",
+     "C1-3A-2",
+     "C1-3B-1",
+     "C1-3B-2",
+     "GB1-1F-01",
+     "GB1-1F-02",
+     "GB1-1F-03",
+     "GB1-1F-04",
+     "GB1-1F-05",
+     "GB1-1F-06",
+     "GB1-1F-07",
+     "B1-ROOF-01",
+     "B1-ROOF-02",
+     "B1-ROOF-03",
+     "B1-ROOF-04",
+     "B1-ROOF-05",
+     "B1-ROOF-06",
+     "B1-ROOF-07"
+    ],
+    "task": "rebar",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวรวม 399.20 ม. × 0.889 กก./ม.",
+    "price_ref": {
+     "kind": "mat",
+     "code": "0401020203000000,0401020203700000",
+     "wage_code": "STR-1.10.2",
+     "note": "SD40 ธรรมดา (หนองบัวลำภู) / Tempcore (อุดร) — ต้องตัดสินชนิด"
+    }
+   },
+   {
+    "key": "tie_wire",
+    "group_code": "1.1.9",
+    "group": "งานเหล็กเสริมคอนกรีต",
+    "name": "ลวดผูกเหล็ก",
+    "unit": "กก.",
+    "qty": 15.62,
+    "qty_net": 15.62,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "rebar",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "30 กก. ต่อเหล็กเสริม 1,000 กก. (คิดจากน้ำหนักรวมเผื่อ)",
+    "price_ref": {
+     "kind": "mat",
+     "code": "0401030100100000"
+    }
+   },
+   {
+    "key": "lean_conc",
+    "group_code": "1.1.12",
+    "group": "งานคอนกรีต",
+    "name": "คอนกรีตหยาบรองใต้ฐานราก (1:3:5)",
+    "unit": "ลบ.ม.",
+    "qty": 0.3,
+    "qty_net": 0.3,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B"
+    ],
+    "task": "footing",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "1.1",
+     "wage_code": "STR-1.6.1",
+     "note": "comp 1.1 และ 1.2 ชื่อเหมือนกัน ต้องเลือก"
+    }
+   },
+   {
+    "key": "conc_C240",
+    "group_code": "1.1.12",
+    "group": "งานคอนกรีต",
+    "name": "คอนกรีตโครงสร้าง f'c 240 ksc (ทรงกระบอก)",
+    "unit": "ลบ.ม.",
+    "qty": 10.09,
+    "qty_net": 10.09,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "F1-1A",
+     "F1-1B",
+     "F1-2A",
+     "F1-2B",
+     "F1-3A",
+     "F1-3B",
+     "C1-1A-1",
+     "C1-1A-2",
+     "C1-1B-1",
+     "C1-1B-2",
+     "C1-2A-1",
+     "C1-2A-2",
+     "C1-2B-1",
+     "C1-2B-2",
+     "C1-3A-1",
+     "C1-3A-2",
+     "C1-3B-1",
+     "C1-3B-2",
+     "GB1-1F-01",
+     "GB1-1F-02",
+     "GB1-1F-03",
+     "GB1-1F-04",
+     "GB1-1F-05",
+     "GB1-1F-06",
+     "GB1-1F-07",
+     "B1-ROOF-01",
+     "B1-ROOF-02",
+     "B1-ROOF-03",
+     "B1-ROOF-04",
+     "B1-ROOF-05",
+     "B1-ROOF-06",
+     "B1-ROOF-07",
+     "S1-1F"
+    ],
+    "task": "footing",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "mat",
+     "code": "0101010100400000",
+     "wage_code": "STR-1.7-b",
+     "wage_tiers": {
+      "STR-1.7-b": "อาคารชั้นเดียว",
+      "STR-1.7-c": "อาคารหลายชั้น"
+     },
+     "note": "คอนกรีตผสมเสร็จ ลูกบาศก์ 280 / ทรงกระบอก 240 ksc; ค่าแรงเทคอนกรีตผสมเสร็จ"
+    }
+   },
+   {
+    "key": "roof_frame_area",
+    "group_code": "1.1.19",
+    "group": "งานโครงหลังคา",
+    "name": "งานโครงหลังคา (พื้นที่ตามแนวลาด)",
+    "unit": "ตร.ม.",
+    "qty": 57.21,
+    "qty_net": 57.21,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "R1"
+    ],
+    "task": "roof_frame",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "note": "ค่าแรงโครงหลังคาเหล็กคิดต่อ กก. แล้ว (STR-1.11.1) แถวนี้เป็นข้อมูล"
+    }
+   },
+   {
+    "key": "steel_C100x50x20x2.3",
+    "group_code": "1.1.19",
+    "group": "งานโครงหลังคา",
+    "name": "เหล็กรูปพรรณ C100x50x20x2.3 (4.06 กก./ม.)",
+    "unit": "กก.",
+    "qty": 48.72,
+    "qty_net": 48.72,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "RF1-1A",
+     "RF1-1B",
+     "RF1-2A",
+     "RF1-2B",
+     "RF1-3A",
+     "RF1-3B"
+    ],
+    "task": "roof_frame",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวรวม 12.77 ม. เผื่อ 3% = 2 ท่อน × 6 ม.",
+    "price_ref": {
+     "kind": "user",
+     "wage_code": "STR-1.11.1",
+     "note": "เลือกรหัสเหล็กรูปพรรณตามขนาด (หมวดพาณิชย์ 0402); ค่าแรงประกอบโครงหลังคาเหล็กต่อ กก."
+    }
+   },
+   {
+    "key": "steel_C75x45x15x2.3",
+    "group_code": "1.1.19",
+    "group": "งานโครงหลังคา",
+    "name": "เหล็กรูปพรรณ C75x45x15x2.3 (3.25 กก./ม.)",
+    "unit": "กก.",
+    "qty": 253.5,
+    "qty_net": 253.5,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "R1"
+    ],
+    "task": "roof_frame",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวรวม 76.80 ม. เผื่อ 3% = 13 ท่อน × 6 ม.",
+    "price_ref": {
+     "kind": "user",
+     "wage_code": "STR-1.11.1",
+     "note": "เลือกรหัสเหล็กรูปพรรณตามขนาด (หมวดพาณิชย์ 0402); ค่าแรงประกอบโครงหลังคาเหล็กต่อ กก."
+    }
+   },
+   {
+    "key": "cover_metal_sheet",
+    "group_code": "1.2.1",
+    "group": "งานหลังคา",
+    "name": "วัสดุมุงหลังคา เมทัลชีท",
+    "unit": "ตร.ม.",
+    "qty": 58.93,
+    "qty_net": 57.21,
+    "waste": 0.03,
+    "waste_included": true,
+    "from": [
+     "R1"
+    ],
+    "task": "roof_cover",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "พื้นที่ตามแนวลาด; ถ้าคิดเป็นแผ่นให้แปลงตามคู่มือผู้ผลิตแล้วเผื่อ 3%/5%",
+    "price_ref": {
+     "kind": "user",
+     "note": "ยังไม่พบรหัสเมทัลชีทในราคาพาณิชย์"
+    }
+   },
+   {
+    "key": "ridge_cap",
+    "group_code": "1.2.1",
+    "group": "งานหลังคา",
+    "name": "ครอบสันหลังคา",
+    "unit": "ม.",
+    "qty": 9.89,
+    "qty_net": 9.6,
+    "waste": 0.03,
+    "waste_included": true,
+    "from": [
+     "R1"
+    ],
+    "task": "roof_cover",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user"
+    }
+   },
+   {
+    "key": "fin_ceiling_ฝ้ายิปซัมบอร์ด 9 มม. ฉาบเรียบ โครงคร่าวเหล็กชุบสังกะสี",
+    "group_code": "1.2.2",
+    "group": "งานฝ้าเพดาน",
+    "name": "ฝ้ายิปซัมบอร์ด 9 มม. ฉาบเรียบ โครงคร่าวเหล็กชุบสังกะสี",
+    "unit": "ตร.ม.",
+    "qty": 30.81,
+    "qty_net": 30.81,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "FN-CL1"
+    ],
+    "task": "ceiling",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "wage_code": "ARC-2.2.3",
+     "note": "เลือก comp ฝ้าตามชนิดในรายการประกอบแบบ"
+    }
+   },
+   {
+    "key": "wall_brick_mon",
+    "group_code": "1.2.3",
+    "group": "งานผนัง",
+    "name": "ผนังก่ออิฐมอญครึ่งแผ่น หนา 10 ซม.",
+    "unit": "ตร.ม.",
+    "qty": 54.84,
+    "qty_net": 54.84,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "W-A12",
+     "W-A23",
+     "W-3AB",
+     "W-B23",
+     "W-B12",
+     "W-1AB"
+    ],
+    "task": "wall",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "6.1",
+     "wage_code": "ARC-2.3.1-a",
+     "note": "ตรวจว่า ARC-2.3.1-a คือก่อครึ่งแผ่น"
+    }
+   },
+   {
+    "key": "lintel",
+    "group_code": "1.2.3",
+    "group": "งานผนัง",
+    "name": "เสาเอ็น-ทับหลัง คสล. รอบช่องเปิด",
+    "unit": "ม.",
+    "qty": 17.1,
+    "qty_net": 17.1,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "D1-1",
+     "W1-1",
+     "W1-2"
+    ],
+    "task": "wall",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "4.1",
+     "note": "ชนิดก่อครึ่งแผ่น"
+    }
+   },
+   {
+    "key": "plaster_wall",
+    "group_code": "1.2.4",
+    "group": "งานฉาบปูน",
+    "name": "ฉาบปูนเรียบผนัง",
+    "unit": "ตร.ม.",
+    "qty": 109.68,
+    "qty_net": 109.68,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "W-A12",
+     "W-A23",
+     "W-3AB",
+     "W-B23",
+     "W-B12",
+     "W-1AB"
+    ],
+    "task": "plaster",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "7.2",
+     "note": "ยังไม่ได้ผูกค่าแรงฉาบ"
+    }
+   },
+   {
+    "key": "fin_floor_กระเบื้องแกรนิตโต้ 60x60 ซม.",
+    "group_code": "1.2.5",
+    "group": "งานวัสดุผิวพื้นและผนัง",
+    "name": "กระเบื้องแกรนิตโต้ 60x60 ซม.",
+    "unit": "ตร.ม.",
+    "qty": 30.81,
+    "qty_net": 30.81,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "FN-FL1"
+    ],
+    "task": "finish",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "note": "เลือก comp กลุ่ม 9 ตามขนาดกระเบื้อง และค่าแรง ARC-2.4.x"
+    }
+   },
+   {
+    "key": "open_D1",
+    "group_code": "1.2.6",
+    "group": "งานประตู-หน้าต่าง",
+    "name": "ประตูไม้อัดสัก (D1 0.9×2 ม.)",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "D1-1"
+    ],
+    "task": "opening",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "note": "ประตู-หน้าต่างคิดเป็นชุด สืบราคา/เลือกรหัสในเว็บ"
+    }
+   },
+   {
+    "key": "open_W1",
+    "group_code": "1.2.6",
+    "group": "งานประตู-หน้าต่าง",
+    "name": "หน้าต่างบานเลื่อนอลูมิเนียม (W1 1.2×1.1 ม.)",
+    "unit": "ชุด",
+    "qty": 2,
+    "qty_net": 2.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "W1-1",
+     "W1-2"
+    ],
+    "task": "opening",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "user",
+     "note": "ประตู-หน้าต่างคิดเป็นชุด สืบราคา/เลือกรหัสในเว็บ"
+    }
+   },
+   {
+    "key": "paint_ext",
+    "group_code": "1.2.7",
+    "group": "งานทาสี",
+    "name": "ทาสีน้ำอะคริลิกภายนอก",
+    "unit": "ตร.ม.",
+    "qty": 54.84,
+    "qty_net": 54.84,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "W-A12",
+     "W-A23",
+     "W-3AB",
+     "W-B23",
+     "W-B12",
+     "W-1AB"
+    ],
+    "task": "paint",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "10.1",
+     "note": "เกรด 1; ค่าแรง ARC-2.8.1 ตามขั้นพื้นที่"
+    }
+   },
+   {
+    "key": "paint_int",
+    "group_code": "1.2.7",
+    "group": "งานทาสี",
+    "name": "ทาสีน้ำอะคริลิกภายใน",
+    "unit": "ตร.ม.",
+    "qty": 54.84,
+    "qty_net": 54.84,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "W-A12",
+     "W-A23",
+     "W-3AB",
+     "W-B23",
+     "W-B12",
+     "W-1AB"
+    ],
+    "task": "paint",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "comp",
+     "code": "10.2",
+     "wage_code": "ARC-2.8.1-b"
+    }
+   },
+   {
+    "key": "pt_L",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "จุดดวงโคม (ดาวน์ไลท์ LED 12W)",
+    "unit": "จุด",
+    "qty": 2,
+    "qty_net": 2.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)"
+   },
+   {
+    "key": "pt_S",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "จุดสวิตช์",
+    "unit": "จุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)"
+   },
+   {
+    "key": "pt_P",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "จุดเต้ารับ",
+    "unit": "จุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)"
+   },
+   {
+    "key": "panel",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "ตู้ไฟฟ้า 6 ช่อง MCB 2P 32A",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "LC"
+    ],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)"
+   }
+  ]
  },
  "history": [
   {
@@ -1969,6 +2811,13 @@
     "*"
    ],
    "note": "สร้างไฟล์ตัวอย่าง"
+  },
+  {
+   "at": "2026-10-18T03:25:24+07:00",
+   "by": "tools/takeoff.py",
+   "sections": [
+    "quantities"
+   ]
   }
  ]
 }
