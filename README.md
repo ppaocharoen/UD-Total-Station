@@ -15,6 +15,9 @@
 | `tools/roofgeom.py` | เรขาคณิตหลังคา (ยกจาก phiso-house-3d) |
 | `tools/price_map.json` | ร่างการผูกรายการกับรหัสราคา UD-Cost Hub (รอตรวจ) |
 | `tools/test_takeoff.py` | ทดสอบตัวถอดปริมาณเทียบค่าคำนวณมือ |
+| `tools/sap_export.py` | ส่งออก `.bm.json` เป็น SAP2000 `.s2k` (ทดสอบกับ v23.3.1) + ไฟล์ประกอบ `.sap.json` |
+| `tools/sap_results.py` | อ่านผลจาก Excel ที่ SAP export กลับเข้า `results` (`--write`) |
+| `tools/test_sap.py` | ทดสอบส่งออก/อ่านผล เทียบแรงปฏิกิริยารวมกับน้ำหนักที่ใส่ |
 
 ```
 pip install jsonschema
@@ -22,7 +25,18 @@ python tools/validate.py examples/sample-building.bm.json
 python tools/test_validate.py
 python tools/takeoff.py examples/sample-building.bm.json --write
 python tools/test_takeoff.py
+python tools/sap_export.py examples/sample-building.bm.json
+python tools/sap_results.py examples/sample-building.bm.json examples/sample-building.results.xlsx
+python tools/test_sap.py
 ```
+
+## ใช้กับ SAP2000
+
+1. `python tools/sap_export.py โครงการ.bm.json` ได้ `โครงการ.s2k` และ `โครงการ.sap.json` (จำรุ่นโมเดลที่ส่งไป)
+2. SAP: File > Import > SAP2000 .s2k Text File > New model แล้วรัน
+3. SAP: File > Export > SAP2000 MS Excel Spreadsheet เลือก Analysis Results: Joint Output > Reactions, Displacements และ Element Output > Frame Output > Element Forces - Frames บันทึกชื่อเดียวกับ `.s2k` (เช่น `โครงการ.xlsx`)
+4. `python tools/sap_results.py โครงการ.bm.json โครงการ.xlsx --write`
+ถ้าแก้โมเดลหลังส่งออก ผลที่อ่านกลับจะถูกนับว่าเก่า (stale) จนกว่าจะส่งออกและวิเคราะห์ใหม่
 
 ## เว็บ BOQ (`/boq/`)
 

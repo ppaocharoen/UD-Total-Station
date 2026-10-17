@@ -19,6 +19,7 @@
 รัน: python tools/sap_export.py model.bm.json [-o out.s2k] [--version 23.0.0]
 """
 import argparse, json, math, os, sys
+from datetime import datetime
 from collections import defaultdict
 
 PATTERN_TYPE = {"dead": "Dead", "super_dead": "Super Dead", "live": "Live", "roof_live": "Roof Live",
@@ -63,6 +64,9 @@ class Exporter:
         self.members = {x["id"]: x for x in m.get("members", [])}
         self.tables = []
         self._oh_warned = set()
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from validate import model_hash
+        self.model_hash = model_hash(m)
 
     def table(self, name, rows):
         if rows:
@@ -408,7 +412,7 @@ class Exporter:
         self._combos()
         meta = self.m.get("meta", {})
         out = ["File exported from UD-Total-Station sap_export.py  project=%s  model_hash=%s"
-               % (meta.get("name", ""), self.m.get("quantities", {}).get("model_hash", "")), ""]
+               % (meta.get("name", ""), self.model_hash), ""]
         out.append('TABLE:  "PROGRAM CONTROL"')
         out.append(row(ProgramName="SAP2000", Version=self.version, CurrUnits="Kgf, m, C", SteelCode="AISC 360-16",
                        ConcCode="ACI 318-19", ColdCode="AISI-16"))
@@ -432,7 +436,12 @@ def main():
     txt = ex.build()
     out = a.out or os.path.splitext(os.path.splitext(a.model)[0])[0] + ".s2k"
     open(out, "w", encoding="utf-8", newline="").write(txt)
-    print("เขียน", out)
+    # ไฟล์ประกอบ: จำ model_hash ตอนส่งออก เพื่อให้ตัวอ่านผลรู้ว่าผลวิเคราะห์มาจากโมเดลรุ่นไหน
+    side = os.path.splitext(out)[0] + ".sap.json"
+    json.dump({"model_hash": ex.model_hash, "model": os.path.basename(a.model), "s2k": os.path.basename(out),
+               "exported_at": datetime.now().isoformat(timespec="seconds")},
+              open(side, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print("เขียน", out, "และ", side)
     for w in ex.warn:
         print("  ! " + w)
 
