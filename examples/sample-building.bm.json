@@ -389,6 +389,252 @@
    "z": 4.0279,
    "grid": "3/AB",
    "level": "RIDGE"
+  },
+  {
+   "id": "N-1A-E",
+   "x": 0.0,
+   "y": -0.8,
+   "z": 3.0088,
+   "grid": "1/A"
+  },
+  {
+   "id": "N-1B-E",
+   "x": 0.0,
+   "y": 4.8,
+   "z": 3.0088,
+   "grid": "1/B"
+  },
+  {
+   "id": "N-2A-E",
+   "x": 4.0,
+   "y": -0.8,
+   "z": 3.0088,
+   "grid": "2/A"
+  },
+  {
+   "id": "N-2B-E",
+   "x": 4.0,
+   "y": 4.8,
+   "z": 3.0088,
+   "grid": "2/B"
+  },
+  {
+   "id": "N-3A-E",
+   "x": 8.0,
+   "y": -0.8,
+   "z": 3.0088,
+   "grid": "3/A"
+  },
+  {
+   "id": "N-3B-E",
+   "x": 8.0,
+   "y": 4.8,
+   "z": 3.0088,
+   "grid": "3/B"
+  },
+  {
+   "id": "N-PA1-W",
+   "x": -0.8,
+   "y": -0.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PA1-1",
+   "x": 0.0,
+   "y": -0.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PA1-2",
+   "x": 4.0,
+   "y": -0.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PA1-3",
+   "x": 8.0,
+   "y": -0.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PA1-E",
+   "x": 8.8,
+   "y": -0.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PA2-W",
+   "x": -0.8,
+   "y": 0.0,
+   "z": 3.3
+  },
+  {
+   "id": "N-PA2-E",
+   "x": 8.8,
+   "y": 0.0,
+   "z": 3.3
+  },
+  {
+   "id": "N-PA3-W",
+   "x": -0.8,
+   "y": 0.7505,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PA3-1",
+   "x": 0.0,
+   "y": 0.7505,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PA3-2",
+   "x": 4.0,
+   "y": 0.7505,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PA3-3",
+   "x": 8.0,
+   "y": 0.7505,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PA3-E",
+   "x": 8.8,
+   "y": 0.7505,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PA4-W",
+   "x": -0.8,
+   "y": 1.5022,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PA4-1",
+   "x": 0.0,
+   "y": 1.5022,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PA4-2",
+   "x": 4.0,
+   "y": 1.5022,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PA4-3",
+   "x": 8.0,
+   "y": 1.5022,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PA4-E",
+   "x": 8.8,
+   "y": 1.5022,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PB1-W",
+   "x": -0.8,
+   "y": 4.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PB1-1",
+   "x": 0.0,
+   "y": 4.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PB1-2",
+   "x": 4.0,
+   "y": 4.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PB1-3",
+   "x": 8.0,
+   "y": 4.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PB1-E",
+   "x": 8.8,
+   "y": 4.753,
+   "z": 3.0259
+  },
+  {
+   "id": "N-PB2-W",
+   "x": -0.8,
+   "y": 4.0,
+   "z": 3.3
+  },
+  {
+   "id": "N-PB2-E",
+   "x": 8.8,
+   "y": 4.0,
+   "z": 3.3
+  },
+  {
+   "id": "N-PB3-W",
+   "x": -0.8,
+   "y": 3.2495,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PB3-1",
+   "x": 0.0,
+   "y": 3.2495,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PB3-2",
+   "x": 4.0,
+   "y": 3.2495,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PB3-3",
+   "x": 8.0,
+   "y": 3.2495,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PB3-E",
+   "x": 8.8,
+   "y": 3.2495,
+   "z": 3.5732
+  },
+  {
+   "id": "N-PB4-W",
+   "x": -0.8,
+   "y": 2.4978,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PB4-1",
+   "x": 0.0,
+   "y": 2.4978,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PB4-2",
+   "x": 4.0,
+   "y": 2.4978,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PB4-3",
+   "x": 8.0,
+   "y": 2.4978,
+   "z": 3.8468
+  },
+  {
+   "id": "N-PB4-E",
+   "x": 8.8,
+   "y": 2.4978,
+   "z": 3.8468
   }
  ],
  "members": [
@@ -693,6 +939,19 @@
    "src": "S-03"
   },
   {
+   "id": "RF1-1A-OH",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-1A-E",
+   "j": "N-1A-R",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04",
+   "note": "ส่วนยื่นชายคา"
+  },
+  {
    "id": "RF1-1A",
    "mark": "RF1",
    "type": "rafter",
@@ -709,6 +968,19 @@
    },
    "status": "from_drawing",
    "src": "S-04"
+  },
+  {
+   "id": "RF1-1B-OH",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-1B-E",
+   "j": "N-1B-R",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04",
+   "note": "ส่วนยื่นชายคา"
   },
   {
    "id": "RF1-1B",
@@ -729,6 +1001,19 @@
    "src": "S-04"
   },
   {
+   "id": "RF1-2A-OH",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-2A-E",
+   "j": "N-2A-R",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04",
+   "note": "ส่วนยื่นชายคา"
+  },
+  {
    "id": "RF1-2A",
    "mark": "RF1",
    "type": "rafter",
@@ -745,6 +1030,19 @@
    },
    "status": "from_drawing",
    "src": "S-04"
+  },
+  {
+   "id": "RF1-2B-OH",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-2B-E",
+   "j": "N-2B-R",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04",
+   "note": "ส่วนยื่นชายคา"
   },
   {
    "id": "RF1-2B",
@@ -765,6 +1063,19 @@
    "src": "S-04"
   },
   {
+   "id": "RF1-3A-OH",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-3A-E",
+   "j": "N-3A-R",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04",
+   "note": "ส่วนยื่นชายคา"
+  },
+  {
    "id": "RF1-3A",
    "mark": "RF1",
    "type": "rafter",
@@ -783,6 +1094,19 @@
    "src": "S-04"
   },
   {
+   "id": "RF1-3B-OH",
+   "mark": "RF1",
+   "type": "rafter",
+   "i": "N-3B-E",
+   "j": "N-3B-R",
+   "section": "C100x50x20x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04",
+   "note": "ส่วนยื่นชายคา"
+  },
+  {
    "id": "RF1-3B",
    "mark": "RF1",
    "type": "rafter",
@@ -797,6 +1121,390 @@
      "M3"
     ]
    },
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A1-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA1-W",
+   "j": "N-PA1-1",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A1-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA1-1",
+   "j": "N-PA1-2",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A1-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA1-2",
+   "j": "N-PA1-3",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A1-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA1-3",
+   "j": "N-PA1-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A2-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA2-W",
+   "j": "N-1A-R",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A2-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-1A-R",
+   "j": "N-2A-R",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A2-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-2A-R",
+   "j": "N-3A-R",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A2-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-3A-R",
+   "j": "N-PA2-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A3-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA3-W",
+   "j": "N-PA3-1",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A3-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA3-1",
+   "j": "N-PA3-2",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A3-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA3-2",
+   "j": "N-PA3-3",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A3-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA3-3",
+   "j": "N-PA3-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A4-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA4-W",
+   "j": "N-PA4-1",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A4-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA4-1",
+   "j": "N-PA4-2",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A4-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA4-2",
+   "j": "N-PA4-3",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-A4-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PA4-3",
+   "j": "N-PA4-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B1-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB1-W",
+   "j": "N-PB1-1",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B1-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB1-1",
+   "j": "N-PB1-2",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B1-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB1-2",
+   "j": "N-PB1-3",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B1-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB1-3",
+   "j": "N-PB1-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B2-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB2-W",
+   "j": "N-1B-R",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B2-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-1B-R",
+   "j": "N-2B-R",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B2-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-2B-R",
+   "j": "N-3B-R",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B2-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-3B-R",
+   "j": "N-PB2-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B3-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB3-W",
+   "j": "N-PB3-1",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B3-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB3-1",
+   "j": "N-PB3-2",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B3-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB3-2",
+   "j": "N-PB3-3",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B3-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB3-3",
+   "j": "N-PB3-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B4-1",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB4-W",
+   "j": "N-PB4-1",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B4-2",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB4-1",
+   "j": "N-PB4-2",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B4-3",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB4-2",
+   "j": "N-PB4-3",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
+   "status": "from_drawing",
+   "src": "S-04"
+  },
+  {
+   "id": "P1-B4-4",
+   "mark": "P1",
+   "type": "purlin",
+   "i": "N-PB4-3",
+   "j": "N-PB4-E",
+   "section": "C75x45x15x2.3",
+   "material": "SSC400",
+   "group": "roof_frame",
    "status": "from_drawing",
    "src": "S-04"
   }
@@ -1958,7 +2666,7 @@
   }
  ],
  "quantities": {
-  "model_hash": "9a7b6c83c992b8b5",
+  "model_hash": "00c53632e8202f8b",
   "stale": false,
   "generated_by": "tools/takeoff.py",
   "settings": {
@@ -2408,22 +3116,28 @@
     "group": "งานโครงหลังคา",
     "name": "เหล็กรูปพรรณ C100x50x20x2.3 (4.06 กก./ม.)",
     "unit": "กก.",
-    "qty": 48.72,
-    "qty_net": 48.72,
+    "qty": 73.08,
+    "qty_net": 73.08,
     "waste": 0.0,
     "waste_included": false,
     "from": [
+     "RF1-1A-OH",
      "RF1-1A",
+     "RF1-1B-OH",
      "RF1-1B",
+     "RF1-2A-OH",
      "RF1-2A",
+     "RF1-2B-OH",
      "RF1-2B",
+     "RF1-3A-OH",
      "RF1-3A",
+     "RF1-3B-OH",
      "RF1-3B"
     ],
     "task": "roof_frame",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
-    "note": "ยาวรวม 12.77 ม. เผื่อ 3% = 2 ท่อน × 6 ม.",
+    "note": "ยาวรวม 17.88 ม. เผื่อ 3% = 3 ท่อน × 6 ม.",
     "price_ref": {
      "kind": "user",
      "wage_code": "STR-1.11.1",
@@ -2441,7 +3155,38 @@
     "waste": 0.0,
     "waste_included": false,
     "from": [
-     "R1"
+     "P1-A1-1",
+     "P1-A1-2",
+     "P1-A1-3",
+     "P1-A1-4",
+     "P1-A2-1",
+     "P1-A2-2",
+     "P1-A2-3",
+     "P1-A2-4",
+     "P1-A3-1",
+     "P1-A3-2",
+     "P1-A3-3",
+     "P1-A3-4",
+     "P1-A4-1",
+     "P1-A4-2",
+     "P1-A4-3",
+     "P1-A4-4",
+     "P1-B1-1",
+     "P1-B1-2",
+     "P1-B1-3",
+     "P1-B1-4",
+     "P1-B2-1",
+     "P1-B2-2",
+     "P1-B2-3",
+     "P1-B2-4",
+     "P1-B3-1",
+     "P1-B3-2",
+     "P1-B3-3",
+     "P1-B3-4",
+     "P1-B4-1",
+     "P1-B4-2",
+     "P1-B4-3",
+     "P1-B4-4"
     ],
     "task": "roof_frame",
     "status": "computed",
@@ -2787,14 +3532,7 @@
    "note": "สร้างไฟล์ตัวอย่าง"
   },
   {
-   "at": "2026-10-18T03:25:24+07:00",
-   "by": "tools/takeoff.py",
-   "sections": [
-    "quantities"
-   ]
-  },
-  {
-   "at": "2026-10-18T03:50:33+07:00",
+   "at": "2026-10-18T04:31:17+07:00",
    "by": "tools/takeoff.py",
    "sections": [
     "quantities"

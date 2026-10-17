@@ -8,8 +8,9 @@
   - วัสดุคอนกรีต (E = 15100 sqrt(fc) ksc) และเหล็ก (E = 2.04e6 ksc)
   - จุดรองรับจากฐานราก (fixed/pinned), การปลดแรงปลายชิ้นส่วน, เส้นกริด
   - กลุ่มน้ำหนัก + load case แบบ linear static, น้ำหนักบนชิ้นส่วน, ชุดผสม
-  - น้ำหนักแผ่บนหลังคา (area_loads ที่ target เป็นหลังคา) แปลงเป็นน้ำหนักแผ่บนจันทันตามความกว้างรับน้ำหนัก
-    ค่าในกลุ่ม roof_live คิดต่อพื้นที่ฉาย (GravProj) กลุ่มอื่นคิดต่อพื้นที่ลาด
+  - น้ำหนักแผ่บนหลังคา (area_loads ที่ target เป็นหลังคา) แปลงเป็นน้ำหนักแผ่บนแป (ถ้ามีแปในโมเดล) หรือจันทัน
+    ตามความกว้างรับน้ำหนัก; roof_live คิดต่อพื้นที่ราบ กลุ่มอื่นคิดต่อพื้นที่ลาด
+  - ชิ้นส่วนที่มีจุดต่ออื่นอยู่กลางช่วง (จันทันที่แปวางทับ) ตั้ง auto mesh ที่จุดต่อ
   - พื้นวางบนดิน (kind=ground) ไม่ส่งเข้า SAP; พื้นลอยยังไม่รองรับ (เตือน)
 
 รัน: python tools/sap_export.py model.bm.json [-o out.s2k] [--version 23.0.0]
@@ -262,11 +263,14 @@ class Exporter:
         return math.dist((a["x"], a["y"], a["z"]), (b["x"], b["y"], b["z"]))
 
     def _roof_to_rafters(self):
-        """area_loads บนหลังคา -> น้ำหนักแผ่บนจันทัน (กว้างรับ = กึ่งกลางระหว่างจันทันข้างเคียง ปลายถึงขอบหลังคา)"""
+        """area_loads บนหลังคา -> น้ำหนักแผ่บนแป (ถ้ามีแปในโมเดล) หรือจันทัน
+        แป: กว้างรับ = กึ่งกลางระหว่างแปข้างเคียง ปลายถึงชายคา/สัน (วัดราบ)
+            roof_live คิดต่อพื้นที่ราบ, กลุ่มอื่นคิดต่อพื้นที่ลาด (หารด้วย cos มุมลาด)
+        จันทัน: กว้างรับ = กึ่งกลางระหว่างจันทันข้างเคียง ปลายถึงขอบหลังคา
+            roof_live ใช้ Gravity Projected, กลุ่มอื่น Gravity ตามความยาวจริง"""
         roofs = {r["id"]: r for r in self.m.get("roofs", [])}
         slabs = {s["id"]: s for s in self.m.get("slabs", [])}
         out = []
-        rafters = [x for x in self.members.values() if x["type"] == "rafter"]
         for al in self.m.get("loads", {}).get("area_loads", []):
             for tgt in al["targets"]:
                 if tgt in slabs:
@@ -279,34 +283,97 @@ class Exporter:
                     self.warn.append("น้ำหนัก %s: ไม่พบเป้าหมาย %s" % (al["id"], tgt))
                     continue
                 if r["form"] not in ("gable", "shed"):
-                    self.warn.append("หลังคา %s แบบ %s: ยังไม่แปลงน้ำหนักลงจันทันอัตโนมัติ" % (tgt, r["form"]))
+                    self.warn.append("หลังคา %s แบบ %s: ยังไม่แปลงน้ำหนักลงแป/จันทันอัตโนมัติ" % (tgt, r["form"]))
                     continue
-                ax = 0 if r.get("ridge", "X") == "X" else 1  # ตำแหน่งจันทันวัดตามแนวสัน
-                key = "xy"[ax]
-                xs = [p[ax] for p in r["outline"]]
-                lo, hi = min(xs), max(xs)
-                mine = [x for x in rafters if lo - 1e-6 <= self.nodes[x["i"]][key] <= hi + 1e-6
-                        and abs(self.nodes[x["i"]][key] - self.nodes[x["j"]][key]) < 1e-6]
-                pos = sorted({round(self.nodes[x["i"]][key], 6) for x in mine})
-                if not pos:
-                    self.warn.append("หลังคา %s: ไม่พบจันทันในโมเดล" % tgt)
-                    continue
-                trib = {}
-                for k, p in enumerate(pos):
-                    left = lo if k == 0 else (pos[k - 1] + p) / 2
-                    right = hi if k == len(pos) - 1 else (pos[k + 1] + p) / 2
-                    trib[p] = right - left
-                kind = self.pattern_kind.get(al["pattern"])
-                proj = kind == "roof_live"
-                for x in mine:
-                    w = round(al["value"] * trib[round(self.nodes[x["i"]][key], 6)], 4)
-                    out.append({"id": "%s@%s" % (al["id"], x["id"]), "pattern": al["pattern"], "member": x["id"],
-                                "kind": "uniform", "value": w, "dir": "gravity_proj" if proj else "gravity"})
-                if r.get("overhang") and tgt not in self._oh_warned:
-                    self._oh_warned.add(tgt)
-                    self.warn.append("หลังคา %s: ชายคายื่น %.2f ม. — ถ้าจันทันในโมเดลไม่ยื่นออกไป น้ำหนักส่วนยื่นจะไม่ถูกรวม"
-                                     % (tgt, r["overhang"]))
+                proj = self.pattern_kind.get(al["pattern"]) == "roof_live"
+                got = self._to_purlins(r, al, proj) or self._to_rafters(r, al, proj)
+                if not got:
+                    self.warn.append("หลังคา %s: ไม่พบแปหรือจันทันในโมเดล" % tgt)
+                out += got
         return out
+
+    def _in_outline(self, x, r):
+        xs = [p[0] for p in r["outline"]]; ys = [p[1] for p in r["outline"]]
+        out = []
+        for nid in (x["i"], x["j"]):
+            n = self.nodes[nid]
+            out.append(min(xs) - 1e-6 <= n["x"] <= max(xs) + 1e-6 and min(ys) - 1e-6 <= n["y"] <= max(ys) + 1e-6)
+        return all(out)
+
+    def _to_purlins(self, r, al, proj):
+        along = 0 if r.get("ridge", "X") == "X" else 1      # แปขนานสัน
+        k_c = "yx"[along]                                     # พิกัดที่คงที่ตามแนวแป
+        pur = [x for x in self.members.values() if x["type"] == "purlin" and self._in_outline(x, r)
+               and abs(self.nodes[x["i"]][k_c] - self.nodes[x["j"]][k_c]) < 0.01]
+        if not pur:
+            return []
+        cs = [p[1 - along] for p in r["outline"]]
+        lo, hi = min(cs), max(cs)
+        groups = ([(lo, (lo + hi) / 2), ((lo + hi) / 2, hi)] if r["form"] == "gable" else [(lo, hi)])
+        cosp = math.cos(math.radians(r["pitch"]))
+        out = []
+        for g0, g1 in groups:
+            mine = [x for x in pur if g0 - 1e-6 <= self.nodes[x["i"]][k_c] <= g1 + 1e-6]
+            pos = sorted({round(self.nodes[x["i"]][k_c], 6) for x in mine})
+            trib = {}
+            for k, p in enumerate(pos):
+                left = g0 if k == 0 else (pos[k - 1] + p) / 2
+                right = g1 if k == len(pos) - 1 else (pos[k + 1] + p) / 2
+                trib[p] = right - left
+            for x in mine:
+                w = al["value"] * trib[round(self.nodes[x["i"]][k_c], 6)] / (1 if proj else cosp)
+                out.append({"id": "%s@%s" % (al["id"], x["id"]), "pattern": al["pattern"], "member": x["id"],
+                            "kind": "uniform", "value": round(w, 4), "dir": "gravity"})
+        return out
+
+    def _to_rafters(self, r, al, proj):
+        ax = 0 if r.get("ridge", "X") == "X" else 1  # ตำแหน่งจันทันวัดตามแนวสัน
+        key = "xy"[ax]
+        xs = [p[ax] for p in r["outline"]]
+        lo, hi = min(xs), max(xs)
+        mine = [x for x in self.members.values() if x["type"] == "rafter" and self._in_outline(x, r)
+                and abs(self.nodes[x["i"]][key] - self.nodes[x["j"]][key]) < 1e-6]
+        pos = sorted({round(self.nodes[x["i"]][key], 6) for x in mine})
+        if not pos:
+            return []
+        trib = {}
+        for k, p in enumerate(pos):
+            left = lo if k == 0 else (pos[k - 1] + p) / 2
+            right = hi if k == len(pos) - 1 else (pos[k + 1] + p) / 2
+            trib[p] = right - left
+        out = [{"id": "%s@%s" % (al["id"], x["id"]), "pattern": al["pattern"], "member": x["id"], "kind": "uniform",
+                "value": round(al["value"] * trib[round(self.nodes[x["i"]][key], 6)], 4),
+                "dir": "gravity_proj" if proj else "gravity"} for x in mine]
+        if r.get("overhang") and not any(x["id"] for x in mine if self._reaches_edge(x, r)):
+            self.warn.append("หลังคา %s: จันทันในโมเดลไม่ยื่นถึงชายคา น้ำหนักส่วนยื่นจะไม่ถูกรวม" % r["id"])
+        return out
+
+    def _reaches_edge(self, x, r):
+        k = "yx"[0 if r.get("ridge", "X") == "X" else 1]
+        cs = [p[1 if k == "y" else 0] for p in r["outline"]]
+        return any(abs(self.nodes[n][k] - c) < 0.02 for n in (x["i"], x["j"]) for c in (min(cs), max(cs)))
+
+    def _automesh(self):
+        """ชิ้นส่วนที่มีจุดต่อของชิ้นอื่นอยู่กลางช่วง (เช่น จันทันที่แปวางทับ) ให้ SAP แบ่งช่วงที่จุดนั้น"""
+        pts = {nid: (n["x"], n["y"], n["z"]) for nid, n in self.nodes.items() if nid in self.used_nodes}
+        rows = []
+        for x in self.members.values():
+            a, b = pts[x["i"]], pts[x["j"]]
+            L = math.dist(a, b)
+            if L < 1e-6:
+                continue
+            u = [(b[k] - a[k]) / L for k in range(3)]
+            for nid, p in pts.items():
+                if nid in (x["i"], x["j"]):
+                    continue
+                t = sum((p[k] - a[k]) * u[k] for k in range(3))
+                if 1e-3 < t < L - 1e-3:
+                    off = math.dist(p, [a[k] + u[k] * t for k in range(3)])
+                    if off < 2e-3:
+                        rows.append(row(Frame=x["id"], AutoMesh="Yes", AtJoints="Yes", AtFrames="No",
+                                        NumSegments=0, MaxLength=0, MaxDegrees=0))
+                        break
+        self.table("FRAME AUTO MESH ASSIGNMENTS", rows)
 
     def _combos(self):
         rows = []
@@ -330,6 +397,7 @@ class Exporter:
         self._restraints()
         self._materials()
         self._frames()
+        self._automesh()
         self._patterns()
         self._member_loads()
         self._combos()

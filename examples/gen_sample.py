@@ -56,13 +56,49 @@ def beams(mark, lvl, tag, sec, typ):
 beams("GB1", "1F", "1F", "RC-20x40", "tie_beam")
 beams("B1", "R", "ROOF", "RC-20x40", "beam")
 
-# จันทันหลัก (แนวกริด 1, 2, 3) — แปอยู่ใน roofs[].purlin
-for gx in X:
-    for side, gy in (("A", "A"), ("B", "B")):
+# จันทันหลัก (แนวกริด 1, 2, 3) ยื่นถึงชายคา + แปเป็นชิ้นส่วนจริง (ตามวิธีที่ Earth ขึ้นโมเดลใน SAP)
+OH = 0.80
+TANP = math.tan(math.radians(PITCH))
+EAVE_Z = ROOF - OH * TANP
+for gx, x in X.items():
+    for side, gy, ye in (("A", "A", -OH), ("B", "B", 4.0 + OH)):
+        node(f"N-{gx}{gy}-E", x, ye, EAVE_Z, f"{gx}/{gy}", None)
+        members.append({"id": f"RF1-{gx}{side}-OH", "mark": "RF1", "type": "rafter",
+                        "i": f"N-{gx}{gy}-E", "j": f"N-{gx}{gy}-R", "section": "C100x50x20x2.3",
+                        "material": "SSC400", "group": "roof_frame", "status": "from_drawing", "src": "S-04",
+                        "note": "ส่วนยื่นชายคา"})
         members.append({"id": f"RF1-{gx}{side}", "mark": "RF1", "type": "rafter",
                         "i": f"N-{gx}{gy}-R", "j": f"N-{gx}-RIDGE", "section": "C100x50x20x2.3",
                         "material": "SSC400", "group": "roof_frame",
                         "releases": {"i": ["M2", "M3"]}, "status": "from_drawing", "src": "S-04"})
+
+# แป C75 @0.80 ตามแนวลาด วัดจากชายคา (ตำแหน่งเดียวกับที่ตัวถอดปริมาณสร้าง) ต่อเนื่องข้ามจันทัน
+SLOPE_SP = 0.80
+XS = [("W", -OH)] + list(X.items()) + [("E", 8.0 + OH)]
+for side, y0, sgn in (("A", -OH, 1), ("B", 4.0 + OH, -1)):
+    k = 0
+    slope_len = (2.0 + OH) / math.cos(math.radians(PITCH))   # ชายคาถึงสัน ตามแนวลาด
+    c = 0.05                                                  # ตัวแรกห่างขอบ 5 ซม. (ตาม plane_lines)
+    while c <= slope_len - 0.02:
+        h = c * math.cos(math.radians(PITCH))
+        k += 1
+        y = y0 + sgn * h
+        z = EAVE_Z + h * TANP
+        if abs(y - Y[side]) < 0.01:                       # แปทับแนวคาน -> จัดให้ตรงแนวพอดี
+            y, z = Y[side], ROOF
+        ids = []
+        for lab, x in XS:
+            if lab in X and abs(y - Y[side]) < 0.01:      # แปทับแนวคาน -> ใช้จุดบนจันทันเดิม
+                ids.append(f"N-{lab}{side}-R")
+                continue
+            nid = f"N-P{side}{k}-{lab}"
+            node(nid, x, y, z, None, None)
+            ids.append(nid)
+        for t in range(len(ids) - 1):
+            members.append({"id": f"P1-{side}{k}-{t + 1}", "mark": "P1", "type": "purlin",
+                            "i": ids[t], "j": ids[t + 1], "section": "C75x45x15x2.3", "material": "SSC400",
+                            "group": "roof_frame", "status": "from_drawing", "src": "S-04"})
+        c += SLOPE_SP
 
 walls, n = [], 0
 perimeter = [((0, 0), (4, 0), "A12"), ((4, 0), (8, 0), "A23"), ((8, 0), (8, 4), "3AB"),
