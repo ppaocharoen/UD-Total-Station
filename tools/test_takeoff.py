@@ -28,14 +28,15 @@ items, notes, used = run(m)
 by = {it["key"]: it for it in items}
 
 EXPECT = {
-    "excav": 11.70, "backfill": 9.32, "sand_base": 0.38, "sand_slab": 2.00, "lean_conc": 0.30,
+    "excav": 11.70, "sand_base": 0.38, "sand_slab": 2.00, "lean_conc": 0.30,
     "conc_C240": 10.09, "formwork": 77.64, "props": 40, "rebar_DB12": 386.78, "rebar_RB6": 133.84,
     "tie_wire": 15.62, "wall_brick_mon": 54.84, "plaster_wall": 109.68, "lintel": 17.10,
     "cover_metal_sheet": 58.93, "roof_frame_area": 57.21, "steel_C75x45x15x2.3": 253.50,
     "steel_C100x50x20x2.3": 48.72, "ridge_cap": 9.89, "open_W1": 2, "open_D1": 1, "paint_ext": 54.84,
     "demo_ARC-2.9.17-a": 20.00,
 }
-ok = True
+ok = "backfill" not in by
+print(("PASS" if ok else "FAIL"), "ไม่มีแถวถมคืนแยก (รวมใน 1.3)")
 for k, v in EXPECT.items():
     got = by.get(k, {}).get("qty")
     good = got is not None and abs(got - v) < 0.005
