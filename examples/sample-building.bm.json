@@ -960,12 +960,6 @@
    "section": "C100x50x20x2.3",
    "material": "SSC400",
    "group": "roof_frame",
-   "releases": {
-    "i": [
-     "M2",
-     "M3"
-    ]
-   },
    "status": "from_drawing",
    "src": "S-04"
   },
@@ -991,12 +985,6 @@
    "section": "C100x50x20x2.3",
    "material": "SSC400",
    "group": "roof_frame",
-   "releases": {
-    "i": [
-     "M2",
-     "M3"
-    ]
-   },
    "status": "from_drawing",
    "src": "S-04"
   },
@@ -1022,12 +1010,6 @@
    "section": "C100x50x20x2.3",
    "material": "SSC400",
    "group": "roof_frame",
-   "releases": {
-    "i": [
-     "M2",
-     "M3"
-    ]
-   },
    "status": "from_drawing",
    "src": "S-04"
   },
@@ -1053,12 +1035,6 @@
    "section": "C100x50x20x2.3",
    "material": "SSC400",
    "group": "roof_frame",
-   "releases": {
-    "i": [
-     "M2",
-     "M3"
-    ]
-   },
    "status": "from_drawing",
    "src": "S-04"
   },
@@ -1084,12 +1060,6 @@
    "section": "C100x50x20x2.3",
    "material": "SSC400",
    "group": "roof_frame",
-   "releases": {
-    "i": [
-     "M2",
-     "M3"
-    ]
-   },
    "status": "from_drawing",
    "src": "S-04"
   },
@@ -1115,12 +1085,6 @@
    "section": "C100x50x20x2.3",
    "material": "SSC400",
    "group": "roof_frame",
-   "releases": {
-    "i": [
-     "M2",
-     "M3"
-    ]
-   },
    "status": "from_drawing",
    "src": "S-04"
   },
@@ -2666,7 +2630,7 @@
   }
  ],
  "quantities": {
-  "model_hash": "00c53632e8202f8b",
+  "model_hash": "b29ac0992a02d4ca",
   "stale": false,
   "generated_by": "tools/takeoff.py",
   "settings": {
@@ -3532,7 +3496,7 @@
    "note": "สร้างไฟล์ตัวอย่าง"
   },
   {
-   "at": "2026-10-18T04:31:17+07:00",
+   "at": "2026-10-18T04:42:25+07:00",
    "by": "tools/takeoff.py",
    "sections": [
     "quantities"

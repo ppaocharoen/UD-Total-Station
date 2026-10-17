@@ -1,0 +1,363 @@
+File exported from UD-Total-Station sap_export.py  project=อาคารตัวอย่าง 1 ชั้น  model_hash=b29ac0992a02d4ca
+
+TABLE:  "PROGRAM CONTROL"
+   ProgramName=SAP2000   Version=23.0.0   CurrUnits="Kgf, m, C"   SteelCode="AISC 360-16"   ConcCode="ACI 318-19"   ColdCode=AISI-16
+
+TABLE:  "FRAME SECTION PROPERTIES 01 - GENERAL"
+   SectionName=RC-20x20   Material=C240   Shape=Rectangular   t3=0.2   t2=0.2   Color=Cyan   FromFile=No   AMod=1   A2Mod=1   A3Mod=1   JMod=1   I2Mod=1   I3Mod=1   MMod=1   WMod=1
+   SectionName=RC-20x40   Material=C240   Shape=Rectangular   t3=0.4   t2=0.2   Color=Cyan   FromFile=No   AMod=1   A2Mod=1   A3Mod=1   JMod=1   I2Mod=1   I3Mod=1   MMod=1   WMod=1
+   SectionName=C100x50x20x2.3   Material=SSC400   Shape="Cold Formed C"   t3=0.1   t2=0.05   tw=0.0023   Radius=0   LipDepth=0.02   Color=Red   FromFile=No   AMod=1   A2Mod=1   A3Mod=1   JMod=1   I2Mod=1   I3Mod=1   MMod=1   WMod=1
+   SectionName=C75x45x15x2.3   Material=SSC400   Shape="Cold Formed C"   t3=0.075   t2=0.045   tw=0.0023   Radius=0   LipDepth=0.015   Color=Red   FromFile=No   AMod=1   A2Mod=1   A3Mod=1   JMod=1   I2Mod=1   I3Mod=1   MMod=1   WMod=1
+
+TABLE:  "GRID LINES"
+   CoordSys=GLOBAL   AxisDir=X   GridID=1   XRYZCoord=0   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=X   GridID=2   XRYZCoord=4   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=X   GridID=3   XRYZCoord=8   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Y   GridID=A   XRYZCoord=0   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Y   GridID=B   XRYZCoord=4   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Z   GridID=FOOT   XRYZCoord=-1.5   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Z   GridID=GL   XRYZCoord=0   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Z   GridID=1F   XRYZCoord=0.3   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Z   GridID=ROOF   XRYZCoord=3.3   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+   CoordSys=GLOBAL   AxisDir=Z   GridID=RIDGE   XRYZCoord=4.0279   LineType=Primary   LineColor=Gray8Dark   Visible=Yes   BubbleLoc=End
+
+TABLE:  "JOINT COORDINATES"
+   Joint=N-1A-B   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=0   Z=-1.15   SpecialJt=No   GlobalX=0   GlobalY=0   GlobalZ=-1.15
+   Joint=N-1A-1F   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=0   Z=0.3   SpecialJt=No   GlobalX=0   GlobalY=0   GlobalZ=0.3
+   Joint=N-1A-R   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=0   Z=3.3   SpecialJt=No   GlobalX=0   GlobalY=0   GlobalZ=3.3
+   Joint=N-1B-B   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=4   Z=-1.15   SpecialJt=No   GlobalX=0   GlobalY=4   GlobalZ=-1.15
+   Joint=N-1B-1F   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=4   Z=0.3   SpecialJt=No   GlobalX=0   GlobalY=4   GlobalZ=0.3
+   Joint=N-1B-R   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=4   Z=3.3   SpecialJt=No   GlobalX=0   GlobalY=4   GlobalZ=3.3
+   Joint=N-1-RIDGE   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=2   Z=4.0279   SpecialJt=No   GlobalX=0   GlobalY=2   GlobalZ=4.0279
+   Joint=N-2A-B   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=0   Z=-1.15   SpecialJt=No   GlobalX=4   GlobalY=0   GlobalZ=-1.15
+   Joint=N-2A-1F   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=0   Z=0.3   SpecialJt=No   GlobalX=4   GlobalY=0   GlobalZ=0.3
+   Joint=N-2A-R   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=0   Z=3.3   SpecialJt=No   GlobalX=4   GlobalY=0   GlobalZ=3.3
+   Joint=N-2B-B   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=4   Z=-1.15   SpecialJt=No   GlobalX=4   GlobalY=4   GlobalZ=-1.15
+   Joint=N-2B-1F   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=4   Z=0.3   SpecialJt=No   GlobalX=4   GlobalY=4   GlobalZ=0.3
+   Joint=N-2B-R   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=4   Z=3.3   SpecialJt=No   GlobalX=4   GlobalY=4   GlobalZ=3.3
+   Joint=N-2-RIDGE   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=2   Z=4.0279   SpecialJt=No   GlobalX=4   GlobalY=2   GlobalZ=4.0279
+   Joint=N-3A-B   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=0   Z=-1.15   SpecialJt=No   GlobalX=8   GlobalY=0   GlobalZ=-1.15
+   Joint=N-3A-1F   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=0   Z=0.3   SpecialJt=No   GlobalX=8   GlobalY=0   GlobalZ=0.3
+   Joint=N-3A-R   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=0   Z=3.3   SpecialJt=No   GlobalX=8   GlobalY=0   GlobalZ=3.3
+   Joint=N-3B-B   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=4   Z=-1.15   SpecialJt=No   GlobalX=8   GlobalY=4   GlobalZ=-1.15
+   Joint=N-3B-1F   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=4   Z=0.3   SpecialJt=No   GlobalX=8   GlobalY=4   GlobalZ=0.3
+   Joint=N-3B-R   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=4   Z=3.3   SpecialJt=No   GlobalX=8   GlobalY=4   GlobalZ=3.3
+   Joint=N-3-RIDGE   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=2   Z=4.0279   SpecialJt=No   GlobalX=8   GlobalY=2   GlobalZ=4.0279
+   Joint=N-1A-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=-0.8   Z=3.0088   SpecialJt=No   GlobalX=0   GlobalY=-0.8   GlobalZ=3.0088
+   Joint=N-1B-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=4.8   Z=3.0088   SpecialJt=No   GlobalX=0   GlobalY=4.8   GlobalZ=3.0088
+   Joint=N-2A-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=-0.8   Z=3.0088   SpecialJt=No   GlobalX=4   GlobalY=-0.8   GlobalZ=3.0088
+   Joint=N-2B-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=4.8   Z=3.0088   SpecialJt=No   GlobalX=4   GlobalY=4.8   GlobalZ=3.0088
+   Joint=N-3A-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=-0.8   Z=3.0088   SpecialJt=No   GlobalX=8   GlobalY=-0.8   GlobalZ=3.0088
+   Joint=N-3B-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=4.8   Z=3.0088   SpecialJt=No   GlobalX=8   GlobalY=4.8   GlobalZ=3.0088
+   Joint=N-PA1-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=-0.753   Z=3.0259   SpecialJt=No   GlobalX=-0.8   GlobalY=-0.753   GlobalZ=3.0259
+   Joint=N-PA1-1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=-0.753   Z=3.0259   SpecialJt=No   GlobalX=0   GlobalY=-0.753   GlobalZ=3.0259
+   Joint=N-PA1-2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=-0.753   Z=3.0259   SpecialJt=No   GlobalX=4   GlobalY=-0.753   GlobalZ=3.0259
+   Joint=N-PA1-3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=-0.753   Z=3.0259   SpecialJt=No   GlobalX=8   GlobalY=-0.753   GlobalZ=3.0259
+   Joint=N-PA1-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=-0.753   Z=3.0259   SpecialJt=No   GlobalX=8.8   GlobalY=-0.753   GlobalZ=3.0259
+   Joint=N-PA2-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=0   Z=3.3   SpecialJt=No   GlobalX=-0.8   GlobalY=0   GlobalZ=3.3
+   Joint=N-PA2-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=0   Z=3.3   SpecialJt=No   GlobalX=8.8   GlobalY=0   GlobalZ=3.3
+   Joint=N-PA3-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=0.7505   Z=3.5732   SpecialJt=No   GlobalX=-0.8   GlobalY=0.7505   GlobalZ=3.5732
+   Joint=N-PA3-1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=0.7505   Z=3.5732   SpecialJt=No   GlobalX=0   GlobalY=0.7505   GlobalZ=3.5732
+   Joint=N-PA3-2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=0.7505   Z=3.5732   SpecialJt=No   GlobalX=4   GlobalY=0.7505   GlobalZ=3.5732
+   Joint=N-PA3-3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=0.7505   Z=3.5732   SpecialJt=No   GlobalX=8   GlobalY=0.7505   GlobalZ=3.5732
+   Joint=N-PA3-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=0.7505   Z=3.5732   SpecialJt=No   GlobalX=8.8   GlobalY=0.7505   GlobalZ=3.5732
+   Joint=N-PA4-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=1.5022   Z=3.8468   SpecialJt=No   GlobalX=-0.8   GlobalY=1.5022   GlobalZ=3.8468
+   Joint=N-PA4-1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=1.5022   Z=3.8468   SpecialJt=No   GlobalX=0   GlobalY=1.5022   GlobalZ=3.8468
+   Joint=N-PA4-2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=1.5022   Z=3.8468   SpecialJt=No   GlobalX=4   GlobalY=1.5022   GlobalZ=3.8468
+   Joint=N-PA4-3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=1.5022   Z=3.8468   SpecialJt=No   GlobalX=8   GlobalY=1.5022   GlobalZ=3.8468
+   Joint=N-PA4-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=1.5022   Z=3.8468   SpecialJt=No   GlobalX=8.8   GlobalY=1.5022   GlobalZ=3.8468
+   Joint=N-PB1-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=4.753   Z=3.0259   SpecialJt=No   GlobalX=-0.8   GlobalY=4.753   GlobalZ=3.0259
+   Joint=N-PB1-1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=4.753   Z=3.0259   SpecialJt=No   GlobalX=0   GlobalY=4.753   GlobalZ=3.0259
+   Joint=N-PB1-2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=4.753   Z=3.0259   SpecialJt=No   GlobalX=4   GlobalY=4.753   GlobalZ=3.0259
+   Joint=N-PB1-3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=4.753   Z=3.0259   SpecialJt=No   GlobalX=8   GlobalY=4.753   GlobalZ=3.0259
+   Joint=N-PB1-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=4.753   Z=3.0259   SpecialJt=No   GlobalX=8.8   GlobalY=4.753   GlobalZ=3.0259
+   Joint=N-PB2-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=4   Z=3.3   SpecialJt=No   GlobalX=-0.8   GlobalY=4   GlobalZ=3.3
+   Joint=N-PB2-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=4   Z=3.3   SpecialJt=No   GlobalX=8.8   GlobalY=4   GlobalZ=3.3
+   Joint=N-PB3-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=3.2495   Z=3.5732   SpecialJt=No   GlobalX=-0.8   GlobalY=3.2495   GlobalZ=3.5732
+   Joint=N-PB3-1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=3.2495   Z=3.5732   SpecialJt=No   GlobalX=0   GlobalY=3.2495   GlobalZ=3.5732
+   Joint=N-PB3-2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=3.2495   Z=3.5732   SpecialJt=No   GlobalX=4   GlobalY=3.2495   GlobalZ=3.5732
+   Joint=N-PB3-3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=3.2495   Z=3.5732   SpecialJt=No   GlobalX=8   GlobalY=3.2495   GlobalZ=3.5732
+   Joint=N-PB3-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=3.2495   Z=3.5732   SpecialJt=No   GlobalX=8.8   GlobalY=3.2495   GlobalZ=3.5732
+   Joint=N-PB4-W   CoordSys=GLOBAL   CoordType=Cartesian   XorR=-0.8   Y=2.4978   Z=3.8468   SpecialJt=No   GlobalX=-0.8   GlobalY=2.4978   GlobalZ=3.8468
+   Joint=N-PB4-1   CoordSys=GLOBAL   CoordType=Cartesian   XorR=0   Y=2.4978   Z=3.8468   SpecialJt=No   GlobalX=0   GlobalY=2.4978   GlobalZ=3.8468
+   Joint=N-PB4-2   CoordSys=GLOBAL   CoordType=Cartesian   XorR=4   Y=2.4978   Z=3.8468   SpecialJt=No   GlobalX=4   GlobalY=2.4978   GlobalZ=3.8468
+   Joint=N-PB4-3   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8   Y=2.4978   Z=3.8468   SpecialJt=No   GlobalX=8   GlobalY=2.4978   GlobalZ=3.8468
+   Joint=N-PB4-E   CoordSys=GLOBAL   CoordType=Cartesian   XorR=8.8   Y=2.4978   Z=3.8468   SpecialJt=No   GlobalX=8.8   GlobalY=2.4978   GlobalZ=3.8468
+
+TABLE:  "JOINT RESTRAINT ASSIGNMENTS"
+   Joint=N-1A-B   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+   Joint=N-1B-B   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+   Joint=N-2A-B   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+   Joint=N-2B-B   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+   Joint=N-3A-B   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+   Joint=N-3B-B   U1=Yes   U2=Yes   U3=Yes   R1=Yes   R2=Yes   R3=Yes
+
+TABLE:  "MATERIAL PROPERTIES 01 - GENERAL"
+   Material=C240   Type=Concrete   Grade="fc 240 ksc"   SymType=Isotropic   TempDepend=No   Color=Gray8Dark   Notes="from bm.json"
+   Material=SSC400   Type=ColdFormed   Grade=SSC400   SymType=Isotropic   TempDepend=No   Color=Red   Notes="from bm.json"
+
+TABLE:  "MATERIAL PROPERTIES 02 - BASIC MECHANICAL PROPERTIES"
+   Material=C240   UnitWeight=2400   UnitMass=244.7319   E1=2339281941   G12=974700808.8   U12=0.2   A1=9.9e-06
+   Material=SSC400   UnitWeight=7850   UnitMass=800.4772   E1=20400000000   G12=7846153846   U12=0.3   A1=1.17e-05
+
+TABLE:  "MATERIAL PROPERTIES 03B - CONCRETE DATA"
+   Material=C240   Fc=2400000   eFc=2400000   LtWtConc=No   SSCurveOpt=Mander   SSHysType=Takeda   SFc=0.00221914   SCap=0.005   FinalSlope=-0.1   FAngle=0   DAngle=0   CoupModType="Modified Darwin-Pecknold"
+
+TABLE:  "MATERIAL PROPERTIES 03D - COLD FORMED DATA"
+   Material=SSC400   Fy=24500000   Fu=41000000   SSHysType=Kinematic   CoupModType="Von Mises"
+
+TABLE:  "CONNECTIVITY - FRAME"
+   Frame=C1-1A-1   JointI=N-1A-B   JointJ=N-1A-1F   IsCurved=No   Length=1.45   CentroidX=0   CentroidY=0   CentroidZ=-0.425
+   Frame=C1-1A-2   JointI=N-1A-1F   JointJ=N-1A-R   IsCurved=No   Length=3   CentroidX=0   CentroidY=0   CentroidZ=1.8
+   Frame=C1-1B-1   JointI=N-1B-B   JointJ=N-1B-1F   IsCurved=No   Length=1.45   CentroidX=0   CentroidY=4   CentroidZ=-0.425
+   Frame=C1-1B-2   JointI=N-1B-1F   JointJ=N-1B-R   IsCurved=No   Length=3   CentroidX=0   CentroidY=4   CentroidZ=1.8
+   Frame=C1-2A-1   JointI=N-2A-B   JointJ=N-2A-1F   IsCurved=No   Length=1.45   CentroidX=4   CentroidY=0   CentroidZ=-0.425
+   Frame=C1-2A-2   JointI=N-2A-1F   JointJ=N-2A-R   IsCurved=No   Length=3   CentroidX=4   CentroidY=0   CentroidZ=1.8
+   Frame=C1-2B-1   JointI=N-2B-B   JointJ=N-2B-1F   IsCurved=No   Length=1.45   CentroidX=4   CentroidY=4   CentroidZ=-0.425
+   Frame=C1-2B-2   JointI=N-2B-1F   JointJ=N-2B-R   IsCurved=No   Length=3   CentroidX=4   CentroidY=4   CentroidZ=1.8
+   Frame=C1-3A-1   JointI=N-3A-B   JointJ=N-3A-1F   IsCurved=No   Length=1.45   CentroidX=8   CentroidY=0   CentroidZ=-0.425
+   Frame=C1-3A-2   JointI=N-3A-1F   JointJ=N-3A-R   IsCurved=No   Length=3   CentroidX=8   CentroidY=0   CentroidZ=1.8
+   Frame=C1-3B-1   JointI=N-3B-B   JointJ=N-3B-1F   IsCurved=No   Length=1.45   CentroidX=8   CentroidY=4   CentroidZ=-0.425
+   Frame=C1-3B-2   JointI=N-3B-1F   JointJ=N-3B-R   IsCurved=No   Length=3   CentroidX=8   CentroidY=4   CentroidZ=1.8
+   Frame=GB1-1F-01   JointI=N-1A-1F   JointJ=N-2A-1F   IsCurved=No   Length=4   CentroidX=2   CentroidY=0   CentroidZ=0.3
+   Frame=GB1-1F-02   JointI=N-2A-1F   JointJ=N-3A-1F   IsCurved=No   Length=4   CentroidX=6   CentroidY=0   CentroidZ=0.3
+   Frame=GB1-1F-03   JointI=N-1B-1F   JointJ=N-2B-1F   IsCurved=No   Length=4   CentroidX=2   CentroidY=4   CentroidZ=0.3
+   Frame=GB1-1F-04   JointI=N-2B-1F   JointJ=N-3B-1F   IsCurved=No   Length=4   CentroidX=6   CentroidY=4   CentroidZ=0.3
+   Frame=GB1-1F-05   JointI=N-1A-1F   JointJ=N-1B-1F   IsCurved=No   Length=4   CentroidX=0   CentroidY=2   CentroidZ=0.3
+   Frame=GB1-1F-06   JointI=N-2A-1F   JointJ=N-2B-1F   IsCurved=No   Length=4   CentroidX=4   CentroidY=2   CentroidZ=0.3
+   Frame=GB1-1F-07   JointI=N-3A-1F   JointJ=N-3B-1F   IsCurved=No   Length=4   CentroidX=8   CentroidY=2   CentroidZ=0.3
+   Frame=B1-ROOF-01   JointI=N-1A-R   JointJ=N-2A-R   IsCurved=No   Length=4   CentroidX=2   CentroidY=0   CentroidZ=3.3
+   Frame=B1-ROOF-02   JointI=N-2A-R   JointJ=N-3A-R   IsCurved=No   Length=4   CentroidX=6   CentroidY=0   CentroidZ=3.3
+   Frame=B1-ROOF-03   JointI=N-1B-R   JointJ=N-2B-R   IsCurved=No   Length=4   CentroidX=2   CentroidY=4   CentroidZ=3.3
+   Frame=B1-ROOF-04   JointI=N-2B-R   JointJ=N-3B-R   IsCurved=No   Length=4   CentroidX=6   CentroidY=4   CentroidZ=3.3
+   Frame=B1-ROOF-05   JointI=N-1A-R   JointJ=N-1B-R   IsCurved=No   Length=4   CentroidX=0   CentroidY=2   CentroidZ=3.3
+   Frame=B1-ROOF-06   JointI=N-2A-R   JointJ=N-2B-R   IsCurved=No   Length=4   CentroidX=4   CentroidY=2   CentroidZ=3.3
+   Frame=B1-ROOF-07   JointI=N-3A-R   JointJ=N-3B-R   IsCurved=No   Length=4   CentroidX=8   CentroidY=2   CentroidZ=3.3
+   Frame=RF1-1A-OH   JointI=N-1A-E   JointJ=N-1A-R   IsCurved=No   Length=0.85135   CentroidX=0   CentroidY=-0.4   CentroidZ=3.1544
+   Frame=RF1-1A   JointI=N-1A-R   JointJ=N-1-RIDGE   IsCurved=No   Length=2.128342   CentroidX=0   CentroidY=1   CentroidZ=3.66395
+   Frame=RF1-1B-OH   JointI=N-1B-E   JointJ=N-1B-R   IsCurved=No   Length=0.85135   CentroidX=0   CentroidY=4.4   CentroidZ=3.1544
+   Frame=RF1-1B   JointI=N-1B-R   JointJ=N-1-RIDGE   IsCurved=No   Length=2.128342   CentroidX=0   CentroidY=3   CentroidZ=3.66395
+   Frame=RF1-2A-OH   JointI=N-2A-E   JointJ=N-2A-R   IsCurved=No   Length=0.85135   CentroidX=4   CentroidY=-0.4   CentroidZ=3.1544
+   Frame=RF1-2A   JointI=N-2A-R   JointJ=N-2-RIDGE   IsCurved=No   Length=2.128342   CentroidX=4   CentroidY=1   CentroidZ=3.66395
+   Frame=RF1-2B-OH   JointI=N-2B-E   JointJ=N-2B-R   IsCurved=No   Length=0.85135   CentroidX=4   CentroidY=4.4   CentroidZ=3.1544
+   Frame=RF1-2B   JointI=N-2B-R   JointJ=N-2-RIDGE   IsCurved=No   Length=2.128342   CentroidX=4   CentroidY=3   CentroidZ=3.66395
+   Frame=RF1-3A-OH   JointI=N-3A-E   JointJ=N-3A-R   IsCurved=No   Length=0.85135   CentroidX=8   CentroidY=-0.4   CentroidZ=3.1544
+   Frame=RF1-3A   JointI=N-3A-R   JointJ=N-3-RIDGE   IsCurved=No   Length=2.128342   CentroidX=8   CentroidY=1   CentroidZ=3.66395
+   Frame=RF1-3B-OH   JointI=N-3B-E   JointJ=N-3B-R   IsCurved=No   Length=0.85135   CentroidX=8   CentroidY=4.4   CentroidZ=3.1544
+   Frame=RF1-3B   JointI=N-3B-R   JointJ=N-3-RIDGE   IsCurved=No   Length=2.128342   CentroidX=8   CentroidY=3   CentroidZ=3.66395
+   Frame=P1-A1-1   JointI=N-PA1-W   JointJ=N-PA1-1   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=-0.753   CentroidZ=3.0259
+   Frame=P1-A1-2   JointI=N-PA1-1   JointJ=N-PA1-2   IsCurved=No   Length=4   CentroidX=2   CentroidY=-0.753   CentroidZ=3.0259
+   Frame=P1-A1-3   JointI=N-PA1-2   JointJ=N-PA1-3   IsCurved=No   Length=4   CentroidX=6   CentroidY=-0.753   CentroidZ=3.0259
+   Frame=P1-A1-4   JointI=N-PA1-3   JointJ=N-PA1-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=-0.753   CentroidZ=3.0259
+   Frame=P1-A2-1   JointI=N-PA2-W   JointJ=N-1A-R   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=0   CentroidZ=3.3
+   Frame=P1-A2-2   JointI=N-1A-R   JointJ=N-2A-R   IsCurved=No   Length=4   CentroidX=2   CentroidY=0   CentroidZ=3.3
+   Frame=P1-A2-3   JointI=N-2A-R   JointJ=N-3A-R   IsCurved=No   Length=4   CentroidX=6   CentroidY=0   CentroidZ=3.3
+   Frame=P1-A2-4   JointI=N-3A-R   JointJ=N-PA2-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=0   CentroidZ=3.3
+   Frame=P1-A3-1   JointI=N-PA3-W   JointJ=N-PA3-1   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=0.7505   CentroidZ=3.5732
+   Frame=P1-A3-2   JointI=N-PA3-1   JointJ=N-PA3-2   IsCurved=No   Length=4   CentroidX=2   CentroidY=0.7505   CentroidZ=3.5732
+   Frame=P1-A3-3   JointI=N-PA3-2   JointJ=N-PA3-3   IsCurved=No   Length=4   CentroidX=6   CentroidY=0.7505   CentroidZ=3.5732
+   Frame=P1-A3-4   JointI=N-PA3-3   JointJ=N-PA3-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=0.7505   CentroidZ=3.5732
+   Frame=P1-A4-1   JointI=N-PA4-W   JointJ=N-PA4-1   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=1.5022   CentroidZ=3.8468
+   Frame=P1-A4-2   JointI=N-PA4-1   JointJ=N-PA4-2   IsCurved=No   Length=4   CentroidX=2   CentroidY=1.5022   CentroidZ=3.8468
+   Frame=P1-A4-3   JointI=N-PA4-2   JointJ=N-PA4-3   IsCurved=No   Length=4   CentroidX=6   CentroidY=1.5022   CentroidZ=3.8468
+   Frame=P1-A4-4   JointI=N-PA4-3   JointJ=N-PA4-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=1.5022   CentroidZ=3.8468
+   Frame=P1-B1-1   JointI=N-PB1-W   JointJ=N-PB1-1   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=4.753   CentroidZ=3.0259
+   Frame=P1-B1-2   JointI=N-PB1-1   JointJ=N-PB1-2   IsCurved=No   Length=4   CentroidX=2   CentroidY=4.753   CentroidZ=3.0259
+   Frame=P1-B1-3   JointI=N-PB1-2   JointJ=N-PB1-3   IsCurved=No   Length=4   CentroidX=6   CentroidY=4.753   CentroidZ=3.0259
+   Frame=P1-B1-4   JointI=N-PB1-3   JointJ=N-PB1-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=4.753   CentroidZ=3.0259
+   Frame=P1-B2-1   JointI=N-PB2-W   JointJ=N-1B-R   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=4   CentroidZ=3.3
+   Frame=P1-B2-2   JointI=N-1B-R   JointJ=N-2B-R   IsCurved=No   Length=4   CentroidX=2   CentroidY=4   CentroidZ=3.3
+   Frame=P1-B2-3   JointI=N-2B-R   JointJ=N-3B-R   IsCurved=No   Length=4   CentroidX=6   CentroidY=4   CentroidZ=3.3
+   Frame=P1-B2-4   JointI=N-3B-R   JointJ=N-PB2-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=4   CentroidZ=3.3
+   Frame=P1-B3-1   JointI=N-PB3-W   JointJ=N-PB3-1   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=3.2495   CentroidZ=3.5732
+   Frame=P1-B3-2   JointI=N-PB3-1   JointJ=N-PB3-2   IsCurved=No   Length=4   CentroidX=2   CentroidY=3.2495   CentroidZ=3.5732
+   Frame=P1-B3-3   JointI=N-PB3-2   JointJ=N-PB3-3   IsCurved=No   Length=4   CentroidX=6   CentroidY=3.2495   CentroidZ=3.5732
+   Frame=P1-B3-4   JointI=N-PB3-3   JointJ=N-PB3-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=3.2495   CentroidZ=3.5732
+   Frame=P1-B4-1   JointI=N-PB4-W   JointJ=N-PB4-1   IsCurved=No   Length=0.8   CentroidX=-0.4   CentroidY=2.4978   CentroidZ=3.8468
+   Frame=P1-B4-2   JointI=N-PB4-1   JointJ=N-PB4-2   IsCurved=No   Length=4   CentroidX=2   CentroidY=2.4978   CentroidZ=3.8468
+   Frame=P1-B4-3   JointI=N-PB4-2   JointJ=N-PB4-3   IsCurved=No   Length=4   CentroidX=6   CentroidY=2.4978   CentroidZ=3.8468
+   Frame=P1-B4-4   JointI=N-PB4-3   JointJ=N-PB4-E   IsCurved=No   Length=0.8   CentroidX=8.4   CentroidY=2.4978   CentroidZ=3.8468
+
+TABLE:  "FRAME SECTION ASSIGNMENTS"
+   Frame=C1-1A-1   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-1A-2   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-1B-1   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-1B-2   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-2A-1   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-2A-2   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-2B-1   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-2B-2   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-3A-1   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-3A-2   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-3B-1   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=C1-3B-2   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x20   MatProp=Default
+   Frame=GB1-1F-01   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=GB1-1F-02   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=GB1-1F-03   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=GB1-1F-04   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=GB1-1F-05   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=GB1-1F-06   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=GB1-1F-07   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-01   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-02   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-03   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-04   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-05   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-06   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=B1-ROOF-07   SectionType=Rectangular   AutoSelect=N.A.   AnalSect=RC-20x40   MatProp=Default
+   Frame=RF1-1A-OH   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-1A   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-1B-OH   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-1B   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-2A-OH   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-2A   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-2B-OH   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-2B   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-3A-OH   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-3A   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-3B-OH   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=RF1-3B   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C100x50x20x2.3   MatProp=Default
+   Frame=P1-A1-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A1-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A1-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A1-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A2-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A2-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A2-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A2-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A3-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A3-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A3-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A3-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A4-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A4-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A4-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-A4-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B1-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B1-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B1-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B1-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B2-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B2-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B2-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B2-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B3-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B3-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B3-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B3-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B4-1   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B4-2   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B4-3   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+   Frame=P1-B4-4   SectionType="Cold Formed C"   AutoSelect=N.A.   AnalSect=C75x45x15x2.3   MatProp=Default
+
+TABLE:  "FRAME AUTO MESH ASSIGNMENTS"
+   Frame=RF1-1A-OH   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-1A   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-1B-OH   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-1B   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-2A-OH   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-2A   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-2B-OH   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-2B   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-3A-OH   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-3A   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-3B-OH   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+   Frame=RF1-3B   AutoMesh=Yes   AtJoints=Yes   AtFrames=No   NumSegments=0   MaxLength=0   MaxDegrees=0
+
+TABLE:  "LOAD PATTERN DEFINITIONS"
+   LoadPat=DL   DesignType=Dead   SelfWtMult=1
+   LoadPat=SDL   DesignType="Super Dead"   SelfWtMult=0
+   LoadPat=LR   DesignType="Roof Live"   SelfWtMult=0
+   LoadPat=WX   DesignType=Wind   SelfWtMult=0   AutoLoad=None
+
+TABLE:  "LOAD CASE DEFINITIONS"
+   Case=DL   Type=LinStatic   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType=Dead   DesActOpt="Prog Det"   DesignAct=Non-Composite   AutoType=None   RunCase=Yes   CaseStatus="Not Run"
+   Case=SDL   Type=LinStatic   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType="Super Dead"   DesActOpt="Prog Det"   DesignAct=Non-Composite   AutoType=None   RunCase=Yes   CaseStatus="Not Run"
+   Case=LR   Type=LinStatic   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType="Roof Live"   DesActOpt="Prog Det"   DesignAct=Non-Composite   AutoType=None   RunCase=Yes   CaseStatus="Not Run"
+   Case=WX   Type=LinStatic   InitialCond=Zero   DesTypeOpt="Prog Det"   DesignType=Wind   DesActOpt="Prog Det"   DesignAct=Non-Composite   AutoType=None   RunCase=Yes   CaseStatus="Not Run"
+
+TABLE:  "CASE - STATIC 1 - LOAD ASSIGNMENTS"
+   Case=DL   LoadType="Load pattern"   LoadName=DL   LoadSF=1
+   Case=SDL   LoadType="Load pattern"   LoadName=SDL   LoadSF=1
+   Case=LR   LoadType="Load pattern"   LoadName=LR   LoadSF=1
+   Case=WX   LoadType="Load pattern"   LoadName=WX   LoadSF=1
+
+TABLE:  "FRAME LOADS - DISTRIBUTED"
+   Frame=GB1-1F-01   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=468   FOverLB=468
+   Frame=GB1-1F-02   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=468   FOverLB=468
+   Frame=GB1-1F-07   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=468   FOverLB=468
+   Frame=GB1-1F-04   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=468   FOverLB=468
+   Frame=GB1-1F-03   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=468   FOverLB=468
+   Frame=GB1-1F-05   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=468   FOverLB=468
+   Frame=RF1-1A   LoadPat=WX   CoordSys=Local   Type=Force   Dir=2   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=-45   FOverLB=-45
+   Frame=P1-A1-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-A1-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-A1-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-A1-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-A2-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-A2-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-A2-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-A2-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-A3-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-A3-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-A3-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-A3-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-A4-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-A4-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-A4-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-A4-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-B1-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-B1-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-B1-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-B1-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=4.5068   FOverLB=4.5068
+   Frame=P1-B2-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-B2-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-B2-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-B2-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=8   FOverLB=8
+   Frame=P1-B3-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-B3-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-B3-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-B3-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=7.993   FOverLB=7.993
+   Frame=P1-B4-1   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-B4-2   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-B4-3   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-B4-4   LoadPat=SDL   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=9.2972   FOverLB=9.2972
+   Frame=P1-A1-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-A1-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-A1-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-A1-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-A2-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-A2-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-A2-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-A2-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-A3-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-A3-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-A3-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-A3-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-A4-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-A4-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-A4-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-A4-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-B1-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-B1-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-B1-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-B1-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=21.175   FOverLB=21.175
+   Frame=P1-B2-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-B2-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-B2-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-B2-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.5875   FOverLB=37.5875
+   Frame=P1-B3-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-B3-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-B3-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-B3-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=37.555   FOverLB=37.555
+   Frame=P1-B4-1   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-B4-2   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-B4-3   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+   Frame=P1-B4-4   LoadPat=LR   CoordSys=GLOBAL   Type=Force   Dir=Gravity   DistType=RelDist   RelDistA=0   RelDistB=1   FOverLA=43.6825   FOverLB=43.6825
+
+TABLE:  "COMBINATION DEFINITIONS"
+   ComboName=W1   ComboType="Linear Add"   AutoDesign=No   CaseType="Linear Static"   CaseName=DL   ScaleFactor=1   SteelDesign=Strength   ConcDesign=Strength   ColdDesign=Strength
+   ComboName=W1   CaseType="Linear Static"   CaseName=SDL   ScaleFactor=1
+   ComboName=W1   CaseType="Linear Static"   CaseName=LR   ScaleFactor=1
+
+END TABLE DATA

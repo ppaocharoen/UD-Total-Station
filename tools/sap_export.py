@@ -13,6 +13,9 @@
   - ชิ้นส่วนที่มีจุดต่ออื่นอยู่กลางช่วง (จันทันที่แปวางทับ) ตั้ง auto mesh ที่จุดต่อ
   - พื้นวางบนดิน (kind=ground) ไม่ส่งเข้า SAP; พื้นลอยยังไม่รองรับ (เตือน)
 
+ทดสอบกับ SAP2000 v23.3.1 แล้ว (18 ต.ค. 2569): import ไม่มี error, รันได้, แรงปฏิกิริยารวมตรงกับน้ำหนักที่ใส่
+  (DL 13,643.96 = คอนกรีต 5.548 ลบ.ม. + C100 73.9 + C75 254.9 กก.; SDL 11,804.1 = ผนัง 11,232 + หลังคา 572.1; LR 2,688)
+
 รัน: python tools/sap_export.py model.bm.json [-o out.s2k] [--version 23.0.0]
 """
 import argparse, json, math, os, sys
@@ -141,13 +144,13 @@ class Exporter:
                 fc = mt["fc"]
                 E = mt.get("E") or 15100 * math.sqrt(fc)
                 w = mt.get("unit_weight", 2400)
-                gen.append(row(Material=mt["id"], Type="Concrete", SymType="Isotropic", TempDepend="No",
-                               Color="Gray8Dark", Notes="from bm.json"))
+                gen.append(row(Material=mt["id"], Type="Concrete", Grade="fc %g ksc" % fc, SymType="Isotropic",
+                               TempDepend="No", Color="Gray8Dark", Notes="from bm.json"))
                 mech.append(row(Material=mt["id"], UnitWeight=w, UnitMass=round(w / G, 4), E1=E * KSC,
                                 G12=round(E * KSC / 2.4, 2), U12=0.2, A1=9.9e-6))
-                conc.append(row(Material=mt["id"], Fc=fc * KSC, LtWtConc="No", SSCurveOpt="Mander",
+                conc.append(row(Material=mt["id"], Fc=fc * KSC, eFc=fc * KSC, LtWtConc="No", SSCurveOpt="Mander",
                                 SSHysType="Takeda", SFc=0.00221914, SCap=0.005, FinalSlope=-0.1,
-                                FAngle=0, DAngle=0))
+                                FAngle=0, DAngle=0, CoupModType="Modified Darwin-Pecknold"))
                 if not mt.get("E"):
                     self.warn.append("วัสดุ %s: E = 15100√f'c = %.0f ksc (คำนวณ)" % (mt["id"], E))
             elif k in ("steel", "cold_formed"):
@@ -155,23 +158,25 @@ class Exporter:
                 fu = mt.get("fu") or {"SSC400": 4100, "SS400": 4100, "SM520": 5300}.get(mt.get("grade"), 4100)
                 E = mt.get("E") or E_STEEL
                 gen.append(row(Material=mt["id"], Type=("ColdFormed" if k == "cold_formed" else "Steel"),
-                               SymType="Isotropic", TempDepend="No", Color="Red", Notes="from bm.json"))
+                               Grade=mt.get("grade", mt["id"]), SymType="Isotropic", TempDepend="No", Color="Red", Notes="from bm.json"))
                 mech.append(row(Material=mt["id"], UnitWeight=7850, UnitMass=round(7850 / G, 4), E1=E * KSC,
                                 G12=round(E * KSC / 2.6, 2), U12=0.3, A1=1.17e-5))
-                tbl = cf if k == "cold_formed" else steel
-                tbl.append(row(Material=mt["id"], Fy=fy * KSC, Fu=fu * KSC,
-                               **({} if k == "cold_formed" else {"EffFy": fy * 1.1 * KSC, "EffFu": fu * 1.1 * KSC}),
-                               SSCurveOpt="Simple", SSHysType="Kinematic", SHard=0.02, SMax=0.14,
-                               SRup=0.2, FinalSlope=-0.1))
+                if k == "cold_formed":   # ตาราง 03D ตาม SAP2000 v23 (ตรวจจากไฟล์ที่ SAP export)
+                    cf.append(row(Material=mt["id"], Fy=fy * KSC, Fu=fu * KSC, SSHysType="Kinematic",
+                                  CoupModType="Von Mises"))
+                else:
+                    steel.append(row(Material=mt["id"], Fy=fy * KSC, Fu=fu * KSC, EffFy=fy * 1.1 * KSC,
+                                     EffFu=fu * 1.1 * KSC, SSCurveOpt="Simple", SSHysType="Kinematic", SHard=0.02,
+                                     SMax=0.14, SRup=0.2, FinalSlope=-0.1))
                 if not mt.get("fu"):
                     self.warn.append("วัสดุ %s: Fu = %s ksc (ค่าตามเกรด)" % (mt["id"], fu))
             else:
                 self.warn.append("วัสดุ %s ชนิด %s ไม่ส่งเข้า SAP" % (mt["id"], k))
         self.table("MATERIAL PROPERTIES 01 - GENERAL", gen)
         self.table("MATERIAL PROPERTIES 02 - BASIC MECHANICAL PROPERTIES", mech)
-        self.table("MATERIAL PROPERTIES 03a - STEEL DATA", steel)
-        self.table("MATERIAL PROPERTIES 03b - CONCRETE DATA", conc)
-        self.table("MATERIAL PROPERTIES 03c - COLD FORMED DATA", cf)
+        self.table("MATERIAL PROPERTIES 03A - STEEL DATA", steel)
+        self.table("MATERIAL PROPERTIES 03B - CONCRETE DATA", conc)
+        self.table("MATERIAL PROPERTIES 03D - COLD FORMED DATA", cf)
 
     def sap_shape(self, s):
         if s["kind"] == "rc_rect":
@@ -201,7 +206,7 @@ class Exporter:
                                 MMod=1, WMod=1))
             else:
                 d, b, lip, t = parse_cf_name(s["name"])
-                rows.append(row(SectionName=sid, Material=mat, Shape=shape, t3=d, t2=b, tf=t, tw=t,
+                rows.append(row(SectionName=sid, Material=mat, Shape=shape, t3=d, t2=b, tw=t,
                                 Radius=0, LipDepth=lip, Color="Red", FromFile="No",
                                 AMod=1, A2Mod=1, A3Mod=1, JMod=1, I2Mod=1, I3Mod=1, MMod=1, WMod=1))
         self.table("FRAME SECTION PROPERTIES 01 - GENERAL", rows)

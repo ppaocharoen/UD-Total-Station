@@ -69,8 +69,7 @@ for gx, x in X.items():
                         "note": "ส่วนยื่นชายคา"})
         members.append({"id": f"RF1-{gx}{side}", "mark": "RF1", "type": "rafter",
                         "i": f"N-{gx}{gy}-R", "j": f"N-{gx}-RIDGE", "section": "C100x50x20x2.3",
-                        "material": "SSC400", "group": "roof_frame",
-                        "releases": {"i": ["M2", "M3"]}, "status": "from_drawing", "src": "S-04"})
+                        "material": "SSC400", "group": "roof_frame", "status": "from_drawing", "src": "S-04"})
 
 # แป C75 @0.80 ตามแนวลาด วัดจากชายคา (ตำแหน่งเดียวกับที่ตัวถอดปริมาณสร้าง) ต่อเนื่องข้ามจันทัน
 SLOPE_SP = 0.80
