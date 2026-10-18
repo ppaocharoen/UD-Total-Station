@@ -266,8 +266,8 @@ function svEditor(t, it) {
         <label class="ck"><input type="checkbox" data-qf="vat" ${q.vat ? 'checked' : ''}> ราคานี้รวม VAT แล้ว (หักออก)</label>
         <label class="wide">หมายเหตุ<input data-qf="note" value="${esc(q.note || '')}"></label>
       </div>
-      <div class="sv-calc">${up !== null ? `= ${fmt(+q.price)}${q.vat ? ' ÷ 1.07' : ''}${+(q.factor || 1) !== 1 ? ` ÷ ${q.factor}` : ''} → <b>${fmt(up)}</b> บ./${esc(it.unit)} (ไม่รวม VAT)` : '<span class="hint">ใส่ราคาเพื่อคำนวณ</span>'}</div>
-      <div class="sv-imgs">${(q.imgs || []).map(id => `<span class="sv-th">${S.img[id] ? `<img src="${S.img[id]}" data-view="${esc(id)}">` : '<i>กำลังโหลด…</i>'}<button data-imgdel="${esc(id)}">×</button></span>`).join('')}
+      <div class="sv-calc">${up !== null ? `= ${fmt(+q.price)}${q.vat ? ' ÷ 1.07' : ''}${+(q.factor || 1) !== 1 ? ` ÷ ${esc(q.factor)}` : ''} → <b>${fmt(up)}</b> บ./${esc(it.unit)} (ไม่รวม VAT)` : '<span class="hint">ใส่ราคาเพื่อคำนวณ</span>'}</div>
+      <div class="sv-imgs">${(q.imgs || []).map(id => `<span class="sv-th">${S.img[id] ? `<img src="${esc(Survey.safeImg(S.img[id]) || '')}" data-view="${esc(id)}">` : '<i>กำลังโหลด…</i>'}<button data-imgdel="${esc(id)}">×</button></span>`).join('')}
         <label class="btn small">+ แนบภาพ (แคปจอ/ใบเสนอราคา)<input type="file" accept="image/*" multiple data-qimg="1" hidden></label></div>
     </div>`;
   });
@@ -300,26 +300,28 @@ async function svLibHint(card, it) {
 }
 function libStatus(msg, err) {
   const c = Survey.cfg();
-  $('#sv-libst').innerHTML = (c.url ? `คลังราคาสืบ: <b style="color:var(--green)">คลังกลาง (Google Sheet)</b>${c.team ? '' : ' · <span style="color:var(--amber)">ยังไม่ใส่รหัสทีม (อ่านได้อย่างเดียว)</span>'}` : 'คลังราคาสืบ: เก็บในเครื่องนี้ (ยังไม่ได้ตั้งคลังกลาง)')
+  $('#sv-libst').innerHTML = (c.url ? `คลังราคาสืบ: <b style="color:var(--green)">คลังกลาง (Google Sheet)</b>${c.team ? '' : ' · <span style="color:var(--amber)">ยังไม่ใส่รหัสทีม — กด ตั้งค่าคลังกลาง เพื่อเปิดดู/บันทึก (ตอนนี้ใช้คลังในเครื่อง)</span>'}` : 'คลังราคาสืบ: เก็บในเครื่องนี้ (ยังไม่ได้ตั้งคลังกลาง)')
     + (msg ? ` · <span style="color:var(${err ? '--red' : '--text3'})">${esc(msg)}</span>` : '');
 }
 function libConfig() {
   const c = Survey.cfg(); let m = $('#lib-modal');
   if (!m) { m = document.createElement('div'); m.id = 'lib-modal'; m.className = 'modal'; document.body.appendChild(m); }
   m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">คลังราคาสืบกลาง</h2><button class="btn small" data-close="1">×</button></div>
-    <p class="hint">ราคาสืบเก็บใน Google Sheet กลาง ทุกคนที่เปิดเว็บเห็นคลังเดียวกัน · เพิ่ม/แก้ต้องมีรหัสทีม (เก็บในเบราว์เซอร์นี้)</p>
+    <p class="hint">ราคาสืบเก็บใน Google Sheet กลาง · ดู/เพิ่ม/แก้ ต้องใช้รหัสทีม · คอมกลางหรือเครื่องคนอื่น อย่าติ๊ก "จำรหัส"</p>
     <div class="form-grid"><label>Web app URL (Apps Script)<input id="lib-url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label>
-    <label>รหัสทีม<input id="lib-team" type="password" value="${esc(c.team || '')}"></label></div>
-    <div class="btn-row"><button class="btn small primary" id="lib-save">บันทึกและทดสอบ</button><button class="btn small" id="lib-off">ใช้คลังในเครื่อง</button><button class="btn small" id="lib-push">ส่งคลังในเครื่องขึ้นคลังกลาง</button></div>
+    <label>รหัสทีม<input id="lib-team" type="password" autocomplete="off" value="${esc(c.team || '')}"></label>
+    <label class="ck"><input type="checkbox" id="lib-remember" ${c.remember ? 'checked' : ''}> จำรหัสบนเครื่องนี้ (ไม่ติ๊ก = ลืมเมื่อปิดแท็บ)</label></div>
+    <div class="btn-row"><button class="btn small primary" id="lib-save">บันทึกและทดสอบ</button><button class="btn small" id="lib-off">ลบรหัสจากเครื่องนี้</button><button class="btn small" id="lib-push">ส่งคลังในเครื่องขึ้นคลังกลาง</button></div>
     <div class="hint" id="lib-msg"></div></div>`;
   m.classList.add('on');
   m.onclick = e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); };
   $('#lib-save').onclick = async () => {
-    const n = { url: $('#lib-url').value.trim(), team: $('#lib-team').value };
+    const n = { url: $('#lib-url').value.trim(), team: $('#lib-team').value, remember: $('#lib-remember').checked };
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(n.url)) { $('#lib-msg').textContent = 'URL ต้องเป็น Web app ของ Apps Script (https://script.google.com/macros/s/…/exec)'; return; }
     try { const r = await Survey.ping(n); if (!r.ok) throw new Error(r.error); Survey.setCfg(n); $('#lib-msg').textContent = 'เชื่อมต่อแล้ว: ' + r.name; libStatus(); }
     catch (er) { $('#lib-msg').textContent = 'เชื่อมต่อไม่ได้: ' + er.message; }
   };
-  $('#lib-off').onclick = () => { Survey.setCfg({}); libStatus(); m.classList.remove('on'); };
+  $('#lib-off').onclick = () => { Survey.setCfg({ url: Survey.cfg().url }); libStatus(); m.classList.remove('on'); toast('ลบรหัสทีมออกจากเครื่องนี้แล้ว'); };
   $('#lib-push').onclick = async () => {
     const loc = await Survey.localAll(); let ok = 0, bad = 0;
     for (const x of loc) { try { await Survey.libPut(x.key, x); ok++; } catch (er) { bad++; $('#lib-msg').textContent = er.message; } }
@@ -339,7 +341,7 @@ function bindSurvey() {
     const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q);
     if (q && e.target.dataset.qdel) { if (confirm('ลบเจ้านี้?')) { it.quotes = it.quotes.filter(x => x !== q); svSave(it); renderSurvey(); renderPR1(); } return; }
     if (q && e.target.dataset.imgdel) { q.imgs = q.imgs.filter(x => x !== e.target.dataset.imgdel); svSave(it); renderSurvey(); return; }
-    if (e.target.dataset.view) { const w = window.open(''); if (w) w.document.write(`<img src="${S.img[e.target.dataset.view]}" style="max-width:100%">`); }
+    if (e.target.dataset.view) { const d = Survey.safeImg(S.img[e.target.dataset.view]), w = d && window.open(''); if (w) { w.opener = null; const im = w.document.createElement('img'); im.src = d; im.style.maxWidth = '100%'; w.document.body.appendChild(im); } }
   });
   $('#sv-list').addEventListener('change', async e => {
     const card = e.target.closest('[data-svi]'); if (!card) return;
@@ -378,12 +380,12 @@ function svPrintout() {   // บัญชีสืบราคา + ภาคผ
     h += `<h4>${k + 1}. ${esc(it.name)} (หน่วย ${esc(it.unit)})</h4><div class="table-wrap"><table class="boq"><tr><th>เจ้า</th><th>ร้าน / ช่องทาง</th><th>ติดต่อ</th><th>วันที่</th><th>ราคาที่ได้</th><th>VAT</th><th>แปลงหน่วย</th><th>บาท/${esc(it.unit)}</th><th>หลักฐาน</th></tr>
       ${s.list.map((x, i) => { const q = x.q, refs = (q.imgs || []).map(id => { fig.push({ id, cap: `${it.name} — ${q.shop || Survey.CHANNEL[q.channel]}` }); return 'ภาพ ' + fig.length; });
         return `<tr ${q === s.best ? 'class="total"' : ''}><td class="r">${i + 1}</td><td>${esc(q.shop || '')}<br><small>${Survey.CHANNEL[q.channel] || ''}</small></td><td style="word-break:break-all">${esc(q.contact || '')}</td><td>${esc(q.date || '')}</td>
-          <td class="r">${fmt(+q.price)}${q.qunit ? '/' + esc(q.qunit) : ''}</td><td>${q.vat ? 'รวม (หักออก)' : 'ไม่รวม'}</td><td class="r">${+(q.factor || 1) !== 1 ? `1 ${esc(q.qunit || '')} = ${q.factor} ${esc(it.unit)}` : '-'}</td>
+          <td class="r">${fmt(+q.price)}${q.qunit ? '/' + esc(q.qunit) : ''}</td><td>${q.vat ? 'รวม (หักออก)' : 'ไม่รวม'}</td><td class="r">${+(q.factor || 1) !== 1 ? `1 ${esc(q.qunit || '')} = ${esc(q.factor)} ${esc(it.unit)}` : '-'}</td>
           <td class="r"><b>${fmt(x.up)}</b></td><td>${refs.join(', ') || '-'}</td></tr>`; }).join('')}
       </table></div><p>ใช้ราคา <b>${fmt(s.price)}</b> บาท/${esc(it.unit)} (${esc(s.best.shop || '')})${s.n < Survey.MIN_Q ? ` · สืบได้ ${s.n} เจ้า: ${esc(it.reason || 'ไม่ได้ระบุเหตุผล')}` : ''}</p>`;
     n++;
   });
-  if (fig.length) h += `<div class="sv-appx"><h3 style="text-align:center">ภาคผนวก ภาพหลักฐานการสืบราคา</h3>${fig.map((f, i) => S.img[f.id] ? `<figure><img src="${S.img[f.id]}"><figcaption>ภาพ ${i + 1} ${esc(f.cap)}</figcaption></figure>` : '').join('')}</div>`;
+  if (fig.length) h += `<div class="sv-appx"><h3 style="text-align:center">ภาคผนวก ภาพหลักฐานการสืบราคา</h3>${fig.map((f, i) => S.img[f.id] ? `<figure><img src="${esc(Survey.safeImg(S.img[f.id]) || '')}"><figcaption>ภาพ ${i + 1} ${esc(f.cap)}</figcaption></figure>` : '').join('')}</div>`;
   $('#sv-printout').innerHTML = n ? h : '<p>ยังไม่มีรายการที่สืบราคา</p>';
 }
 
@@ -1208,7 +1210,7 @@ function bind() {
       const f = await readFile(e.target); const b = JSON.parse(f.text);
       if (b.format !== 'ud-boq') throw new Error('ไม่ใช่ไฟล์ .boq.json');
       const svimg = b.svimg || {}; delete b.svimg;
-      Object.entries(svimg).forEach(([id, d]) => { S.img[id] = d; Survey.imgPut(id, d); });
+      Object.entries(svimg).forEach(([id, d]) => { if (Survey.safeImg(d)) { S.img[id] = d; Survey.imgPut(id, d); } });   // รับเฉพาะภาพจริง
       S.boq = Object.assign(newBoq(), b);
       S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
       if (S.model && b.model_file && b.model_file !== S.modelName) toast(`หมายเหตุ: ไฟล์ BOQ นี้ทำกับ ${b.model_file}`);

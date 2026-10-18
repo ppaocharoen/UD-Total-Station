@@ -73,3 +73,8 @@ python tools/test_sap.py
 - `results`, `design`, `quantities` เก็บ `model_hash` ตอนสร้าง ถ้าโมเดลเปลี่ยนจะถูกนับว่าเก่า (stale)
 
 รายละเอียดการตัดสินใจทั้งหมดอยู่ในเอกสาร "ข้อเสนอโครงสร้างข้อมูลกลาง (Building Model)"
+
+## ความปลอดภัย (v4.5)
+- คลังราคาสืบกลาง (tools/survey_lib.gs + tools/survey_lib.appsscript.json): ทุกคำสั่งต้องมีรหัสทีม ส่งแบบ POST · เดาผิด 20 ครั้ง/10 นาที ปิดรับ 10 นาที · ภาพในโฟลเดอร์ Drive เป็นส่วนตัว (ดึงผ่านสคริปต์) · สิทธิ์ `spreadsheets` + `drive.file` เท่านั้น · ข้อความขึ้นต้น = + - @ ถูกเก็บเป็นข้อความ · ลบ = ย้ายไปชีต `deleted`
+- หน้าเว็บ: ภาพหลักฐานรับเฉพาะ data URL ของ JPEG/PNG/WebP · `?pricing=` รับเฉพาะ `ppaocharoen.github.io/UDmaterial-price/` หรือ localhost · three.js มี SRI · รหัสทีมเก็บเฉพาะแท็บนี้ เว้นแต่ติ๊ก "จำรหัส"
+- ห้ามใส่รหัสทีมลงใน repo (repo เป็นสาธารณะ) — ตั้งใน Script properties เท่านั้น
