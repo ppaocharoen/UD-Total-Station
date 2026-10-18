@@ -96,7 +96,7 @@ function rows() {
 
 // ------------------------------------------------------------------ render
 function renderAll() {
-  renderProject(); renderSurvey(); renderPR1(); renderPR23(); renderSummary(); renderPlan();
+  renderProject(); renderSurvey(); renderPR1(); renderPR23(); renderSummary(); renderPlan(); if (S.old) setTimeout(renderDiff, 0);
 }
 
 function renderProject() {
@@ -171,6 +171,7 @@ function _renderPR1() {
           <td class="r">${n}</td>
           <td>${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
+            ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
             ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}</td>
           <td class="r">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : fmt(r.qty)}</td>
           <td>${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
@@ -465,6 +466,45 @@ function renderInst(inst, contract, sel, full) {
     เงินล่วงหน้าและประกันผลงานใช้ % เดียวกับเงื่อนไข Factor F ในหน้าโครงการ · เงินประกันผลงานคืนตามเงื่อนไขสัญญา (ไม่รวมในตาราง)`;
 }
 
+// ------------------------------------------------------------------ เทียบรุ่น
+function totalsFor(model) {
+  // แถวรุ่นเก่าที่ไม่มีการผูกราคา ใช้การผูกราคาของแถว key เดียวกันในรุ่นปัจจุบัน (ให้เทียบด้วยราคาชุดเดียวกัน)
+  const ref = Object.fromEntries(((S.model.quantities && S.model.quantities.items) || []).map(r => [r.key, r.price_ref]));
+  const rs = ((model.quantities && model.quantities.items) || []).map(r => (r.price_ref || !ref[r.key]) ? r : Object.assign({}, r, { price_ref: ref[r.key] }))
+    .concat(S.boq.custom_rows || []);
+  const pr = BoqCalc.priceRows(S.db, window.UDPrice, rs, { overrides: S.boq.overrides });
+  const fc = S.boq.factor, cost = r2(pr.reduce((a, r) => a + r.total, 0));
+  const ff = FactorF.compute(cost, { advance: +fc.advance, retention: +fc.retention, loanShare: (+fc.loanPct || 0) / 100 });
+  const secs = SECTIONS.map(([c]) => r2(r2(pr.filter(r => sectionOf(r.group_code) === c).reduce((a, r) => a + r.total, 0)) * ff.F));
+  const build = r2(secs.reduce((a, b) => a + b, 0));
+  const T = totals(), grand = r2(build + T.eqTotal + T.sp);
+  const plan = Schedule.build(pr, model, planCfg());
+  return { pr, cost, F: ff.F, build, grand, plan };
+}
+function renderDiff() {
+  const out = $('#diff-out');
+  if (!S.old) { out.innerHTML = ''; return; }
+  if (!S.model || !S.db) { out.innerHTML = '<div class="card hint">เปิดโมเดลปัจจุบันและรอโหลดราคาก่อน</div>'; return; }
+  const A = totalsFor(S.old.model), B = totalsFor(S.model), E = BmDiff.elements(S.old.model, S.model), R = BmDiff.rows(A.pr, B.pr);
+  S.diffIds = [...E.added, ...E.changed].map(e => e.id);
+  const d = (a, b, n = 2) => { const x = r2(b - a); return `<span style="color:${x > 0 ? 'var(--amber)' : x < 0 ? 'var(--cyan)' : 'var(--text3)'}">${x > 0 ? '+' : ''}${fmt(x, n)}</span>`; };
+  const k = (l, a, b, u, n = 2) => `<div class="kpi"><span>${l}</span><b>${fmt(b, n)}<small>${u}</small></b><span>เดิม ${fmt(a, n)} · ต่าง ${d(a, b, n)}${a ? ` (${((b - a) / a * 100).toFixed(1)}%)` : ''}</span></div>`;
+  const ch = R.filter(r => r.status !== 'same');
+  const el = [...E.added.map(e => ['เพิ่ม', e]), ...E.removed.map(e => ['ลบ', e]), ...E.changed.map(e => ['แก้', e])];
+  const stale = [S.old.model, S.model].filter(m => m.quantities && m.quantities.stale).length;
+  out.innerHTML = `<div class="kpis">${k('ค่างานต้นทุน', A.cost, B.cost, 'บ.')}${k('ราคากลาง', A.grand, B.grand, 'บ.')}${k('Factor F', A.F, B.F, '', 4)}${k('ระยะเวลา', A.plan.calDays, B.plan.calDays, 'วัน', 0)}</div>
+  ${stale ? '<p class="alert">มีโมเดลที่ปริมาณเก่า (แก้โมเดลหลังถอดปริมาณ) — ถอดปริมาณใหม่ก่อนเทียบ</p>' : ''}
+  <div class="card"><h2>ชิ้นส่วนที่เปลี่ยน (${el.length})</h2>${el.length ? `<div class="table-wrap"><table class="boq"><tr><th>สถานะ</th><th>ประเภท</th><th>id</th><th>สิ่งที่เปลี่ยน</th></tr>${el.map(([t, e]) =>
+    `<tr class="row" data-id="${esc(e.id)}"><td><span class="pill ${t === 'เพิ่ม' ? 'ok' : t === 'ลบ' ? 'err' : 'warn'}">${t}</span></td><td>${esc(BmDiff.SETS[e.set])}</td><td class="mono">${esc(e.id)}</td><td>${e.fields ? e.fields.map(f => `<b>${esc(f)}</b> ${e.before && f in e.before ? `<span class="mono">${esc(JSON.stringify(e.before[f]))} → ${esc(JSON.stringify(e.after[f]))}</span>` : ''}`).join('<br>') : ''}</td></tr>`).join('')}</table></div>` : '<p class="hint">ไม่มีชิ้นส่วนที่เปลี่ยน</p>'}</div>
+  <div class="card"><h2>รายการ BOQ ที่เปลี่ยน (${ch.length} จาก ${R.length})</h2><div class="table-wrap"><table class="boq"><tr><th>หมวด</th><th>รายการ</th><th>หน่วย</th><th>ปริมาณเดิม</th><th>ใหม่</th><th>ต่าง</th><th>เงินเดิม</th><th>ใหม่</th><th>ต่าง</th></tr>
+    ${ch.map(r => `<tr class="row" data-key="${esc(r.key)}"><td class="mono">${esc(r.group_code)}</td><td>${esc(r.name)} ${r.status !== 'changed' ? `<span class="pill ${r.status === 'added' ? 'ok' : 'err'}">${r.status === 'added' ? 'ใหม่' : 'ตัดออก'}</span>` : ''}</td><td>${esc(r.unit)}</td>
+      <td class="r">${fmt(r.q0)}</td><td class="r">${fmt(r.q1)}</td><td class="r">${d(r.q0, r.q1)}</td><td class="r">${fmt(r.t0)}</td><td class="r">${fmt(r.t1)}</td><td class="r">${d(r.t0, r.t1)}</td></tr>`).join('')}
+    <tr class="total"><td></td><td colspan="5">รวมค่างานต้นทุน</td><td class="r">${fmt(A.cost)}</td><td class="r">${fmt(B.cost)}</td><td class="r">${d(A.cost, B.cost)}</td></tr></table></div></div>`;
+  $$('#diff-out tr[data-id]').forEach(tr => tr.onclick = () => { if (S.viewer) S.viewer.highlight([tr.dataset.id]); toast(`ไฮไลต์ ${tr.dataset.id} ในแท็บโมเดล 3D`); });
+  $$('#diff-out tr[data-key]').forEach(tr => tr.onclick = () => { const r = R.find(x => x.key === tr.dataset.key); if (S.viewer) S.viewer.highlight(r.from); toast(`ไฮไลต์ ${r.from.length} ชิ้นส่วนในแท็บโมเดล 3D`); });
+  $('#diff-status').innerHTML = `เทียบ <b>${esc(S.old.name)}</b> (เดิม) กับ <b>${esc(S.modelName)}</b> (ปัจจุบัน) · ชิ้นส่วน เพิ่ม ${E.added.length} · ลบ ${E.removed.length} · แก้ ${E.changed.length}`;
+}
+
 // ------------------------------------------------------------------ HUD / dock
 function kpiHtml(T, plan) {
   const mat = r2(T.pr.reduce((a, r) => a + (r.mat_amt || 0), 0)), lab = r2(T.pr.reduce((a, r) => a + (r.lab_amt || 0), 0));
@@ -712,6 +752,15 @@ function bind() {
   const fitStage = () => { $('#stage').style.height = Math.max(420, innerHeight - $('.topbar').offsetHeight) + 'px'; };
   addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
+  $('#f-old').onchange = async e => {
+    try { const f = await readFile(e.target); const m = JSON.parse(f.text); if (!m.schema_version) throw new Error('ไม่ใช่ไฟล์ .bm.json');
+      if (!(m.quantities && m.quantities.items)) throw new Error('โมเดลรุ่นก่อนยังไม่ได้ถอดปริมาณ (รัน tools/takeoff.py --write)');
+      S.old = { model: m, name: f.name }; renderDiff(); toast('เทียบรุ่นแล้ว'); }
+    catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); }
+    e.target.value = '';
+  };
+  $('#b-diff-3d').onclick = () => { if (!S.diffIds) return toast('เปิดรุ่นก่อนก่อน'); $$('#tabs .nav-tab').find(x => x.dataset.tab === 'model').click(); setTimeout(() => S.viewer && S.viewer.highlight(S.diffIds), 80); toast(`ไฮไลต์ชิ้นที่เพิ่ม/แก้ ${S.diffIds.length} ชิ้น`); };
+  $('#b-diff-clear').onclick = () => { S.old = null; S.diffIds = null; $('#diff-status').textContent = ''; renderDiff(); };
   $$('.dock-tab[data-dock]').forEach(t => t.onclick = () => setDock(t.dataset.dock));
   $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '▴ ขยาย' : '▾ ย่อ'; };
   $('#dk-q').oninput = () => renderPlan();

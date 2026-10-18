@@ -20,6 +20,7 @@
     <div class="nav-tab" data-tab="pr23">ปร.2 / ปร.3</div>
     <div class="nav-tab" data-tab="summary">สรุป ปร.4</div>
     <div class="nav-tab" data-tab="plan">แผนงาน / งวดงาน</div>
+    <div class="nav-tab" data-tab="diff">เทียบรุ่น</div>
   </nav>
   <div class="meta-bar"><div><div id="meta-proj" class="meta-proj">ยังไม่ได้เปิดโครงการ</div><div id="meta-price" class="meta-price">กำลังโหลดราคา…</div></div><button class="crt-btn" id="b-crt" title="เปิด/ปิดเอฟเฟกต์จอ CRT">CRT:ON</button></div>
 </header>
@@ -179,6 +180,17 @@
   <div class="card"><h2>S-Curve ผลงานสะสมตามแผน</h2><div id="pl-scurve"></div></div>
   <div class="card"><h2>งวดงานและการจ่ายเงิน</h2><div class="table-wrap"><table class="boq" id="pl-inst"></table></div><div id="pl-instnote" class="hint" style="margin-top:6px"></div></div>
 </section>
+<!-- ================================================================ เทียบรุ่น -->
+<section class="page" id="page-diff">
+  <div class="card">
+    <h2>เทียบโมเดลก่อน/หลังแก้</h2>
+    <p class="hint">เปิดไฟล์ .bm.json รุ่นก่อนหน้า (ต้องถอดปริมาณแล้ว) เพื่อเทียบกับโมเดลที่เปิดอยู่ ใช้ราคา ราคาที่แก้เอง ปร.2/ปร.3 และเงื่อนไขชุดเดียวกัน ความต่างจึงมาจากโมเดลล้วน ๆ</p>
+    <div class="btn-row"><label class="btn primary">เปิด .bm.json รุ่นก่อน<input type="file" id="f-old" accept=".json" hidden></label>
+      <button class="btn" id="b-diff-3d">ดูชิ้นที่เปลี่ยนใน 3D</button><button class="btn" id="b-diff-clear">ล้าง</button></div>
+    <div id="diff-status" class="status"></div>
+  </div>
+  <div id="diff-out"></div>
+</section>
 </main>
 
 <div id="toast" class="toast"></div>
@@ -189,6 +201,7 @@
 <script src="../lib/boqcalc.js"></script>
 <script src="../lib/viewer3d.js"></script>
 <script src="../lib/schedule.js"></script>
+<script src="../lib/diff.js"></script>
 <script>
   // โค้ดคิดราคาใช้ร่วมกับ UD-Cost Hub; ทดสอบในเครื่องใส่ ?pricing=<url>
   (function () {
