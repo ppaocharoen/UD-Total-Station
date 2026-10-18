@@ -41,6 +41,7 @@ function autosave() { try { if (S.modelName) localStorage.setItem('udboq:' + S.m
 
 // ------------------------------------------------------------------ ราคา
 async function loadPrices() {
+  try { S.pmap = (await (await fetch('../tools/price_map.json', { cache: 'no-cache' })).json()).map; } catch (e) { S.pmap = null; }
   try {
     S.db = await UDPrice.load();
     S.baseCompItems = S.db.compItems.slice();
@@ -89,9 +90,9 @@ function loadModel(json, name) {
 }
 function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return Math.abs(a) / 2; }
 
-function rows() {
+function rows() {   // ผูกราคาตอนเปิด (lib/pricemap.js + tools/price_map.json) — ไม่ต้องถอดปริมาณใหม่เมื่อแก้การผูก
   const q = (S.model && S.model.quantities && S.model.quantities.items) || [];
-  return q.concat(S.boq.custom_rows || []);
+  return PriceMap.bindAll(q, S.pmap).concat(S.boq.custom_rows || []);
 }
 
 // ------------------------------------------------------------------ render
@@ -470,7 +471,7 @@ function renderInst(inst, contract, sel, full) {
 function totalsFor(model) {
   // แถวรุ่นเก่าที่ไม่มีการผูกราคา ใช้การผูกราคาของแถว key เดียวกันในรุ่นปัจจุบัน (ให้เทียบด้วยราคาชุดเดียวกัน)
   const ref = Object.fromEntries(((S.model.quantities && S.model.quantities.items) || []).map(r => [r.key, r.price_ref]));
-  const rs = ((model.quantities && model.quantities.items) || []).map(r => (r.price_ref || !ref[r.key]) ? r : Object.assign({}, r, { price_ref: ref[r.key] }))
+  const rs = PriceMap.bindAll(((model.quantities && model.quantities.items) || []).map(r => (r.price_ref || !ref[r.key]) ? r : Object.assign({}, r, { price_ref: ref[r.key] })), S.pmap)
     .concat(S.boq.custom_rows || []);
   const pr = BoqCalc.priceRows(S.db, window.UDPrice, rs, { overrides: S.boq.overrides });
   const fc = S.boq.factor, cost = r2(pr.reduce((a, r) => a + r.total, 0));

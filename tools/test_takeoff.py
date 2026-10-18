@@ -36,7 +36,7 @@ by = {it["key"]: it for it in items}
 EXPECT = {
     "excav": 11.70, "sand_base": 0.38, "sand_slab": 2.00, "lean_conc": 0.30,
     "conc_C240": 10.09, "formwork": 77.64, "props": 40, "rebar_DB12": 386.78, "rebar_RB6": 133.84,
-    "tie_wire": 15.62, "wall_brick_mon": 54.84, "plaster_wall": 109.68, "lintel": 17.10,
+    "tie_wire": 15.62, "wall_brick_mon": 54.84, "plaster_int_brick": 54.84, "plaster_ext_brick": 54.84, "lintel": 17.10,
     "cover_metal_sheet": 58.93, "roof_frame_area": 57.21, "steel_C75x45x15x2.3": 253.50,
     "steel_C100x50x20x2.3": 73.08, "ridge_cap": 9.89, "open_W1": 2, "open_D1": 1, "paint_ext": 54.84,
     "demo_ARC-2.9.17-a": 20.00, "paint_rust": 38.53,
@@ -58,10 +58,9 @@ print(("PASS" if good else "FAIL"), "ท่อที่ประมาณแน�
 good = by["fit_SN-3.7"]["price_ref"]["kind"] == "pct" and set(by["fit_SN-3.7"]["price_ref"]["of"]) == {'pipe_soil_PVC ชั้น 8.5_4"', 'pipe_waste_PVC ชั้น 8.5_2"', 'pipe_vent_PVC ชั้น 8.5_2"'} \
     and by["fit_SN-3.7"]["price_ref"]["mat"] == 0.4 and by["sup_SN-3.7"]["price_ref"]["mat"] == 0.3 and by["test_SN-3.8"]["price_ref"]["mat"] == 0.1 \
     and by["fit_SN-3.8"]["price_ref"]["mat"] == 0.5
-# งานระบบผูกค่าแรง ว480 ตามขนาด
-good = good and by['pipe_cw_PVC ชั้น 13.5_1/2"']["price_ref"].get("wage_code") == "SN-3.8-a" and by['pipe_soil_PVC ชั้น 8.5_4"']["price_ref"].get("wage_code") == "SN-3.7-e" \
-    and by["wire_THW_2.5"]["price_ref"].get("wage_code") == "EE-4.2-d" and by['conduit_PVC 1/2"']["price_ref"].get("wage_code") == "EE-4.44-i" \
-    and by["pt_P"]["price_ref"].get("wage_code") == "EE-4.53-k" and by["fx_WC"]["price_ref"].get("wage_code") == "ARC-2.6.1"
+# งานระบบส่ง spec ให้เว็บผูกราคา (ราคาผูกใน lib/pricemap.js — ทดสอบ tools/test_pricemap.js)
+good = good and by['pipe_cw_PVC ชั้น 13.5_1/2"'].get("spec") == {"t": "pipe", "sys": "cw", "mat": "PVC ชั้น 13.5", "dia": '1/2"'} \
+    and by["wire_THW_2.5"]["spec"]["t"] == "wire" and by["open_D1"]["spec"]["w"] == 0.9 and by["plaster_ext_brick"]["spec"]["side"] == "ext"
 ok &= good
 print(("PASS" if good else "FAIL"), "ข้อต่อระบายน้ำคิด 40% จากท่อระบายน้ำ 3 รายการ")
 

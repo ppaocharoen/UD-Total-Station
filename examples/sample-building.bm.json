@@ -4674,6 +4674,11 @@
     "by_src": {
      "R1": 57.2102
     },
+    "spec": {
+     "t": "cover",
+     "cover": "metal_sheet",
+     "form": "gable"
+    },
     "by_task": {
      "roof_cover": {
       "share": 1.0,
@@ -4706,6 +4711,10 @@
     "by_src": {
      "R1": 9.6
     },
+    "spec": {
+     "t": "ridge",
+     "cover": "metal_sheet"
+    },
     "by_task": {
      "roof_cover": {
       "share": 1.0,
@@ -4736,6 +4745,11 @@
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
      "FN-CL1": 30.81
+    },
+    "spec": {
+     "t": "finish",
+     "kind": "ceiling",
+     "desc": "ฝ้ายิปซัมบอร์ด 9 มม. ฉาบเรียบ โครงคร่าวเหล็กชุบสังกะสี"
     },
     "by_task": {
      "ceiling": {
@@ -4842,6 +4856,11 @@
      "W1-1": 5.8,
      "W1-2": 5.8
     },
+    "spec": {
+     "t": "lintel",
+     "wall": "brick_mon",
+     "wt": 0.1
+    },
     "by_task": {
      "wall": {
       "share": 1.0,
@@ -4859,13 +4878,13 @@
     }
    },
    {
-    "key": "plaster_wall",
+    "key": "plaster_int_brick",
     "group_code": "1.2.4",
     "group": "งานฉาบปูน",
-    "name": "ฉาบปูนเรียบผนัง",
+    "name": "ฉาบปูนเรียบผนังภายใน",
     "unit": "ตร.ม.",
-    "qty": 109.68,
-    "qty_net": 109.68,
+    "qty": 54.84,
+    "qty_net": 54.84,
     "waste": 0.0,
     "waste_included": false,
     "from": [
@@ -4880,12 +4899,37 @@
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
-     "W-A12": 16.16,
-     "W-A23": 19.76,
-     "W-3AB": 19.76,
-     "W-B23": 17.12,
-     "W-B12": 17.12,
-     "W-1AB": 19.76
+     "W-A12": 8.08,
+     "W-A23": 9.88,
+     "W-3AB": 9.88,
+     "W-B23": 8.56,
+     "W-B12": 8.56,
+     "W-1AB": 9.88
+    },
+    "calc": {
+     "W-A12": [
+      "สุทธิ 8.08 × 1 ด้าน"
+     ],
+     "W-A23": [
+      "สุทธิ 9.88 × 1 ด้าน"
+     ],
+     "W-3AB": [
+      "สุทธิ 9.88 × 1 ด้าน"
+     ],
+     "W-B23": [
+      "สุทธิ 8.56 × 1 ด้าน"
+     ],
+     "W-B12": [
+      "สุทธิ 8.56 × 1 ด้าน"
+     ],
+     "W-1AB": [
+      "สุทธิ 9.88 × 1 ด้าน"
+     ]
+    },
+    "spec": {
+     "t": "plaster",
+     "side": "int",
+     "wall": "brick_mon"
     },
     "by_task": {
      "plaster": {
@@ -4899,11 +4943,74 @@
        "W-1AB"
       ]
      }
+    }
+   },
+   {
+    "key": "plaster_ext_brick",
+    "group_code": "1.2.4",
+    "group": "งานฉาบปูน",
+    "name": "ฉาบปูนเรียบผนังภายนอก",
+    "unit": "ตร.ม.",
+    "qty": 54.84,
+    "qty_net": 54.84,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "W-A12",
+     "W-A23",
+     "W-3AB",
+     "W-B23",
+     "W-B12",
+     "W-1AB"
+    ],
+    "task": "plaster",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_src": {
+     "W-A12": 8.08,
+     "W-A23": 9.88,
+     "W-3AB": 9.88,
+     "W-B23": 8.56,
+     "W-B12": 8.56,
+     "W-1AB": 9.88
     },
-    "price_ref": {
-     "kind": "comp",
-     "code": "7.2",
-     "note": "ยังไม่ได้ผูกค่าแรงฉาบ"
+    "calc": {
+     "W-A12": [
+      "สุทธิ 8.08 × 1 ด้าน"
+     ],
+     "W-A23": [
+      "สุทธิ 9.88 × 1 ด้าน"
+     ],
+     "W-3AB": [
+      "สุทธิ 9.88 × 1 ด้าน"
+     ],
+     "W-B23": [
+      "สุทธิ 8.56 × 1 ด้าน"
+     ],
+     "W-B12": [
+      "สุทธิ 8.56 × 1 ด้าน"
+     ],
+     "W-1AB": [
+      "สุทธิ 9.88 × 1 ด้าน"
+     ]
+    },
+    "spec": {
+     "t": "plaster",
+     "side": "ext",
+     "wall": "brick_mon"
+    },
+    "by_task": {
+     "plaster": {
+      "share": 1.0,
+      "from": [
+       "W-A12",
+       "W-A23",
+       "W-3AB",
+       "W-B23",
+       "W-B12",
+       "W-1AB"
+      ]
+     }
     }
    },
    {
@@ -4924,6 +5031,11 @@
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
      "FN-FL1": 30.81
+    },
+    "spec": {
+     "t": "finish",
+     "kind": "floor",
+     "desc": "กระเบื้องแกรนิตโต้ 60x60 ซม."
     },
     "by_task": {
      "finish": {
@@ -4956,6 +5068,13 @@
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
      "D1-1": 1.0
+    },
+    "spec": {
+     "t": "opening",
+     "kind": "door",
+     "w": 0.9,
+     "h": 2.0,
+     "desc": "ประตูไม้อัดสัก"
     },
     "by_task": {
      "opening": {
@@ -4990,6 +5109,13 @@
     "by_src": {
      "W1-1": 1.0,
      "W1-2": 1.0
+    },
+    "spec": {
+     "t": "opening",
+     "kind": "window",
+     "w": 1.2,
+     "h": 1.1,
+     "desc": "หน้าต่างบานเลื่อนอลูมิเนียม"
     },
     "by_task": {
      "opening": {
@@ -5120,6 +5246,11 @@
     "by_src": {
      "WC-1": 1.0
     },
+    "spec": {
+     "t": "fixture",
+     "kind": "wc",
+     "desc": "โถส้วมชักโครก"
+    },
     "by_task": {
      "mep_fix": {
       "share": 1.0,
@@ -5130,8 +5261,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "ARC-2.6.1"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5153,6 +5283,11 @@
     "by_src": {
      "LAV-1": 1.0
     },
+    "spec": {
+     "t": "fixture",
+     "kind": "lavatory",
+     "desc": "อ่างล้างหน้าแขวนผนัง"
+    },
     "by_task": {
      "mep_fix": {
       "share": 1.0,
@@ -5163,8 +5298,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "ARC-2.6.6"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5186,6 +5320,11 @@
     "by_src": {
      "FD-1": 1.0
     },
+    "spec": {
+     "t": "fixture",
+     "kind": "floor_drain",
+     "desc": "ตะแกรงกันกลิ่น"
+    },
     "by_task": {
      "mep_fix": {
       "share": 1.0,
@@ -5196,8 +5335,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "ARC-2.6.25"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5219,6 +5357,11 @@
     "by_src": {
      "ST-1": 1.0
     },
+    "spec": {
+     "t": "equip",
+     "kind": "septic_tank",
+     "size": "1,600 ลิตร"
+    },
     "by_task": {
      "mep_ext": {
       "share": 1.0,
@@ -5228,11 +5371,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "re",
-      "re": "^ถังบำบัดน้ำเสีย.*1,?600 ?ลิตร"
-     }
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5254,6 +5394,11 @@
     "by_src": {
      "MT-1": 1.0
     },
+    "spec": {
+     "t": "equip",
+     "kind": "meter",
+     "size": "1/2\""
+    },
     "by_task": {
      "mep_ext": {
       "share": 1.0,
@@ -5264,8 +5409,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "SN-3.12-a"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5290,6 +5434,12 @@
      "LAV-1": 11.8,
      "WC-1": 1.5
     },
+    "spec": {
+     "t": "pipe",
+     "sys": "cw",
+     "mat": "PVC ชั้น 13.5",
+     "dia": "1/2\""
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5300,13 +5450,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "pvc_pipe",
-      "cls": "13.5",
-      "dia": "1/2\""
-     },
-     "wage_code": "SN-3.8-a"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5329,6 +5474,12 @@
     "by_src": {
      "WC-1": 3.0
     },
+    "spec": {
+     "t": "pipe",
+     "sys": "soil",
+     "mat": "PVC ชั้น 8.5",
+     "dia": "4\""
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5338,13 +5489,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "pvc_pipe",
-      "cls": "8.5",
-      "dia": "4\""
-     },
-     "wage_code": "SN-3.7-e"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5367,6 +5513,12 @@
     "by_src": {
      "V-1": 3.2
     },
+    "spec": {
+     "t": "pipe",
+     "sys": "vent",
+     "mat": "PVC ชั้น 8.5",
+     "dia": "2\""
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5376,13 +5528,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "pvc_pipe",
-      "cls": "8.5",
-      "dia": "2\""
-     },
-     "wage_code": "SN-3.7-b"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5407,6 +5554,12 @@
      "FD-1": 3.9,
      "LAV-1": 1.7
     },
+    "spec": {
+     "t": "pipe",
+     "sys": "waste",
+     "mat": "PVC ชั้น 8.5",
+     "dia": "2\""
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5417,13 +5570,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "pvc_pipe",
-      "cls": "8.5",
-      "dia": "2\""
-     },
-     "wage_code": "SN-3.7-b"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5626,6 +5774,11 @@
     "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "spec": {
+     "t": "point",
+     "kind": "light",
+     "desc": "ดาวน์ไลท์ LED 12W"
+    },
     "by_task": {
      "mep_fix": {
       "share": 1.0,
@@ -5634,8 +5787,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "EE-4.58-a"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5652,6 +5804,11 @@
     "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "spec": {
+     "t": "point",
+     "kind": "switch",
+     "desc": ""
+    },
     "by_task": {
      "mep_fix": {
       "share": 1.0,
@@ -5660,8 +5817,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "EE-4.53-a"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5678,6 +5834,11 @@
     "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "spec": {
+     "t": "point",
+     "kind": "outlet",
+     "desc": ""
+    },
     "by_task": {
      "mep_fix": {
       "share": 1.0,
@@ -5685,12 +5846,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "re",
-      "re": "^เต้ารับคู่.*มีกราวด์"
-     },
-     "wage_code": "EE-4.53-k"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5744,6 +5901,10 @@
     "by_src": {
      "LC": 22.8
     },
+    "spec": {
+     "t": "conduit",
+     "conduit": "PVC 1/2\""
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5754,8 +5915,7 @@
     },
     "price_ref": {
      "kind": "user",
-     "need_mat": true,
-     "wage_code": "EE-4.44-i"
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5778,6 +5938,11 @@
     "by_src": {
      "LC": 21.8
     },
+    "spec": {
+     "t": "wire",
+     "wire": "THW",
+     "size": 1.5
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5787,12 +5952,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "thw",
-      "size": "1.5"
-     },
-     "wage_code": "EE-4.2-c"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    },
    {
@@ -5815,6 +5976,11 @@
     "by_src": {
      "LC": 35.7
     },
+    "spec": {
+     "t": "wire",
+     "wire": "THW",
+     "size": 2.5
+    },
     "by_task": {
      "mep_rough": {
       "share": 1.0,
@@ -5824,12 +5990,8 @@
      }
     },
     "price_ref": {
-     "kind": "mat_find",
-     "find": {
-      "type": "thw",
-      "size": "2.5"
-     },
-     "wage_code": "EE-4.2-d"
+     "kind": "user",
+     "note": "ผูกราคาตามชนิด/ขนาดใน tools/mep_price.py (ค่านี้ใช้เมื่อผูกไม่ได้เท่านั้น)"
     }
    }
   ],
@@ -6202,6 +6364,13 @@
   },
   {
    "at": "2026-10-18T19:20:21+07:00",
+   "by": "tools/takeoff.py",
+   "sections": [
+    "quantities"
+   ]
+  },
+  {
+   "at": "2026-10-18T19:46:43+07:00",
    "by": "tools/takeoff.py",
    "sections": [
     "quantities"

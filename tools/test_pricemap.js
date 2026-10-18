@@ -1,0 +1,31 @@
+// ทดสอบตัวผูกราคา (lib/pricemap.js) กับแถวจากอาคารตัวอย่าง — node tools/test_pricemap.js
+const fs = require('fs'), path = require('path');
+const PM = require('../lib/pricemap.js');
+const map = JSON.parse(fs.readFileSync(path.join(__dirname, 'price_map.json'), 'utf8')).map;
+const m = JSON.parse(fs.readFileSync(path.join(__dirname, '../examples/sample-building.bm.json'), 'utf8'));
+const by = Object.fromEntries(PM.bindAll(m.quantities.items, map).map(r => [r.key, r.price_ref || {}]));
+let ok = true;
+const chk = (c, msg) => { ok = ok && c; console.log((c ? 'PASS ' : 'FAIL ') + msg); };
+const W = k => (by[k] || {}).wage_code;
+chk(W('pipe_cw_PVC ชั้น 13.5_1/2"') === 'SN-3.8-a' && by['pipe_cw_PVC ชั้น 13.5_1/2"'].find.type === 'pvc_pipe', 'ท่อประปา PVC 1/2" → SN-3.8-a + หาในพาณิชย์');
+chk(W('pipe_soil_PVC ชั้น 8.5_4"') === 'SN-3.7-e', 'ท่อโสโครก 4" → SN-3.7-e');
+chk(W('wire_THW_2.5') === 'EE-4.2-d' && W('conduit_PVC 1/2"') === 'EE-4.44-i', 'สาย THW 2.5 → EE-4.2-d, ท่อร้อยสาย 1/2" → EE-4.44-i');
+chk(W('pt_P') === 'EE-4.53-k' && W('pt_S') === 'EE-4.53-a' && W('pt_L') === 'EE-4.58-a', 'เต้ารับคู่ / สวิตช์ / ดาวน์ไลท์');
+chk(W('fx_WC') === 'ARC-2.6.1' && W('fx_LAV') === 'ARC-2.6.6' && W('fx_FD') === 'ARC-2.6.25', 'สุขภัณฑ์ ARC-2.6');
+chk(W('cover_metal_sheet') === 'ARC-2.1.8-a' && W('ridge_cap') === 'ARC-2.1.8-c', 'เมทัลชีท 2.1.8-a ครอบสัน 2.1.8-c');
+chk(W('lintel') === 'ARC-2.3.1-w' && by.lintel.code === '4.1', 'เสาเอ็นทับหลัง ครึ่งแผ่น ARC-2.3.1-w + comp 4.1');
+chk(W('plaster_int_brick') === 'ARC-2.3.1.2-c' && W('plaster_ext_brick') === 'ARC-2.3.1.2-d', 'ฉาบใน 2.3.1.2-c ฉาบนอก 2.3.1.2-d');
+const fl = Object.keys(by).find(k => k.startsWith('fin_floor_'));
+chk(by[fl].code === '9.41' && W(fl) === 'ARC-2.4.8-c', 'แกรนิตโต้ 60×60 → comp 9.41 (ผิวด้าน) + ARC-2.4.8-c');
+const d1 = by.open_D1;
+chk(d1.wages && d1.wages.map(w => w.code).join() === 'ARC-2.5.2-a,ARC-2.5.3-b,ARC-2.5.4-a' && d1.area === 1.8, 'ประตูไม้อัด: วงกบ+บานสำเร็จรูป ต่อ ตร.ม. (0.9×2.0) + ลูกบิด');
+chk(!by.open_W1.wage_code && !by.open_W1.wages && /รวมในราคาสืบ/.test(by.open_W1.no_lab), 'หน้าต่างอลูมิเนียม: ราคาสืบรวมติดตั้ง');
+chk(W('paint_ext') === 'ARC-2.8.1-d' && W('paint_int') === 'ARC-2.8.1-b', 'ทาสีภายนอก/ใน');
+chk(by['fit_SN-3.7'].kind === 'pct', 'แถว % คงเดิม');
+// ค่าแรงหลายรายการ × พื้นที่
+const B = require('../lib/boqcalc.js');
+const db = { materials: [], wage: c => ({ 'ARC-2.5.2-a': { price: 103, unit: 'ตร.ม.' }, 'ARC-2.5.3-b': { price: 77, unit: 'ตร.ม.' }, 'ARC-2.5.4-a': { price: 103, unit: 'ชุด' } })[c] };
+const U = { units: { convertPrice: (p) => ({ ok: true, price: p, how: '' }), normUnit: u => u } };
+const r = B.priceRows(db, U, [{ key: 'open_D1', unit: 'ชุด', qty: 1, price_ref: d1 }], {})[0];
+chk(Math.abs(r.lab_unit - (103 * 1.8 + 77 * 1.8 + 103)) < 0.01, `ค่าแรงประตู = 103×1.8 + 77×1.8 + 103 = ${r.lab_unit}`);
+console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน'); process.exit(ok ? 0 : 1);
