@@ -35,7 +35,9 @@ function doGet(e) {
   try {
     if (a === 'list') return out_({ ok: true, items: rows_().map(x => { delete x.row; return x; }) });
     if (a === 'img') {   // คืนภาพเป็น data URL (ให้เว็บเก็บลงไฟล์โครงการได้)
-      const f = DriveApp.getFileById(e.parameter.file);
+      const f = DriveApp.getFileById(e.parameter.file), fid = folder_().getId();
+      let inLib = false; const ps = f.getParents(); while (ps.hasNext()) if (ps.next().getId() === fid) inLib = true;
+      if (!inLib) return out_({ ok: false, error: 'ไม่ใช่ภาพในคลัง' });   // อ่านได้เฉพาะภาพในโฟลเดอร์คลัง
       return out_({ ok: true, data: 'data:' + f.getMimeType() + ';base64,' + Utilities.base64Encode(f.getBlob().getBytes()) });
     }
     if (a === 'ping') return out_({ ok: true, name: SpreadsheetApp.getActiveSpreadsheet().getName() });
