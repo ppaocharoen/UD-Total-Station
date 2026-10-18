@@ -2174,7 +2174,8 @@
             "mat",
             "wage",
             "user",
-            "pct"
+            "pct",
+            "mat_find"
           ],
           "description": "comp = วัสดุมวลรวม (comp_id), mat = รหัสพาณิชย์, wage = รหัส ว480 คอลัมน์ G, user = กรอกเอง, pct = คิดเป็น % ของค่าวัสดุแถวอื่น (ข้อต่อ/อุปกรณ์ยึดท่อ)"
         },
@@ -2199,6 +2200,14 @@
         "lab_of_mat": {
           "type": "number",
           "description": "สัดส่วนค่าแรงต่อค่าวัสดุของแถวนี้ (pct)"
+        },
+        "find": {
+          "type": "object",
+          "description": "ตัวจับคู่ราคาพาณิชย์ (mat_find): type pvc_pipe {cls,dia} | thw {size} | re {re}"
+        },
+        "need_mat": {
+          "type": "boolean",
+          "description": "ต้องมีค่าวัสดุแต่ราคาพาณิชย์ไม่มี → เตือนให้กรอกราคาสืบ"
         }
       }
     },

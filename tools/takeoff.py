@@ -18,6 +18,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from validate import qty_hash  # noqa: E402
 from roofgeom import roof_planes, plane_lines, poly_area3, v_len, v_sub  # noqa: E402
+import mep_price as MP  # noqa: E402
 
 DEFAULTS = {
     "cover": 0.025,       # ระยะหุ้มสำหรับความยาวปลอก/เหล็กฐานราก (ม.)
@@ -618,8 +619,9 @@ class Takeoff:
         pt = el.get("point_types", {})
         for i, p in enumerate(el.get("points", [])):
             t = pt.get(p["type"], {})
-            self.add("1.4", f"pt_{p['type']}", "จุด" + POINT_NAME.get(t.get("kind"), p["type"]) + (f" ({t['desc']})" if t.get("desc") else ""), "จุด", 1,
-                     p.get("id"), count=True, task="mep_fix")
+            it = self.add("1.4", f"pt_{p['type']}", "จุด" + POINT_NAME.get(t.get("kind"), p["type"]) + (f" ({t['desc']})" if t.get("desc") else ""), "จุด", 1,
+                          p.get("id"), count=True, task="mep_fix")
+            it["pref"] = MP.point_ref(t.get("kind"), t.get("desc", ""))
         for pnl in el.get("panels", []):
             self.add("1.4", "panel", f"ตู้ไฟฟ้า {pnl.get('ways', '')} ช่อง {pnl.get('main', '')}".strip(), "ชุด", 1, pnl["id"],
                      count=True, task="mep_fix")
@@ -629,11 +631,13 @@ class Takeoff:
         ft = pl.get("fixture_types", {})
         for i, f in enumerate(pl.get("fixtures", [])):
             t = ft.get(f["type"], {})
-            self.add("1.3", f"fx_{f['type']}", FIXTURE_NAME.get(t.get("kind"), f["type"]) + (f" ({t['desc']})" if t.get("desc") else ""), "ชุด", 1,
-                     f.get("id"), count=True, task="mep_fix")
+            it = self.add("1.3", f"fx_{f['type']}", FIXTURE_NAME.get(t.get("kind"), f["type"]) + (f" ({t['desc']})" if t.get("desc") else ""), "ชุด", 1,
+                          f.get("id"), count=True, task="mep_fix")
+            it["pref"] = MP.fixture_ref(t.get("kind"))
         for e in pl.get("equipment", []):
-            self.add("1.3", f"eq_{e['kind']}", EQUIP_NAME.get(e["kind"], e["kind"]) + (f" {e['size']}" if e.get("size") else ""), "ชุด", 1,
-                     e.get("id"), count=True, task="mep_ext")
+            it = self.add("1.3", f"eq_{e['kind']}", EQUIP_NAME.get(e["kind"], e["kind"]) + (f" {e['size']}" if e.get("size") else ""), "ชุด", 1,
+                          e.get("id"), count=True, task="mep_ext")
+            it["pref"] = MP.equip_ref(e["kind"], e.get("size", ""))
         if pl.get("fixtures") or pl.get("pipes"):
             self._pipes(pl)
 
@@ -674,12 +678,14 @@ class Takeoff:
             if not c.get("conductors"):
                 self.note(f"ไฟฟ้า: วงจร {cid} ไม่ระบุจำนวนสาย — ใช้ 2 เส้น")
             size = c.get("wire_size")
-            self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, c["panel"],
-                     waste=self.s["branch_conduit_waste"], task="mep_rough",
-                     note="ประมาณจากตำแหน่งจุดในโมเดล เดินระดับฝ้าแบบมุมฉาก; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
-            self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, c["panel"],
-                     waste=self.s["branch_wire_waste"], task="mep_rough",
-                     note="ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
+            it = self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, c["panel"],
+                          waste=self.s["branch_conduit_waste"], task="mep_rough",
+                          note="ประมาณจากตำแหน่งจุดในโมเดล เดินระดับฝ้าแบบมุมฉาก; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
+            it["pref"] = MP.conduit_ref(conduit)
+            it = self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, c["panel"],
+                          waste=self.s["branch_wire_waste"], task="mep_rough",
+                          note="ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
+            it["pref"] = MP.wire_ref(wire_t, size)
         self.note("ไฟฟ้า: คิดเฉพาะวงจรย่อย (แผง → จุด) ยังไม่รวมสายเมน/สายป้อน และค่าธรรมเนียมการไฟฟ้า")
 
     def _pipes(self, pl):
@@ -740,22 +746,27 @@ class Takeoff:
             note = "ยาวตามแนวท่อ + เผื่อ 10%"
             if est_note[k]:
                 note += f" · ประมาณแนวท่อให้ (แบบไม่ได้เขียน): {', '.join(est_note[k])} — ตรวจกับแบบ"
+            ref, grp, pnote = MP.pipe_ref(sysn, m_, dia)
+            if pnote:
+                note += " · " + pnote
             it = self.add("1.3", key, f"ท่อ{SYS_NAME.get(sysn, sysn)} {m_} ⌀ {dia}", "ม.", Lp, None,
                           waste=self.s["pipe_waste"], task="mep_rough", note=note)
             it["from"] = src[k]; it["parts"] = {"mep_rough": {"q": Lp, "from": src[k]}}; it["by_src"] = dict(plen[k])
+            it["pref"] = ref
             if est_note[k]:
                 it["estimated"] = True
-            fit_of["water" if sysn in ("cw", "hw") else "drain"].append(key)
-        # ข้อต่อ ของอ และอุปกรณ์ยึด (% ของราคาท่อ ตามข้อ 4.3 ข้อ 3.2–3.3)
+            if grp:
+                fit_of[grp].append(key)
+            else:
+                self.note(f"ท่อ {m_}: ไม่มีอัตรา % ข้อต่อ/เหล็กยึดใน ว480 ที่ผูกไว้ — ไม่ได้คิดรายการ %")
+        # ข้อต่อ / เหล็กยึด / ทดสอบ-ทำความสะอาด-ทาสีสัญลักษณ์: % ของค่าท่อ ตาม ว480 ของท่อแต่ละชนิด (ตกลงกับ Earth 18 ต.ค. 2569)
         for grp, keys in fit_of.items():
-            pct = 0.5 if grp == "water" else 0.4
-            it = self.add("1.3", f"fit_{grp}", f"ข้อต่อ ข้องอท่อ{'ประปา' if grp == 'water' else 'ระบายน้ำ'} (วัสดุ {pct*100:g}% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
-                          "งาน", 1, None, count=True, task="mep_rough")
-            it["pct"] = {"of": keys, "mat": pct, "lab_of_mat": 0.30}
-        allk = [k for ks in fit_of.values() for k in ks]
-        it = self.add("1.3", "pipe_support", "อุปกรณ์ยึดและรองรับท่อ ทำความสะอาด ทาสี ทำสัญลักษณ์ท่อ (วัสดุ 10% ของค่าท่อ, ค่าแรง 30%)",
-                      "งาน", 1, None, count=True, task="mep_rough")
-        it["pct"] = {"of": allk, "mat": 0.10, "lab_of_mat": 0.30}
+            pc, cd = MP.PCT[grp], MP.PCT_CODES[grp]
+            for part, label, code in (("fit", "ข้อต่อ ข้องอ อุปกรณ์", cd[0]), ("sup", "เหล็กยึดและรองรับท่อ", cd[1]),
+                                      ("test", "ทดสอบ ทำความสะอาด ทาสีทำสัญลักษณ์ท่อ", cd[2])):
+                it = self.add("1.3", f"{part}_{grp}", f"{label} ท่อ{pc['name']} (วัสดุ {pc[part]*100:g}% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
+                              "งาน", 1, None, count=True, task="mep_rough", note=f"ว480 {grp}-{code}")
+                it["pct"] = {"of": keys, "mat": pc[part], "lab_of_mat": MP.PCT_LAB}
 
     # ------------------------------------------------------------ เหล็กเสริมรวม
     def _rebar_items(self):
@@ -827,6 +838,8 @@ class Takeoff:
                 pr = next((v for k, v in price_map.items() if k.endswith("*") and it["key"].startswith(k[:-1])), None)
             if it.get("wage_code"):
                 pr = {"kind": "wage", "code": it["wage_code"]}
+            if it.get("pref"):     # งานระบบผูกราคาตามชนิด/ขนาดเอง (tools/mep_price.py) แทน price_map
+                pr = it["pref"]
             if pr and not it.get("pct"):
                 row["price_ref"] = pr
             out.append(row)

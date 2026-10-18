@@ -42,7 +42,7 @@ EXPECT = {
     "demo_ARC-2.9.17-a": 20.00, "paint_rust": 38.53,
     'conduit_PVC 1/2"': 29.64, "wire_THW_1.5": 26.16, "wire_THW_2.5": 42.84,
     'pipe_soil_PVC ชั้น 8.5_4"': 3.30, 'pipe_waste_PVC ชั้น 8.5_2"': 6.16, 'pipe_cw_PVC ชั้น 13.5_1/2"': 14.63,
-    'pipe_vent_PVC ชั้น 8.5_2"': 3.52, "fit_water": 1, "fit_drain": 1, "pipe_support": 1,
+    'pipe_vent_PVC ชั้น 8.5_2"': 3.52, "fit_SN-3.8": 1, "fit_SN-3.7": 1, "sup_SN-3.7": 1, "sup_SN-3.8": 1, "test_SN-3.7": 1, "test_SN-3.8": 1,
 }
 ok = "backfill" not in by
 print(("PASS" if ok else "FAIL"), "ไม่มีแถวถมคืนแยก (รวมใน 1.3)")
@@ -55,7 +55,13 @@ for k, v in EXPECT.items():
 good = by.get('pipe_cw_PVC ชั้น 13.5_1/2"', {}).get("status") == "assumed" and by.get('pipe_vent_PVC ชั้น 8.5_2"', {}).get("status") == "computed"
 ok &= good
 print(("PASS" if good else "FAIL"), "ท่อที่ประมาณแนวให้ติดป้าย assumed, ท่อที่เขียนไว้เป็น computed")
-good = by["fit_drain"]["price_ref"]["kind"] == "pct" and set(by["fit_drain"]["price_ref"]["of"]) == {'pipe_soil_PVC ชั้น 8.5_4"', 'pipe_waste_PVC ชั้น 8.5_2"', 'pipe_vent_PVC ชั้น 8.5_2"'}
+good = by["fit_SN-3.7"]["price_ref"]["kind"] == "pct" and set(by["fit_SN-3.7"]["price_ref"]["of"]) == {'pipe_soil_PVC ชั้น 8.5_4"', 'pipe_waste_PVC ชั้น 8.5_2"', 'pipe_vent_PVC ชั้น 8.5_2"'} \
+    and by["fit_SN-3.7"]["price_ref"]["mat"] == 0.4 and by["sup_SN-3.7"]["price_ref"]["mat"] == 0.3 and by["test_SN-3.8"]["price_ref"]["mat"] == 0.1 \
+    and by["fit_SN-3.8"]["price_ref"]["mat"] == 0.5
+# งานระบบผูกค่าแรง ว480 ตามขนาด
+good = good and by['pipe_cw_PVC ชั้น 13.5_1/2"']["price_ref"].get("wage_code") == "SN-3.8-a" and by['pipe_soil_PVC ชั้น 8.5_4"']["price_ref"].get("wage_code") == "SN-3.7-e" \
+    and by["wire_THW_2.5"]["price_ref"].get("wage_code") == "EE-4.2-d" and by['conduit_PVC 1/2"']["price_ref"].get("wage_code") == "EE-4.44-i" \
+    and by["pt_P"]["price_ref"].get("wage_code") == "EE-4.53-k" and by["fx_WC"]["price_ref"].get("wage_code") == "ARC-2.6.1"
 ok &= good
 print(("PASS" if good else "FAIL"), "ข้อต่อระบายน้ำคิด 40% จากท่อระบายน้ำ 3 รายการ")
 
