@@ -124,7 +124,7 @@ function _renderSurvey() {
   if (!S.db) { box.textContent = 'กำลังโหลดราคา…'; return; }
   const used = new Set(S.baseCompItems.map(i => i.itemCode));
   const list = Object.entries(S.db.matRef).filter(([k, r]) => used.has(k) && !S.db.resolveMat({ itemCode: k, commodityCode: '' }).matItem && !r.compRef);
-  box.innerHTML = `<table class="boq"><tr><th>รหัส</th><th>วัสดุ</th><th>หน่วย</th><th>ราคาสืบ (บาท)</th><th>ใช้ในวัสดุมวลรวม</th></tr>${
+  box.innerHTML = `<div class="table-wrap"><table class="boq"><tr><th>รหัส</th><th>วัสดุ</th><th>หน่วย</th><th>ราคาสืบ (บาท)</th><th>ใช้ในวัสดุมวลรวม</th></tr>${
     list.map(([k, r]) => {
       const n = S.baseCompItems.filter(i => i.itemCode === k).length;
       return `<tr><td class="mono">${esc(k)}</td><td>${esc(r.name)}</td><td>${esc(r.unit)}</td>
@@ -149,7 +149,7 @@ function _renderPR1() {
   const p = S.boq.project;
   $('#pr1-head').innerHTML = `<h3 style="text-align:center">แบบ ปร.1 แบบแสดงรายการ ปริมาณงาน และราคา ค่างานต้นทุน</h3>
     <div>ชื่อโครงการ ${esc(p.name)} · สถานที่ ${esc(p.location)} · แบบเลขที่ ${esc(p.drawing_no || '')} · หน่วยงาน ${esc(p.agency)} · คำนวณเมื่อ ${esc(p.calc_date)}</div>`;
-  let h = `<thead><tr><th rowspan="2">ลำดับ</th><th rowspan="2">รายการ</th><th rowspan="2">จำนวน</th><th rowspan="2">หน่วย</th>
+  let h = `<thead class="pr1-th"><tr><th rowspan="2">ลำดับ</th><th rowspan="2">รายการ</th><th rowspan="2">จำนวน</th><th rowspan="2">หน่วย</th>
     <th colspan="2">ค่าวัสดุ</th><th colspan="2">ค่าแรงงาน</th><th rowspan="2">รวมค่าวัสดุ<br>และค่าแรงงาน</th><th rowspan="2">หมายเหตุ</th></tr>
     <tr><th>ราคา/หน่วย</th><th>จำนวนเงิน</th><th>ราคา/หน่วย</th><th>จำนวนเงิน</th></tr></thead><tbody>`;
   let n = 0, grand = 0, warn = 0;
@@ -168,26 +168,26 @@ function _renderPR1() {
         if (r.warns.length) warn++;
         const custom = r.key.startsWith('custom_');
         h += `<tr class="row ${r.warns.length ? 'warn' : ''} ${S.selKey === r.key ? 'sel' : ''}" data-key="${esc(r.key)}">
-          <td class="r">${n}</td>
-          <td>${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
+          <td class="r c-no">${n}</td>
+          <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
             ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
             ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}</td>
-          <td class="r">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : fmt(r.qty)}</td>
-          <td>${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
-          <td class="r"><input class="price ${o.mat !== undefined ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span></td>
-          <td class="r">${fmt(r.mat_amt)}</td>
-          <td class="r"><input class="price ${o.lab !== undefined ? 'ov' : ''}" data-ov="lab" value="${r.lab_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.lab_src)}</span></td>
-          <td class="r">${fmt(r.lab_amt)}</td>
-          <td class="r">${fmt(r.total)}</td>
-          <td><span class="src">${esc((r.ref && r.ref.note) || r.note || '')}</span>${custom ? '<button class="btn small" data-del="1">ลบ</button>' : ''}</td></tr>`;
+          <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : fmt(r.qty)}</td>
+          <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
+          <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${o.mat !== undefined ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span></td>
+          <td class="r c-ma" data-l="ค่าวัสดุ">${fmt(r.mat_amt)}</td>
+          <td class="r c-lu" data-l="ค่าแรง/หน่วย"><input class="price ${o.lab !== undefined ? 'ov' : ''}" data-ov="lab" value="${r.lab_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.lab_src)}</span></td>
+          <td class="r c-la" data-l="ค่าแรง">${fmt(r.lab_amt)}</td>
+          <td class="r c-tot" data-l="รวม">${fmt(r.total)}</td>
+          <td class="c-note"><span class="src">${esc((r.ref && r.ref.note) || r.note || '')}</span>${custom ? '<button class="btn small" data-del="1">ลบ</button>' : ''}</td></tr>`;
         secTot += r.total;
       }
     }
-    h += `<tr class="total"><td></td><td colspan="7">รวม ${sc} ${esc(sname)}</td><td class="r">${fmt(r2(secTot))}</td><td></td></tr>`;
+    h += `<tr class="total"><td></td><td colspan="7">รวม ${sc} ${esc(sname)}</td><td class="r c-tot">${fmt(r2(secTot))}</td><td></td></tr>`;
     grand += secTot;
   }
-  h += `<tr class="total"><td></td><td colspan="7">รวมค่างานต้นทุนทั้งหมด</td><td class="r">${fmt(r2(grand))}</td><td></td></tr></tbody>`;
+  h += `<tr class="total"><td></td><td colspan="7">รวมค่างานต้นทุนทั้งหมด</td><td class="r c-tot">${fmt(r2(grand))}</td><td></td></tr></tbody>`;
   tb.innerHTML = h;
   $('#pr1-alert').textContent = warn ? `มี ${warn} รายการที่ยังไม่มีราคาหรือมีคำเตือน (แถบสีส้ม) — แก้ราคาในช่องได้โดยตรง` : '';
   tb.querySelectorAll('tr.row').forEach(tr => {
@@ -305,9 +305,9 @@ function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV
   const sig = `<p class="hint" style="margin-top:18px;text-align:center">ประธานกรรมการกำหนดราคากลาง ............................ &nbsp; กรรมการ ............................ &nbsp; กรรมการ ............................</p>`;
   box.innerHTML = `<div class="kpis no-print">${kpiHtml({ pr, cost, ff, grand }, S.plan)}</div>
   <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุปค่าก่อสร้าง ค่างานต้นทุน</h3>${head}
-    <table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>Factor F</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
+    <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>Factor F</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
     ${secs.map((s, i) => `<tr><td class="r">${i + 1}</td><td>${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.cost)}</td><td class="r">${ff.F.toFixed(4)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
-    <tr class="total"><td></td><td>รวมค่าก่อสร้าง</td><td class="r">${fmt(cost)}</td><td></td><td class="r">${fmt(build)}</td><td></td></tr></table>
+    <tr class="total"><td></td><td>รวมค่าก่อสร้าง</td><td class="r">${fmt(cost)}</td><td></td><td class="r">${fmt(build)}</td><td></td></tr></table></div>
     <p class="hint" style="margin-top:8px">เงื่อนไขการใช้ตาราง Factor F: เงินค่าจ้างล่วงหน้า ${fc.advance}% · เงินประกันผลงาน ${fc.retention}% · ดอกเบี้ยเงินกู้ ${ff.interest}% · ภาษีมูลค่าเพิ่ม ${ff.vat}%${ff.loanShare ? ` · เงินกู้ไม่เสีย VAT ${+(ff.loanShare * 100).toFixed(2)}%` : ''}</p>
     ${p.area ? `<p class="hint">ขนาดหรือเนื้อที่อาคาร ${fmt(p.area)} ตร.ม. · เฉลี่ย ${fmt(r2(build / p.area))} บาท/ตร.ม.</p>` : ''}${sig}</div>
   <div class="sum-doc"><h3>รายละเอียดการหาค่า Factor F</h3>
@@ -315,15 +315,15 @@ function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV
     ${ff.detail.map(d => `<p class="mono" style="font-size:13px;margin-top:4px">${esc(d)}</p>`).join('')}
     <p class="hint" style="margin-top:6px">ตามเล่มหลักเกณฑ์อาคาร 2569 ข้อ 9.3 · ทศนิยม 4 ตำแหน่งแบบตัดทิ้ง · ${esc(FactorF.SOURCE)}</p></div>
   ${S.boq.pr2.length ? `<div class="sum-doc"><h3>แบบ ปร.2 (ก) แบบสรุปค่าครุภัณฑ์จัดซื้อ</h3>${head}
-    <table class="boq"><tr><th>รายการ</th><th>ค่าครุภัณฑ์</th><th>VAT</th><th>จำนวนเงิน</th><th>ค่าติดตั้ง</th><th>VAT</th><th>จำนวนเงิน</th><th>รวมค่าครุภัณฑ์จัดซื้อ</th></tr>
-    <tr><td>ครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eq)}</td><td class="r">${fmt(eqV)}</td><td class="r">${fmt(r2(eq + eqV))}</td><td class="r">${fmt(ins)}</td><td class="r">${fmt(insV)}</td><td class="r">${fmt(r2(ins + insV))}</td><td class="r">${fmt(eqTotal)}</td></tr></table>${sig}</div>` : ''}
+    <div class="table-wrap"><table class="boq"><tr><th>รายการ</th><th>ค่าครุภัณฑ์</th><th>VAT</th><th>จำนวนเงิน</th><th>ค่าติดตั้ง</th><th>VAT</th><th>จำนวนเงิน</th><th>รวมค่าครุภัณฑ์จัดซื้อ</th></tr>
+    <tr><td>ครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eq)}</td><td class="r">${fmt(eqV)}</td><td class="r">${fmt(r2(eq + eqV))}</td><td class="r">${fmt(ins)}</td><td class="r">${fmt(insV)}</td><td class="r">${fmt(r2(ins + insV))}</td><td class="r">${fmt(eqTotal)}</td></tr></table></div>${sig}</div>` : ''}
   <div class="sum-doc"><h3>แบบ ปร.4 แบบสรุปราคากลางงานก่อสร้างอาคาร</h3>${head}
-    <table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
+    <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
     <tr><td class="r">1</td><td>ค่างานต้นทุน</td><td class="r">${fmt(build)}</td><td></td></tr>
     ${secs.map(s => `<tr><td></td><td>&nbsp;&nbsp;- ${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
     <tr><td class="r">2</td><td>ค่าครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eqTotal)}</td><td></td></tr>
     <tr><td class="r">3</td><td>ค่าใช้จ่ายพิเศษตามข้อกำหนด (ถ้ามี)</td><td class="r">${fmt(sp)}</td><td></td></tr>
-    <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr></table>
+    <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr></table></div>
     <p class="bigtotal" style="margin-top:12px">ราคากลาง ${fmt(grand)} บาท</p>
     <p style="text-align:right">(${esc(BoqCalc.bahtText(grand))})</p>${sig}</div>`;
 }
@@ -398,7 +398,7 @@ function selectTask(id) {
   toast(`${t.label}: ${t.from.length} ชิ้นส่วน${$('#page-model').classList.contains('active') ? '' : ' — ดูในแท็บโมเดล 3D'}`);
 }
 function renderGantt(plan, inst, sel) {
-  const days = plan.calDays, rowH = 24, left = 250, top = 34, W = Math.max(720, left + days * 12 + 20);
+  const narrow = innerWidth < 800, days = plan.calDays, rowH = 24, left = narrow ? 128 : 250, top = 34, W = Math.max(720, left + days * 12 + 20);
   const sx = (W - left - 20) / days, H = top + plan.tasks.length * rowH + 10;
   const x = d => left + Schedule.parse(d).getTime() / 864e5 * sx - Schedule.parse(plan.start).getTime() / 864e5 * sx;
   let g = `<svg class="gantt" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
@@ -410,7 +410,7 @@ function renderGantt(plan, inst, sel) {
   g += `<text x="${left}" y="12">วันที่ (สัปดาห์เริ่มวันจันทร์) · รวม ${days} วัน</text>`;
   plan.tasks.forEach((t, i) => {
     const y = top + i * rowH, x0 = x(t.start), x1 = x(t.finish) + sx;
-    g += `<text x="6" y="${y + 15}">${esc(t.label.length > 34 ? t.label.slice(0, 33) + '…' : t.label)}</text>
+    g += `<text x="6" y="${y + 15}">${esc(t.label.length > (narrow ? 17 : 34) ? t.label.slice(0, narrow ? 16 : 33) + '…' : t.label)}</text>
       <rect class="bar ${S.selTask === t.id ? 'sel' : ''}" data-task="${esc(t.id)}" x="${x0}" y="${y + 4}" width="${Math.max(3, x1 - x0)}" height="${rowH - 9}" rx="3" fill="${t.color}"><title>${esc(t.label)}\n${thDate(t.start)} – ${thDate(t.finish)} (${t.days} วันทำงาน)\n${fmt(t.cost)} บาท (${t.pct}%)</title></rect>`;
   });
   inst.list.forEach(c => { if (!c.due) return; const xx = x(c.due) + sx; g += `<line class="cut" x1="${xx}" y1="${top - 4}" x2="${xx}" y2="${H}"/><text class="cutlbl" x="${xx + 2}" y="${H - 2}">งวด ${c.no}</text>`; });
@@ -725,6 +725,15 @@ function bind() {
     $$('#tabs .nav-tab').forEach(x => x.classList.toggle('active', x === t));
     $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t.dataset.tab));
     if (t.dataset.tab === 'model') { initViewer(); S.viewer && S.viewer.resize(); }
+    $$('#bnav [data-go]').forEach(b => b.classList.toggle('active', b.dataset.go === t.dataset.tab || (b.dataset.go === 'more' && ['pr23', 'diff'].includes(t.dataset.tab))));
+    document.body.classList.toggle('on-model', t.dataset.tab === 'model');
+    $('#bmore').classList.remove('on'); scrollTo(0, 0);
+  });
+  $$('#bnav [data-go], #bmore [data-go]').forEach(b => b.onclick = () => {
+    const go = b.dataset.go;
+    if (go === 'more') { $('#bmore-meta').innerHTML = $('#meta-proj').innerHTML + '<br>' + $('#meta-price').innerHTML; return $('#bmore').classList.toggle('on'); }
+    if (go === 'crt') { $('#b-crt').click(); return $('#bmore').classList.remove('on'); }
+    $$('#tabs .nav-tab').find(x => x.dataset.tab === go).click();
   });
   $('#f-model').onchange = async e => { try { const f = await readFile(e.target); loadModel(f.text, f.name); toast('เปิดโมเดลแล้ว'); } catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); } e.target.value = ''; };
   $('#f-boq').onchange = async e => {
@@ -778,7 +787,7 @@ function bind() {
     const sv = localStorage.getItem('udboq:side');
     if (sv === '1' || (sv === null && innerWidth < 800)) $('#stage').classList.add('collapsed');   // มือถือเริ่มแบบพับเมนู
   } catch (er) { /* */ }
-  const fitStage = () => { $('#stage').style.height = Math.max(420, innerHeight - $('.topbar').offsetHeight) + 'px'; };
+  const fitStage = () => { const bn = $('#bnav'), bh = bn && getComputedStyle(bn).display !== 'none' ? bn.offsetHeight : 0; $('#stage').style.height = Math.max(bh ? 300 : 420, innerHeight - $('.topbar').offsetHeight - bh) + 'px'; };
   addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
   $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };

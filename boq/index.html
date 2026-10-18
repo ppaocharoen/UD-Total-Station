@@ -25,6 +25,20 @@
   <div class="meta-bar"><div><div id="meta-proj" class="meta-proj">ยังไม่ได้เปิดโครงการ</div><div id="meta-price" class="meta-price">กำลังโหลดราคา…</div></div><button class="crt-btn" id="b-crt" title="เปิด/ปิดเอฟเฟกต์จอ CRT">CRT:ON</button></div>
 </header>
 
+<nav class="bnav" id="bnav">
+  <button data-go="project" class="active"><i>01</i>โครงการ</button>
+  <button data-go="model"><i>02</i>3D</button>
+  <button data-go="pr1"><i>03</i>ปร.1</button>
+  <button data-go="summary"><i>04</i>สรุป</button>
+  <button data-go="plan"><i>05</i>แผนงาน</button>
+  <button data-go="more"><i>··</i>อื่นๆ</button>
+</nav>
+<div class="bmore glass" id="bmore">
+  <button data-go="pr23">ปร.2 / ปร.3 ครุภัณฑ์ ค่าใช้จ่ายพิเศษ</button>
+  <button data-go="diff">เทียบรุ่น</button>
+  <button data-go="crt">เอฟเฟกต์จอ CRT เปิด/ปิด</button>
+  <div class="hint" id="bmore-meta"></div>
+</div>
 <main>
 <!-- ================================================================ โครงการ -->
 <section class="page active" id="page-project">
@@ -103,9 +117,9 @@
     <div class="pick glass" id="pick-info"></div>
     <div class="dock glass" id="dock">
       <div class="dock-tabs">
-        <div class="dock-tab active" data-dock="time">▶ ลำดับก่อสร้าง</div><div class="dock-tab" data-dock="gantt">Gantt</div>
+        <div class="dock-tab active" data-dock="time">▶ <span class="lg">ลำดับก่อสร้าง</span><span class="sm">ลำดับ</span></div><div class="dock-tab" data-dock="gantt">Gantt</div>
         <div class="dock-tab" data-dock="scurve">S-Curve</div><div class="dock-tab" data-dock="inst">งวดงาน</div><div class="dock-tab" data-dock="boq">BOQ</div><div class="dock-tab" data-dock="clash">Clash <span id="clash-n"></span></div>
-        <div class="sp"></div><div class="dock-tab" id="dock-min">▾ ย่อ</div>
+        <div class="sp"></div><div class="dock-tab" id="dock-min">▾<span class="lg"> ย่อ</span></div>
       </div>
       <div class="dock-body">
         <div class="dock-pane active" id="dk-time">
