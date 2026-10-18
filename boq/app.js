@@ -22,7 +22,7 @@ const S = {
 };
 function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 15, retention: 10, loanPct: 0 },
-    overrides: {}, survey: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
+    overrides: {}, survey: {}, surveys: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
 function newPlan() { return { start: '', workdays: [1, 2, 3, 4, 5, 6], holidays: [], durations: {}, inst: { n: 4, mode: 'auto', assign: {} } }; }
 
@@ -37,7 +37,23 @@ function readFile(input) {
   return new Promise((res, rej) => { const f = input.files[0]; if (!f) return rej(); const r = new FileReader();
     r.onload = () => res({ name: f.name, text: r.result }); r.onerror = rej; r.readAsText(f, 'utf-8'); });
 }
-function autosave() { try { if (S.modelName) localStorage.setItem('udboq:' + S.modelName, JSON.stringify(S.boq)); } catch (e) { /* ไม่มี storage */ } }
+// ภาพหลักฐานราคาสืบเก็บใน S.img (หน่วยความจำ) + IndexedDB; localStorage เก็บเฉพาะตัวเลข (ไม่พอสำหรับภาพ)
+function autosave() { try { if (S.modelName) localStorage.setItem('udboq:' + S.modelName, JSON.stringify(Object.assign({}, S.boq, { svimg: undefined }))); } catch (e) { /* ไม่มี storage */ } }
+S.img = {};
+async function restoreImgs() {
+  const ids = Object.values(S.boq.surveys || {}).flatMap(it => (it.quotes || []).flatMap(q => q.imgs || [])).filter(id => !S.img[id]);
+  for (const id of ids) { const d = await Survey.imgGet(id); if (d) S.img[id] = d; }
+  if (ids.length) renderSurvey();
+}
+function migrateSurvey() {   // ราคาสืบรุ่นเดิม {รหัส: ราคา} → รายการราคาสืบ
+  const old = S.boq.survey || {}; S.boq.surveys = S.boq.surveys || {};
+  Object.entries(old).forEach(([code, p]) => {
+    const id = 'sub:' + code; if (S.boq.surveys[id] || p === '' || p === null) return;
+    const r = S.db && S.db.matRef[code];
+    S.boq.surveys[id] = { id, name: r ? r.name : code, unit: r ? r.unit : '', target: id, quotes: [{ id: Survey.uid('q'), channel: 'store', shop: '(ราคาที่กรอกไว้เดิม)', price: +p, factor: 1, vat: false, imgs: [] }] };
+  });
+  S.boq.survey = {};
+}
 
 // ------------------------------------------------------------------ ราคา
 async function loadPrices() {
@@ -57,7 +73,8 @@ async function loadPrices() {
 function hasCommerce(it) { return !!S.db.resolveMat(it).matItem; }
 function applySurvey() {
   if (!S.db) return;
-  const sv = S.boq.survey || {};
+  migrateSurvey();
+  const sv = {}; Object.values(S.boq.surveys || {}).forEach(it => { if (it.target && it.target.startsWith('sub:')) { const p = Survey.summary(it).price; if (p !== null) sv[it.target.slice(4)] = p; } });
   S.db.compItems = S.baseCompItems.map(it => {
     const p = sv[it.itemCode];
     return (p !== undefined && p !== '' && it.fixedPrice === null && !hasCommerce(it)) ? Object.assign({}, it, { fixedPrice: +p, surveyed: true }) : it;
@@ -83,7 +100,7 @@ function loadModel(json, name) {
     const sl = (m.slabs || []).reduce((a, s) => a + polyArea(s.polygon), 0);
     if (sl) p.area = r2(sl);
   }
-  $('#meta-proj').textContent = p.name;
+  $('#meta-proj').textContent = p.name; restoreImgs();
   $('#file-status').innerHTML = `เปิด <b>${esc(name)}</b>${saved ? ' · ดึงงาน BOQ ที่บันทึกไว้ในเบราว์เซอร์นี้' : ''}`;
   if (S.viewer) buildLayers(S.viewer.load(m)); else renderClash();
   renderAll();
@@ -120,25 +137,167 @@ function renderProject() {
 }
 
 function renderSurvey() { clearTimeout(renderSurvey._t); renderSurvey._t = setTimeout(_renderSurvey, 0); }
+// ------------------------------------------------------------------ ราคาสืบ
+const isInfo = r => r.ref && r.ref.no_lab && !r.ref.need_mat && !r.ref.code && !r.ref.find;
+function surveyTargets() {   // รายการที่ต้องสืบ: แถว ปร.1 ที่ไม่มีราคาวัสดุ + วัสดุย่อยในวัสดุมวลรวมที่ไม่มีราคาพาณิชย์
+  const out = [];
+  (S.db ? priceAll() : []).forEach(r => {
+    if ((r.price_ref && ['pct', 'comp'].includes(r.price_ref.kind)) || isInfo(r) || r.unit === 'งาน') return;   // วัสดุมวลรวมคิดจากวัสดุย่อย (สืบที่วัสดุย่อย)
+    if (r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) out.push({ target: 'row:' + r.key, name: r.name, unit: r.unit, qty: r.qty, why: (r.warns || []).join(' · ') });
+  });
+  if (S.db) {
+    const used = new Set(S.baseCompItems.map(i => i.itemCode));
+    Object.entries(S.db.matRef).filter(([k, r]) => used.has(k) && !S.db.resolveMat({ itemCode: k, commodityCode: '' }).matItem && !r.compRef)
+      .forEach(([k, r]) => out.push({ target: 'sub:' + k, name: r.name, unit: r.unit, why: `วัสดุย่อยในวัสดุมวลรวม ${S.baseCompItems.filter(i => i.itemCode === k).length} รายการ` }));
+  }
+  return out;
+}
+function svItem(t) {   // รายการราคาสืบของเป้าหมาย (สร้างใหม่ถ้ายังไม่มี)
+  const sv = S.boq.surveys; let it = sv[t.target];
+  if (!it) it = sv[t.target] = { id: t.target, name: t.name, unit: t.unit, target: t.target, quotes: [], reason: '' };
+  return it;
+}
+function renderSurvey() { clearTimeout(renderSurvey._t); renderSurvey._t = setTimeout(_renderSurvey, 0); }
 function _renderSurvey() {
-  const box = $('#survey-table');
-  if (!S.db) { box.textContent = 'กำลังโหลดราคา…'; return; }
-  const used = new Set(S.baseCompItems.map(i => i.itemCode));
-  const list = Object.entries(S.db.matRef).filter(([k, r]) => used.has(k) && !S.db.resolveMat({ itemCode: k, commodityCode: '' }).matItem && !r.compRef);
-  box.innerHTML = `<div class="table-wrap"><table class="boq"><tr><th>รหัส</th><th>วัสดุ</th><th>หน่วย</th><th>ราคาสืบ (บาท)</th><th>ใช้ในวัสดุมวลรวม</th></tr>${
-    list.map(([k, r]) => {
-      const n = S.baseCompItems.filter(i => i.itemCode === k).length;
-      return `<tr><td class="mono">${esc(k)}</td><td>${esc(r.name)}</td><td>${esc(r.unit)}</td>
-        <td class="r"><input class="price ${S.boq.survey[k] ? 'ov' : ''}" data-sv="${esc(k)}" value="${esc(S.boq.survey[k] ?? '')}" inputmode="decimal"></td><td class="r">${n} รายการ</td></tr>`;
-    }).join('')}</table>`;
-  box.querySelectorAll('[data-sv]').forEach(el => el.onchange = () => {
-    const v = el.value.trim(); if (v === '') delete S.boq.survey[el.dataset.sv]; else S.boq.survey[el.dataset.sv] = +v;
-    applySurvey(); autosave(); renderPR1(); renderSummary(); renderSurvey(); toast('ใช้ราคาสืบคิดวัสดุมวลรวมใหม่แล้ว');
+  const box = $('#sv-list'); if (!box) return;
+  if (!S.model) { box.innerHTML = '<div class="card hint">เปิดโมเดลก่อน</div>'; return; }
+  migrateSurvey();
+  const tg = surveyTargets(), have = new Set(tg.map(t => t.target));
+  const manual = Object.values(S.boq.surveys).filter(it => !have.has(it.target)).map(it => ({ target: it.target, name: it.name, unit: it.unit, why: it.target === 'manual' || it.target.startsWith('manual') ? 'เพิ่มเอง' : 'ไม่ได้ใช้ในงานนี้แล้ว' }));
+  const all = tg.concat(manual).map(t => ({ t, it: S.boq.surveys[t.target], s: S.boq.surveys[t.target] ? Survey.summary(S.boq.surveys[t.target]) : { status: 'none', n: 0, price: null } }));
+  const f = S.svf || 'todo';
+  const cnt = k => all.filter(x => x.s.status === k).length;
+  $('#sv-stat').innerHTML = `ทั้งหมด ${all.length} รายการ · <span style="color:var(--green)">ครบ 3 เจ้า ${cnt('ok')}</span> · <span style="color:var(--amber)">ไม่ครบ ${cnt('few')}</span> · <span style="color:var(--red)">ยังไม่สืบ ${cnt('none')}</span>`;
+  $('#sv-badge').innerHTML = cnt('none') ? `<span class="pill err">${cnt('none')}</span>` : '';
+  $$('#sv-filter [data-svf]').forEach(c => c.classList.toggle('on', c.dataset.svf === f));
+  const show = all.filter(x => x.t.target === S.svOpen || f === 'all' || (f === 'todo' ? x.s.status !== 'ok' : x.s.status === f));
+  box.innerHTML = show.length ? show.map(x => svCard(x)).join('') : '<div class="card hint">ไม่มีรายการในกลุ่มนี้</div>';
+  if (S.svOpen) { const c = box.querySelector(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) c.classList.add('open'); }
+}
+const SVST = { ok: ['ครบ 3 เจ้า', 'ok'], few: ['ไม่ครบ 3 เจ้า', 'warn'], none: ['ยังไม่สืบ', 'err'] };
+function svCard({ t, it, s }) {
+  const open = S.svOpen === t.target;
+  let h = `<div class="card sv-card ${open ? 'open' : ''}" data-svi="${esc(t.target)}">
+    <div class="sv-head" data-svtoggle="1"><div><b>${esc(t.name)}</b> <span class="hint">[${esc(t.unit)}]</span>${t.qty ? ` <span class="hint">· ใช้ ${fmt(t.qty)} ${esc(t.unit)}</span>` : ''}
+      <div class="hint">${esc(t.why || '')}</div></div>
+      <div class="sv-sum"><span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
+  if (open) h += svEditor(t, it || svItem(t));
+  return h + '</div>';
+}
+function svEditor(t, it) {
+  const s = Survey.summary(it), best = s.best && s.best.id;
+  const ch = Object.entries(Survey.CHANNEL);
+  const ph = { web: 'ลิงก์หน้าเว็บ', phone: 'เบอร์โทร', line: 'ชื่อไลน์ / ลิงก์ร้าน', quote: 'เลขที่ใบเสนอราคา / ผู้เสนอ', store: 'ที่อยู่ร้าน' };
+  let h = `<div class="sv-body">`;
+  (it.quotes || []).forEach((q, i) => {
+    const up = Survey.unitPrice(q);
+    h += `<div class="sv-q ${q.id === best ? 'best' : ''}" data-q="${esc(q.id)}">
+      <div class="sv-qh"><b>เจ้าที่ ${i + 1}</b>${q.id === best ? ' <span class="pill ok">ต่ำสุด ใช้ราคานี้</span>' : ''}<button class="btn small" data-qdel="1">ลบ</button></div>
+      <div class="sv-grid">
+        <label>ช่องทาง<select data-qf="channel">${ch.map(([k, v]) => `<option value="${k}" ${q.channel === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
+        <label>ชื่อร้าน<input data-qf="shop" value="${esc(q.shop || '')}"></label>
+        <label class="wide">${ph[q.channel] || 'ติดต่อ'}<input data-qf="contact" value="${esc(q.contact || '')}" ${q.channel === 'phone' ? 'inputmode="tel"' : ''}>${q.contact && /^https?:\/\//.test(q.contact) ? `<a href="${esc(q.contact)}" target="_blank" rel="noopener" class="pk-link">เปิดลิงก์</a>` : ''}</label>
+        <label>วันที่สืบ<input type="date" data-qf="date" value="${esc(q.date || '')}"></label>
+        <label>ราคาที่ได้ (บาท)<input data-qf="price" inputmode="decimal" value="${esc(q.price ?? '')}"></label>
+        <label>ต่อหน่วยที่ร้านขาย<input data-qf="qunit" value="${esc(q.qunit || '')}" placeholder="${esc(it.unit)}"></label>
+        <label>1 หน่วยร้าน = ? ${esc(it.unit)}<input data-qf="factor" inputmode="decimal" value="${esc(q.factor ?? 1)}"></label>
+        <label class="ck"><input type="checkbox" data-qf="vat" ${q.vat ? 'checked' : ''}> ราคานี้รวม VAT แล้ว (หักออก)</label>
+        <label class="wide">หมายเหตุ<input data-qf="note" value="${esc(q.note || '')}"></label>
+      </div>
+      <div class="sv-calc">${up !== null ? `= ${fmt(+q.price)}${q.vat ? ' ÷ 1.07' : ''}${+(q.factor || 1) !== 1 ? ` ÷ ${q.factor}` : ''} → <b>${fmt(up)}</b> บ./${esc(it.unit)} (ไม่รวม VAT)` : '<span class="hint">ใส่ราคาเพื่อคำนวณ</span>'}</div>
+      <div class="sv-imgs">${(q.imgs || []).map(id => `<span class="sv-th">${S.img[id] ? `<img src="${S.img[id]}" data-view="${esc(id)}">` : '<i>กำลังโหลด…</i>'}<button data-imgdel="${esc(id)}">×</button></span>`).join('')}
+        <label class="btn small">+ แนบภาพ (แคปจอ/ใบเสนอราคา)<input type="file" accept="image/*" multiple data-qimg="1" hidden></label></div>
+    </div>`;
+  });
+  h += `<div class="btn-row"><button class="btn small primary" data-qadd="1">+ เพิ่มเจ้า</button><span class="hint" data-libhint="1"></span></div>`;
+  if (s.status !== 'ok') h += `<label class="sv-reason">เหตุผลที่สืบได้ไม่ครบ 3 เจ้า<input data-reason="1" value="${esc(it.reason || '')}" placeholder="เช่น มีจำหน่ายในพื้นที่เพียง 2 ร้าน"></label>`;
+  return h + '</div>';
+}
+function svSave(it) {   // บันทึก + สำรองเข้าคลังราคาสืบ (ใช้ข้ามโครงการ)
+  it.updated = new Date().toISOString(); autosave(); applySurvey(); priceAll();
+  clearTimeout(svSave._t); svSave._t = setTimeout(() => {
+    const imgs = {}; (it.quotes || []).forEach(q => (q.imgs || []).forEach(id => { if (S.img[id]) imgs[id] = S.img[id]; }));
+    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '' });
+  }, 800);
+}
+async function svLibHint(card, it) {
+  const el = card.querySelector('[data-libhint]'); if (!el) return;
+  const m = Survey.libMatch(await Survey.libAll(), it.name, it.unit).filter(x => x.key !== Survey.libKey(it.name, it.unit) || !(it.quotes || []).length);
+  if (!m.length) { el.textContent = ''; return; }
+  el.innerHTML = 'คลังราคาสืบ: ' + m.map((x, i) => { const a = Survey.ageDays(x.updated); return `<a class="pk-link" data-libuse="${i}">${esc(x.name)} · ${x.quotes.length} เจ้า · ${a} วันก่อน${x.project ? ' (' + esc(x.project) + ')' : ''}</a>${a > 90 ? ' <span class="pill warn">เกิน 90 วัน</span>' : ''}`; }).join(' · ');
+  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = () => {
+    const x = m[+a.dataset.libuse];
+    Object.entries(x.imgs || {}).forEach(([id, d]) => { S.img[id] = d; Survey.imgPut(id, d); });
+    it.quotes = (it.quotes || []).concat(x.quotes.map(q => Object.assign({}, q, { id: Survey.uid('q'), note: (q.note ? q.note + ' · ' : '') + 'จากคลัง' })));
+    if (!it.reason && x.reason) it.reason = x.reason;
+    svSave(it); renderSurvey(); renderPR1(); renderSummary(); toast(`ดึง ${x.quotes.length} เจ้าจากคลังแล้ว — ตรวจวันที่สืบ`);
   });
 }
+function bindSurvey() {
+  $('#sv-list').addEventListener('click', e => {
+    const card = e.target.closest('[data-svi]'); if (!card) return;
+    const tid = card.dataset.svi, t = { target: tid, name: card.querySelector('.sv-head b').textContent, unit: (card.querySelector('.sv-head .hint').textContent.match(/\[(.*)\]/) || [])[1] || '' };
+    const it = S.boq.surveys[tid] || svItem(t);
+    if (e.target.closest('[data-svtoggle]')) { S.svOpen = S.svOpen === tid ? null : tid; renderSurvey(); if (S.svOpen) setTimeout(() => { const c = $(`[data-svi="${CSS.escape(tid)}"]`); if (c) { svLibHint(c, it); c.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, 50); return; }
+    if (e.target.dataset.qadd) { it.quotes.push({ id: Survey.uid('q'), channel: 'web', shop: '', contact: '', date: new Date().toISOString().slice(0, 10), price: '', qunit: it.unit, factor: 1, vat: true, note: '', imgs: [] }); svSave(it); renderSurvey(); return; }
+    const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q);
+    if (q && e.target.dataset.qdel) { if (confirm('ลบเจ้านี้?')) { it.quotes = it.quotes.filter(x => x !== q); svSave(it); renderSurvey(); renderPR1(); } return; }
+    if (q && e.target.dataset.imgdel) { q.imgs = q.imgs.filter(x => x !== e.target.dataset.imgdel); svSave(it); renderSurvey(); return; }
+    if (e.target.dataset.view) { const w = window.open(''); if (w) w.document.write(`<img src="${S.img[e.target.dataset.view]}" style="max-width:100%">`); }
+  });
+  $('#sv-list').addEventListener('change', async e => {
+    const card = e.target.closest('[data-svi]'); if (!card) return;
+    const it = S.boq.surveys[card.dataset.svi]; if (!it) return;
+    if (e.target.dataset.reason) { it.reason = e.target.value; svSave(it); return; }
+    const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q); if (!q) return;
+    if (e.target.dataset.qimg) {
+      for (const f of e.target.files) { const d = await Survey.compress(f), id = Survey.uid('img'); S.img[id] = d; Survey.imgPut(id, d); q.imgs.push(id); }
+      svSave(it); renderSurvey(); toast('แนบภาพแล้ว'); return;
+    }
+    const k = e.target.dataset.qf; if (!k) return;
+    q[k] = e.target.type === 'checkbox' ? e.target.checked : (['price', 'factor'].includes(k) ? (e.target.value.trim() === '' ? '' : +e.target.value.replace(/,/g, '')) : e.target.value);
+    svSave(it); renderSurvey(); renderPR1(); renderSummary();
+  });
+  $$('#sv-filter [data-svf]').forEach(c => c.onclick = () => { S.svf = c.dataset.svf; renderSurvey(); });
+  $('#sv-add').onclick = () => {
+    const name = prompt('ชื่อวัสดุ'); if (!name) return; const unit = prompt('หน่วย (ตามใน ปร.)', 'ชุด') || '';
+    const id = Survey.uid('manual:'); S.boq.surveys[id] = { id, name, unit, target: id, quotes: [], reason: '' }; S.svOpen = id; S.svf = 'all'; svSave(S.boq.surveys[id]); renderSurvey();
+  };
+  $('#sv-print').onclick = () => { svPrintout(); document.body.classList.add('print-survey'); setTimeout(() => { window.print(); document.body.classList.remove('print-survey'); }, 300); };
+  $('#sv-libx').onclick = async () => { const all = await Survey.libAll(); download('คลังราคาสืบ-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({ format: 'ud-survey-lib', items: all })); toast(`ส่งออกคลัง ${all.length} รายการ`); };
+  $('#sv-libi').onchange = async e => {
+    try { const f = await readFile(e.target), d = JSON.parse(f.text); if (d.format !== 'ud-survey-lib') throw new Error('ไม่ใช่ไฟล์คลังราคาสืบ');
+      for (const x of d.items) { const cur = await Survey.libGet(x.key); if (!cur || (x.updated || '') > (cur.updated || '')) await Survey.libPut(x.key, x); }
+      toast(`นำเข้าคลัง ${d.items.length} รายการ`); } catch (er) { alert('นำเข้าไม่ได้: ' + er.message); }
+    e.target.value = '';
+  };
+}
+function svPrintout() {   // บัญชีสืบราคา + ภาคผนวกภาพหลักฐาน
+  const p = S.boq.project, items = Object.values(S.boq.surveys).filter(it => (it.quotes || []).length);
+  let h = `<h3 style="text-align:center">บัญชีสืบราคาวัสดุ</h3><div>โครงการ ${esc(p.name || '')} · สถานที่ ${esc(p.location || '')} · หน่วยงาน ${esc(p.agency || '')} · วันที่พิมพ์ ${new Date().toISOString().slice(0, 10)}</div>
+    <p class="hint">ราคาต่อหน่วยไม่รวมภาษีมูลค่าเพิ่ม (ราคาที่รวม VAT หารด้วย 1.07) แปลงเป็นหน่วยตามแบบ ปร. แล้วเลือกราคาต่ำสุด</p>`;
+  let n = 0, fig = [];
+  items.forEach((it, k) => {
+    const s = Survey.summary(it);
+    h += `<h4>${k + 1}. ${esc(it.name)} (หน่วย ${esc(it.unit)})</h4><div class="table-wrap"><table class="boq"><tr><th>เจ้า</th><th>ร้าน / ช่องทาง</th><th>ติดต่อ</th><th>วันที่</th><th>ราคาที่ได้</th><th>VAT</th><th>แปลงหน่วย</th><th>บาท/${esc(it.unit)}</th><th>หลักฐาน</th></tr>
+      ${s.list.map((x, i) => { const q = x.q, refs = (q.imgs || []).map(id => { fig.push({ id, cap: `${it.name} — ${q.shop || Survey.CHANNEL[q.channel]}` }); return 'ภาพ ' + fig.length; });
+        return `<tr ${q === s.best ? 'class="total"' : ''}><td class="r">${i + 1}</td><td>${esc(q.shop || '')}<br><small>${Survey.CHANNEL[q.channel] || ''}</small></td><td style="word-break:break-all">${esc(q.contact || '')}</td><td>${esc(q.date || '')}</td>
+          <td class="r">${fmt(+q.price)}${q.qunit ? '/' + esc(q.qunit) : ''}</td><td>${q.vat ? 'รวม (หักออก)' : 'ไม่รวม'}</td><td class="r">${+(q.factor || 1) !== 1 ? `1 ${esc(q.qunit || '')} = ${q.factor} ${esc(it.unit)}` : '-'}</td>
+          <td class="r"><b>${fmt(x.up)}</b></td><td>${refs.join(', ') || '-'}</td></tr>`; }).join('')}
+      </table></div><p>ใช้ราคา <b>${fmt(s.price)}</b> บาท/${esc(it.unit)} (${esc(s.best.shop || '')})${s.n < Survey.MIN_Q ? ` · สืบได้ ${s.n} เจ้า: ${esc(it.reason || 'ไม่ได้ระบุเหตุผล')}` : ''}</p>`;
+    n++;
+  });
+  if (fig.length) h += `<div class="sv-appx"><h3 style="text-align:center">ภาคผนวก ภาพหลักฐานการสืบราคา</h3>${fig.map((f, i) => S.img[f.id] ? `<figure><img src="${S.img[f.id]}"><figcaption>ภาพ ${i + 1} ${esc(f.cap)}</figcaption></figure>` : '').join('')}</div>`;
+  $('#sv-printout').innerHTML = n ? h : '<p>ยังไม่มีรายการที่สืบราคา</p>';
+}
 
+function surveyState() {
+  const out = {};
+  Object.values(S.boq.surveys || {}).forEach(it => { if (it.target && it.target.startsWith('row:')) { const p = Survey.summary(it).price; if (p !== null) out[it.target.slice(4)] = { price: p, src: Survey.srcText(it) }; } });
+  return out;
+}
 function priceAll() {
-  S.priced = BoqCalc.priceRows(S.db, window.UDPrice, rows(), { overrides: S.boq.overrides });
+  S.priced = BoqCalc.priceRows(S.db, window.UDPrice, rows(), { overrides: S.boq.overrides, survey: surveyState() });
   return S.priced;
 }
 
@@ -173,7 +332,7 @@ function _renderPR1() {
           <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
             ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
-            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}</td>
+            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>` : ''}</td>
           <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : fmt(r.qty)}</td>
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
           <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${o.mat !== undefined ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span></td>
@@ -191,6 +350,7 @@ function _renderPR1() {
   h += `<tr class="total"><td></td><td colspan="7">รวมค่างานต้นทุนทั้งหมด</td><td class="r c-tot">${fmt(r2(grand))}</td><td></td></tr></tbody>`;
   tb.innerHTML = h;
   $('#pr1-alert').textContent = warn ? `มี ${warn} รายการที่ยังไม่มีราคาหรือมีคำเตือน (แถบสีส้ม) — แก้ราคาในช่องได้โดยตรง` : '';
+  tb.querySelectorAll('[data-svgo]').forEach(b => b.onclick = e => { e.stopPropagation(); S.svOpen = 'row:' + b.dataset.svgo; S.svf = 'all'; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'survey').click(); renderSurvey(); setTimeout(() => { const c = $(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) { c.scrollIntoView({ block: 'start' }); svLibHint(c, S.boq.surveys[S.svOpen] || svItem({ target: S.svOpen, name: c.querySelector('.sv-head b').textContent, unit: '' })); } }, 80); });
   tb.querySelectorAll('tr.row').forEach(tr => {
     const key = tr.dataset.key;
     tr.addEventListener('click', e => {
@@ -921,13 +1081,15 @@ function showLog() {
   m.classList.add('on');
 }
 function bind() {
+  bindSurvey();
   $('#logo-ver').textContent = 'v' + UD_VERSION.v; $('#logo-ver').onclick = showLog;
   $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; connecting UD-Cost Hub ...<span class="cur">_</span>`;
   $$('#tabs .nav-tab').forEach(t => t.onclick = () => {
     $$('#tabs .nav-tab').forEach(x => x.classList.toggle('active', x === t));
     $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t.dataset.tab));
     if (t.dataset.tab === 'model') { initViewer(); S.viewer && S.viewer.resize(); }
-    $$('#bnav [data-go]').forEach(b => b.classList.toggle('active', b.dataset.go === t.dataset.tab || (b.dataset.go === 'more' && ['pr23', 'diff'].includes(t.dataset.tab))));
+    if (t.dataset.tab === 'survey') renderSurvey();
+    $$('#bnav [data-go]').forEach(b => b.classList.toggle('active', b.dataset.go === t.dataset.tab || (b.dataset.go === 'more' && ['pr23', 'diff', 'survey'].includes(t.dataset.tab))));
     document.body.classList.toggle('on-model', t.dataset.tab === 'model');
     $('#bmore').classList.remove('on'); scrollTo(0, 0);
   });
@@ -943,6 +1105,8 @@ function bind() {
     try {
       const f = await readFile(e.target); const b = JSON.parse(f.text);
       if (b.format !== 'ud-boq') throw new Error('ไม่ใช่ไฟล์ .boq.json');
+      const svimg = b.svimg || {}; delete b.svimg;
+      Object.entries(svimg).forEach(([id, d]) => { S.img[id] = d; Survey.imgPut(id, d); });
       S.boq = Object.assign(newBoq(), b);
       S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
       if (S.model && b.model_file && b.model_file !== S.modelName) toast(`หมายเหตุ: ไฟล์ BOQ นี้ทำกับ ${b.model_file}`);
@@ -953,7 +1117,10 @@ function bind() {
   $('#b-save').onclick = () => {
     if (!S.model) return toast('เปิดโมเดลก่อน');
     S.boq.saved_at = new Date().toISOString();
-    download((S.modelName || 'project').replace(/\.bm\.json$|\.json$/, '') + '.boq.json', JSON.stringify(S.boq, null, 1));
+    const ids = new Set(Object.values(S.boq.surveys || {}).flatMap(it => (it.quotes || []).flatMap(q => q.imgs || [])));
+    const svimg = {}; ids.forEach(id => { if (S.img[id]) svimg[id] = S.img[id]; });
+    download((S.modelName || 'project').replace(/\.bm\.json$|\.json$/, '') + '.boq.json', JSON.stringify(Object.assign({}, S.boq, { svimg }), null, 1));
+    if (ids.size > Object.keys(svimg).length) toast(`คำเตือน: ภาพหลักฐาน ${ids.size - Object.keys(svimg).length} ภาพยังโหลดไม่เสร็จ — บันทึกอีกครั้ง`);
   };
   $('#b-sample').onclick = async () => {
     try { const r = await fetch('../examples/sample-building.bm.json'); loadModel(await r.text(), 'sample-building.bm.json'); toast('เปิดอาคารตัวอย่างแล้ว'); }

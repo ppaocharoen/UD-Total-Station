@@ -18,6 +18,7 @@
     <div class="nav-tab" data-tab="model">โมเดล 3D</div>
     <div class="nav-tab" data-tab="pr1">ปร.1</div>
     <div class="nav-tab" data-tab="pr23">ปร.2 / ปร.3</div>
+    <div class="nav-tab" data-tab="survey">ราคาสืบ <span id="sv-badge"></span></div>
     <div class="nav-tab" data-tab="summary">สรุป ปร.4</div>
     <div class="nav-tab" data-tab="plan">แผนงาน / งวดงาน</div>
     <div class="nav-tab" data-tab="diff">เทียบรุ่น</div>
@@ -34,6 +35,7 @@
   <button data-go="more"><i>··</i>อื่นๆ</button>
 </nav>
 <div class="bmore glass" id="bmore">
+  <button data-go="survey">ราคาสืบ (แคป ลิงก์ ใบเสนอราคา)</button>
   <button data-go="pr23">ปร.2 / ปร.3 ครุภัณฑ์ ค่าใช้จ่ายพิเศษ</button>
   <button data-go="diff">เทียบรุ่น</button>
   <button data-go="crt">เอฟเฟกต์จอ CRT เปิด/ปิด</button>
@@ -82,11 +84,28 @@
       <div id="model-check" class="hint">ยังไม่ได้เปิดโมเดล</div>
     </div>
   </div>
-  <div class="card">
-    <h2>ราคาสืบ (วัสดุที่ไม่มีราคาพาณิชย์)</h2>
-    <p class="hint">วัสดุย่อยในสูตรวัสดุมวลรวมที่ไม่มีราคาพาณิชย์ เช่น ทราย หิน กรอกราคาที่สืบได้ที่นี่ ระบบจะใช้คิดวัสดุมวลรวมทุกรายการ (บันทึกอยู่ในไฟล์ .boq.json — สำรองไฟล์เอง)</p>
-    <div id="survey-table"></div>
+</section>
+
+<!-- ================================================================ ราคาสืบ -->
+<section class="page" id="page-survey">
+  <div class="card no-print">
+    <h2>ราคาสืบ <span class="hint">วัสดุที่ไม่มีราคาพาณิชย์ — สืบ 3 เจ้า เลือกต่ำสุด ราคาไม่รวม VAT</span></h2>
+    <div class="sv-top">
+      <div class="chips" id="sv-filter">
+        <button class="chip on" data-svf="todo">ต้องสืบ</button><button class="chip" data-svf="few">ไม่ครบ 3 เจ้า</button>
+        <button class="chip" data-svf="ok">ครบแล้ว</button><button class="chip" data-svf="all">ทั้งหมด</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn small" id="sv-add">+ เพิ่มรายการเอง</button>
+        <button class="btn small" id="sv-print">พิมพ์บัญชีสืบราคา</button>
+        <button class="btn small" id="sv-libx">ส่งออกคลัง</button>
+        <label class="btn small">นำเข้าคลัง<input type="file" id="sv-libi" accept=".json" hidden></label>
+      </div>
+    </div>
+    <div class="hint" id="sv-stat"></div>
   </div>
+  <div id="sv-list"></div>
+  <div id="sv-printout" class="sv-printout"></div>
 </section>
 
 <!-- ================================================================ โมเดล 3D -->
@@ -236,6 +255,7 @@
 <script src="../lib/schedule.js"></script>
 <script src="../lib/version.js"></script>
 <script src="../lib/pricemap.js"></script>
+<script src="../lib/survey.js"></script>
 <script src="../lib/diff.js"></script>
 <script src="../lib/clash.js"></script>
 <script>
