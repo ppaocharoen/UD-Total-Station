@@ -1,4 +1,4 @@
-/* UD BOQ — เว็บราคากลางงานอาคาร 2569
+/* UD Total Station — โมเดล 3D ราคากลางงานอาคาร 2569 แผนงาน
  * อ่าน .bm.json (quantities จาก tools/takeoff.py) → ราคาจาก UD-Cost Hub (UDPrice) → ปร.1 / ปร.2 / ปร.3 / ปร.1(ก) / ปร.4
  * งานของผู้ใช้ (ราคาที่แก้, รายการเพิ่ม, ปร.2, ปร.3, ราคาสืบ, เงื่อนไข Factor F) เก็บใน .boq.json แยกจากโมเดล
  */
@@ -578,7 +578,7 @@ function bootRain() {
 }
 function bootDone(msg) {
   const el = $('#boot'); if (!el || el.classList.contains('off')) return;
-  $('#boot-txt').innerHTML = `&gt; UD_BOQ v2.69\n&gt; ${esc(msg)}\n&gt; ready<span class="cur">_</span>`;
+  $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; ${esc(msg)}\n&gt; ready<span class="cur">_</span>`;
   setTimeout(() => { el.classList.add('off'); setTimeout(() => { S.stopRain && S.stopRain(); el.remove(); }, 700); }, Math.max(300, 1400 - (Date.now() - S.bootAt)));
 }
 function setCrt(on) {
@@ -720,7 +720,17 @@ function initViewer() {
 }
 
 // ------------------------------------------------------------------ events
+function showLog() {
+  let m = $('#log-modal');
+  if (!m) { m = document.createElement('div'); m.id = 'log-modal'; m.className = 'modal'; document.body.appendChild(m); m.onclick = e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); }; }
+  m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">${esc(UD_VERSION.name)} v${UD_VERSION.v}</h2><button class="btn small" data-close="1">✕</button></div>
+    <p class="hint">เลขใหญ่.เลขย่อย — แก้เล็กเปลี่ยนเลขย่อย แก้ใหญ่เปลี่ยนเลขใหญ่</p>
+    <table class="mini-boq">${UD_VERSION.log.map(([v, d, t]) => `<tr><td class="mono" style="color:var(--green);white-space:nowrap">v${v}</td><td class="mono" style="color:var(--text3);white-space:nowrap">${d}</td><td>${esc(t)}</td></tr>`).join('')}</table></div>`;
+  m.classList.add('on');
+}
 function bind() {
+  $('#logo-ver').textContent = 'v' + UD_VERSION.v; $('#logo-ver').onclick = showLog;
+  $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; connecting UD-Cost Hub ...<span class="cur">_</span>`;
   $$('#tabs .nav-tab').forEach(t => t.onclick = () => {
     $$('#tabs .nav-tab').forEach(x => x.classList.toggle('active', x === t));
     $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t.dataset.tab));
@@ -732,6 +742,7 @@ function bind() {
   $$('#bnav [data-go], #bmore [data-go]').forEach(b => b.onclick = () => {
     const go = b.dataset.go;
     if (go === 'more') { $('#bmore-meta').innerHTML = $('#meta-proj').innerHTML + '<br>' + $('#meta-price').innerHTML; return $('#bmore').classList.toggle('on'); }
+    if (go === 'log') { $('#bmore').classList.remove('on'); return showLog(); }
     if (go === 'crt') { $('#b-crt').click(); return $('#bmore').classList.remove('on'); }
     $$('#tabs .nav-tab').find(x => x.dataset.tab === go).click();
   });

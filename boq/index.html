@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>UD BOQ ราคากลาง</title>
+<title>UD Total Station</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Share+Tech+Mono&family=VT323&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div id="boot"><canvas id="boot-rain"></canvas><div class="boot-txt" id="boot-txt">&gt; UD_BOQ v2.69
+<div id="boot"><canvas id="boot-rain"></canvas><div class="boot-txt" id="boot-txt">&gt; UD_TOTAL_STATION
 &gt; connecting UD-Cost Hub ...<span class="cur">_</span></div></div>
 <header class="topbar">
-  <div class="logo">&gt;UD_BOQ<span class="cur">_</span> <span class="logo-sub">ราคากลางงานอาคาร 2569</span></div>
+  <div class="logo">&gt;UD_TOTAL_STATION<span class="cur">_</span> <span class="logo-ver" id="logo-ver"></span> <span class="logo-sub">โมเดล · ราคากลาง · แผนงาน</span></div>
   <nav class="nav-tabs" id="tabs">
     <div class="nav-tab active" data-tab="project">โครงการ</div>
     <div class="nav-tab" data-tab="model">โมเดล 3D</div>
@@ -37,6 +37,7 @@
   <button data-go="pr23">ปร.2 / ปร.3 ครุภัณฑ์ ค่าใช้จ่ายพิเศษ</button>
   <button data-go="diff">เทียบรุ่น</button>
   <button data-go="crt">เอฟเฟกต์จอ CRT เปิด/ปิด</button>
+  <button data-go="log">บันทึกการเปลี่ยนแปลง</button>
   <div class="hint" id="bmore-meta"></div>
 </div>
 <main>
@@ -223,6 +224,7 @@
 <script src="../lib/boqcalc.js"></script>
 <script src="../lib/viewer3d.js"></script>
 <script src="../lib/schedule.js"></script>
+<script src="../lib/version.js"></script>
 <script src="../lib/diff.js"></script>
 <script src="../lib/clash.js"></script>
 <script>
