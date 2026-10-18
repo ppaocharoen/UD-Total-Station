@@ -278,3 +278,4 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
   .gantt text,.scurve text{fill:#000}
   #page-plan .card{page-break-inside:avoid}
 }
+.chip[data-scope]{font-family:var(--f-th)}.chip[data-scope].on{background:var(--green);color:#000;border-color:var(--green)}

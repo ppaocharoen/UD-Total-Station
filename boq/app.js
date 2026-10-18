@@ -601,7 +601,7 @@ function buildLayers(groups) {
     $$('.preset').forEach(b => b.classList.remove('on'));
     syncLayers();
   });
-  syncLayers(); buildClip(); tlReset(); renderClash();
+  S.scopeKey = ''; syncLayers(); buildClip(); buildScope(); tlReset(); renderClash();
 }
 function syncLayers() { $$('#layer-list .chip').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
 function buildClip() {
@@ -610,6 +610,31 @@ function buildClip() {
   $('#clip-level').innerHTML = '<option value="">ไม่ตัด (ทั้งหมด)</option>' + lv.map(l => `<option value="${l.z}">ถึงระดับ ${esc(l.name)} (${l.z >= 0 ? '+' : ''}${(+l.z).toFixed(2)})</option>`).join('');
   const zr = $('#clip-z'); zr.min = v.bbox.min.y.toFixed(2); zr.max = (v.bbox.max.y + 0.05).toFixed(2); zr.value = zr.max; zr.disabled = true;
   $('#clip-label').textContent = '';
+}
+const autoFold = () => { if (innerWidth < 800) $('#stage').classList.add('collapsed'); };   // มือถือ: เลือกแล้วพับเมนูให้เห็นโมเดล
+function buildScope() {
+  const v = S.viewer, m = S.model; if (!v || !m) return;
+  const lv = (m.levels || []).slice().sort((a, b) => a.z - b.z);
+  // แต่ละชิ้นอยู่ชั้นเดียว: แนวราบ (พื้น คาน) ตามระดับหลังชิ้น · แนวดิ่ง (เสา ผนัง) ตามระดับที่ตั้ง · หลังคา/โครงเหล็กเป็นชุดหลังคา · เหล็กเสริมตามชิ้นแม่
+  const ROOFG = ['หลังคา', 'เหล็กรูปพรรณ'], e = 0.06, own = {};
+  const base = z => { let k = lv[0] ? lv[0].name : ''; lv.forEach(l => { if (l.z <= z + e) k = l.name; }); return k; };
+  v.meshes().forEach(m => { const u = m.userData, bb = u.bb; if (!bb || u.rebar) return;
+    if (ROOFG.includes(u.group)) u.floor = 'ROOFSYS';
+    else { const top = lv.find(l => Math.abs(l.z - bb.max.y) < e); u.floor = top && bb.max.y - bb.min.y < 1.0 ? top.name : base(bb.min.y); }
+    if (u.id && !own[u.id]) own[u.id] = u.floor; });
+  v.meshes().forEach(m => { const u = m.userData; if (u.rebar) u.floor = own[u.id] || (u.bb ? base(u.bb.min.y) : ''); });
+  const fl = lv.map(l => ({ l, sc: { kind: 'floor', key: l.name } })).concat([{ l: { name: 'หลังคา', z: null }, sc: { kind: 'floor', key: 'ROOFSYS' } }]).filter(o => v.scopeCount(o.sc) > 0);
+  const gr = (m.grids || []).map(g => ({ g, sc: { kind: 'grid', axis: g.axis, c: g.coord, tol: 0.3 } })).filter(o => v.scopeCount(o.sc) > 0);
+  const btn = (txt, key) => `<button class="chip ${S.scopeKey === key ? 'on' : ''}" data-scope="${esc(key)}">${esc(txt)}</button>`;
+  $('#scope-floor').innerHTML = btn('ทั้งหมด', '') + fl.map(o => btn(o.sc.key === 'ROOFSYS' ? 'หลังคา' : 'ชั้น ' + o.l.name, 'f:' + o.l.name)).join('');
+  $('#scope-grid').innerHTML = gr.map(o => btn('แนว ' + o.g.name, 'g:' + o.g.name)).join('');
+  const find = k => k.startsWith('f:') ? fl.find(o => 'f:' + o.l.name === k) : gr.find(o => 'g:' + o.g.name === k);
+  $$('[data-scope]').forEach(b => b.onclick = () => {
+    const k = b.dataset.scope, o = k ? find(k) : null;
+    S.scopeKey = k; setClip(null); v.setScope(o ? o.sc : null); autoFold();
+    $$('[data-scope]').forEach(x => x.classList.toggle('on', x.dataset.scope === k));
+    $('#scope-label').textContent = !o ? '' : o.l ? (o.l.z === null ? 'หลังคาและโครงหลังคาเหล็ก' : `ชั้น ${o.l.name}: พื้น/คานที่ระดับ ${o.l.z >= 0 ? '+' : ''}${(+o.l.z).toFixed(2)} กับเสา/ผนังที่ตั้งจากระดับนี้`) : `แนวกริด ${o.g.name} (${o.g.axis === 'X' ? 'x' : 'y'} = ${o.g.coord}) ระยะ ±0.30 ม. มองตั้งฉาก`;
+  });
 }
 function setClip(z) {
   const zr = $('#clip-z');
@@ -899,7 +924,7 @@ function bind() {
   $('#pl-hol').onchange = e => { S.boq.plan.holidays = e.target.value.split(/\s+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)); autosave(); renderPlan(); };
   $('#pl-reauto').onclick = () => { const ins = S.boq.plan.inst; ins.assign = {}; if (ins.mode === 'manual' && S.plan) ins.assign = Schedule.autoAssign(S.plan, +ins.n || 1); autosave(); renderPlan(); toast('แบ่งงวดอัตโนมัติใหม่แล้ว'); };
   $('#pl-resetdur').onclick = () => { S.boq.plan.durations = {}; autosave(); renderPlan(); };
-  $$('[data-view]').forEach(b => b.onclick = () => S.viewer && S.viewer.setView(b.dataset.view));
+  $$('[data-view]').forEach(b => b.onclick = () => { if (S.viewer) S.viewer.setView(b.dataset.view); autoFold(); });
   $$('[data-preset]').forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
   $('#clip-level').onchange = e => setClip(e.target.value === '' ? null : +e.target.value + 0.02);
   $('#clip-z').oninput = e => setClip(+e.target.value);
