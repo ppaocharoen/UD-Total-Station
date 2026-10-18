@@ -169,9 +169,10 @@ class Takeoff:
         self.backfill = 0.0
         self.src_task = {}
         self.routes = []          # แนวท่อ/สายที่ระบบประมาณให้ (ใช้ตรวจ clash และแสดง 3D)
+        self.rebar_calc = defaultdict(list)   # (dia, ชิ้น) -> วิธีคิดเหล็กเสริม
 
     # ------------------------------------------------------------ accumulate
-    def add(self, code, key, name, unit, qty, src=None, waste=0.0, count=False, task=None, note=None):
+    def add(self, code, key, name, unit, qty, src=None, waste=0.0, count=False, task=None, note=None, calc=None):
         k = f"{code}|{key}"
         it = self.items.get(k)
         if not it:
@@ -181,6 +182,10 @@ class Takeoff:
         it["qty_net"] += qty
         if src and src not in it["from"]:
             it["from"].append(src)
+        if src:   # ปริมาณรายชิ้น (ไม่รวมเผื่อ) + วิธีคิด — ใช้ในกล่องข้อมูลชิ้นส่วนบนเว็บ
+            bs = it.setdefault("by_src", {}); bs[src] = bs.get(src, 0.0) + qty
+            if calc:
+                it.setdefault("calc", {}).setdefault(src, []).append(calc)
         # แยกปริมาณตามงานในแผน (ใช้กระจายต้นทุนลง Gantt/S-Curve และโยงชิ้นส่วนกับงาน)
         part = it.setdefault("parts", {}).setdefault(task or "other", {"q": 0.0, "from": []})
         part["q"] += qty
@@ -202,9 +207,11 @@ class Takeoff:
         if msg not in self.notes:
             self.notes.append(msg)
 
-    def rebar(self, mid, dia, length):
+    def rebar(self, mid, dia, length, calc=None):
         if length > 0:
             self.rebar_len[int(round(dia))][mid] += length
+            if calc:
+                self.rebar_calc[(int(round(dia)), mid)].append(calc)
 
     # ------------------------------------------------------------ helpers
     def mem_geom(self, x):
@@ -262,6 +269,7 @@ class Takeoff:
             if depth <= s["excav_deep"]:
                 exc = b * d * depth
                 self.add("1.1.2", "excav", "งานขุดดินฐานรากและถมคืน (ลึกไม่เกิน 2.00 ม.)", "ลบ.ม.", exc, f["id"], waste=s["excav_waste"], task="footing",
+                         calc=f"กว้าง {b:g} × ยาว {d:g} × ลึก {depth:.2f} = {exc:.2f} ลบ.ม. (+ เผื่อ {s['excav_waste']*100:g}%)",
                          note="ว480 ข้อ 1.3 ขุดหลุมแล้วถมกลับ รวมถมคืนในรายการเดียว")
                 exc_total = exc * (1 + s["excav_waste"])
             else:
@@ -277,14 +285,15 @@ class Takeoff:
                      waste=s["sand_waste"], task="footing")
             self.add("1.1.12", "lean_conc", "คอนกรีตหยาบรองใต้ฐานราก (1:3:5)", "ลบ.ม.", b * d * s["lean_thk"], f["id"], task="footing")
             name, key = self.conc_name(f.get("material"))
-            self.add("1.1.12", key, name, "ลบ.ม.", vol_f, f["id"], task="footing")
-            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + d) * h, f["id"], task="footing")
+            self.add("1.1.12", key, name, "ลบ.ม.", vol_f, f["id"], task="footing", calc=f"{b:g} × {d:g} × หนา {h:g} = {vol_f:.3f} ลบ.ม.")
+            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + d) * h, f["id"], task="footing",
+                     calc=f"รอบรูป 2×({b:g}+{d:g}) × หนา {h:g} = {2*(b+d)*h:.2f} ตร.ม.")
             rb = self.rebar_of("supports", f["id"])
             c = s["cover"]
             if rb.get("bars_x"):
-                n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c))
+                n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c), f"แนว x {n} เส้น × {b - 2*c:.2f} ม.")
             if rb.get("bars_y"):
-                n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c))
+                n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c), f"แนว y {n} เส้น × {d - 2*c:.2f} ม.")
             if not rb:
                 self.note(f"ฐานราก {f['id']}: ยังไม่มีเหล็กเสริมใน design — ไม่ได้คิดเหล็ก")
             p = f.get("piles")
@@ -324,16 +333,17 @@ class Takeoff:
             H = abs(q[2] - p[2])
             b, h = sec["b"], sec["h"]
             name, key = self.conc_name(x.get("material"))
-            self.add("1.1.12", key, name, "ลบ.ม.", b * h * H, x["id"], task=self.lift(x))
-            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + h) * H, x["id"], task=self.lift(x))
+            self.add("1.1.12", key, name, "ลบ.ม.", b * h * H, x["id"], task=self.lift(x), calc=f"{b:g} × {h:g} × สูง {H:.2f} = {b*h*H:.3f} ลบ.ม.")
+            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + h) * H, x["id"], task=self.lift(x),
+                     calc=f"2×({b:g}+{h:g}) × สูง {H:.2f} = {2*(b+h)*H:.2f} ตร.ม.")
             rb = self.rebar_of("members", x["id"])
             if rb.get("main"):
-                n, dia = rb["main"]; self.rebar(x["id"], dia, n * H)
+                n, dia = rb["main"]; self.rebar(x["id"], dia, n * H, f"เหล็กยืน {n} เส้น × {H:.2f} ม.")
             if rb.get("stirrup"):
                 dia, sp = rb["stirrup"][0], rb["stirrup"][1]
                 cnt = math.floor(H / sp) + 1
                 per = 2 * (b + h) - 8 * c
-                self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1))
+                self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1), f"ปลอก @{sp:g} {cnt} วง × {per:.2f} ม.")
             if not rb:
                 self.note(f"เสา {x['id']}: ยังไม่มีเหล็กเสริม")
 
@@ -372,26 +382,28 @@ class Takeoff:
             sl = self._slab_over(top, ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2))
             hc = h - (sl["t"] if sl else 0)
             name, key = self.conc_name(x.get("material"))
-            self.add("1.1.12", key, name, "ลบ.ม.", b * hc * Ln, x["id"], task=self.lift(x))
+            self.add("1.1.12", key, name, "ลบ.ม.", b * hc * Ln, x["id"], task=self.lift(x),
+                     calc=f"{b:g} × {'(' + format(h, 'g') + ' − พื้น ' + format(sl['t'], 'g') + ')' if sl else format(h, 'g')} × ยาวสุทธิ {Ln:.2f} = {b*hc*Ln:.3f} ลบ.ม. (ศูนย์–ศูนย์ {Lc:.2f} หักครึ่งเสา)")
             sides = 2 * hc
             bottom = b if x["type"] != "tie_beam" else b   # คานคอดินหล่อบนแบบเช่นกัน
-            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", (sides + bottom) * Ln, x["id"], task=self.lift(x))
+            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", (sides + bottom) * Ln, x["id"], task=self.lift(x),
+                     calc=f"(ข้าง 2×{hc:g} + ท้อง {bottom:g}) × {Ln:.2f} = {(sides+bottom)*Ln:.2f} ตร.ม.")
             if x["type"] == "beam":
                 self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m_beam"] * Ln,
                          x["id"], count=True, task=self.lift(x))
             rb = self.rebar_of("members", x["id"])
             for k in ("top", "bot", "side"):
                 if rb.get(k):
-                    n, dia = rb[k]; self.rebar(x["id"], dia, n * Lc)
+                    n, dia = rb[k]; self.rebar(x["id"], dia, n * Lc, f"{dict(top='บน', bot='ล่าง', side='ข้าง')[k]} {n} เส้น × {Lc:.2f} ม.")
             if rb.get("extra_top"):
-                n, dia = rb["extra_top"]; self.rebar(x["id"], dia, n * 2 * Lc / 3)
+                n, dia = rb["extra_top"]; self.rebar(x["id"], dia, n * 2 * Lc / 3, f"เสริมบน {n} เส้น × 2/3 ช่วง")
             if rb.get("extra_bot"):
-                n, dia = rb["extra_bot"]; self.rebar(x["id"], dia, n * 0.75 * Lc)
+                n, dia = rb["extra_bot"]; self.rebar(x["id"], dia, n * 0.75 * Lc, f"เสริมล่าง {n} เส้น × 0.75 ช่วง")
             if rb.get("stirrup"):
                 st = rb["stirrup"]; dia, s1 = st[0], st[1]; s2 = st[2] if len(st) > 2 else s1
                 cnt = math.ceil((Ln / 2) / s1) + math.ceil((Ln / 2) / s2) + 1
                 per = 2 * (b + h) - 8 * c
-                self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1))
+                self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1), f"ปลอก @{s1:g}/{s2:g} {cnt} วง × {per:.2f} ม.")
             if not rb:
                 self.note(f"คาน {x['id']}: ยังไม่มีเหล็กเสริม")
         self.note("เหล็กยืนคานวัดศูนย์ถึงศูนย์ ไม่รวมระยะทาบและงอขอ; ปลอกวัดเส้นรอบรูป 2(b+h) − 8×ระยะหุ้ม ไม่รวมขอ")
@@ -406,9 +418,10 @@ class Takeoff:
                 self.add("1.1.16", "precast_slab", "พื้นคอนกรีตสำเร็จรูป", "ตร.ม.", A, s["id"], task=lt)
                 self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {t*100:g} ซม.", "ตร.ม.", A, s["id"], task=lt)
                 continue
-            self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt)
+            self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {t:g} = {A*t:.3f} ลบ.ม.")
             if s["kind"] == "cast":
-                self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task=lt)
+                self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task=lt,
+                         calc=f"ท้องพื้น {A:.2f} + ขอบ {P:.2f}×{t:g} = {A+P*t:.2f} ตร.ม.")
                 self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m2_slab"] * A,
                          s["id"], count=True, task=lt)
             else:   # ground
@@ -421,7 +434,7 @@ class Takeoff:
                 Lx, Ly = max(xs) - min(xs), max(ys) - min(ys)
                 fill = A / (Lx * Ly) if Lx * Ly else 1
                 L = ((math.floor(Ly / sp) + 1) * Lx + (math.floor(Lx / sp) + 1) * Ly) * layers * fill
-                self.rebar(s["id"], dia, L)
+                self.rebar(s["id"], dia, L, f"ตะแกรง @{sp:g} {layers} ชั้น ยาวรวม {L:.2f} ม.")
             elif rb.get("wire_mesh"):
                 self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task=lt)
             else:
@@ -443,6 +456,7 @@ class Takeoff:
     def _steel_and_roofs(self):
         steel_len = defaultdict(float)    # section -> m
         steel_src = defaultdict(list)
+        steel_mem = defaultdict(dict)     # section -> {member: ความยาว}
         hip_roof = any(r["form"] == "hip" for r in self.m.get("roofs", []))
         explicit = {x["type"] for x in self.m.get("members", [])}
         for x in self.m.get("members", []):
@@ -451,6 +465,7 @@ class Takeoff:
                 p, q = self.mem_geom(x)
                 steel_len[x["section"]] += math.dist(p, q)
                 steel_src[x["section"]].append(x["id"])
+                steel_mem[x["section"]][x["id"]] = math.dist(p, q)
         roof_area = 0.0
         for rf in self.m.get("roofs", []):
             r = self._roof_r(rf)
@@ -482,6 +497,7 @@ class Takeoff:
                     L = sum(v_len(v_sub(a, b)) for p in planes if len(p) >= 3 for a, b in plane_lines(p, spec["spacing"], along))
                     steel_len[spec["section"]] += L
                     steel_src[spec["section"]].append(rf["id"])
+                    steel_mem[spec["section"]][rf["id"]] = steel_mem[spec["section"]].get(rf["id"], 0) + L
             self.add("1.1.19", "roof_frame_area", "งานโครงหลังคา (พื้นที่ตามแนวลาด)", "ตร.ม.", area, rf["id"], task="roof_frame")
         for sec_id, L in steel_len.items():
             sec = self.secs[sec_id]
@@ -494,8 +510,10 @@ class Takeoff:
             it["from"] = steel_src[sec_id]
             it["parts"] = {"roof_frame": {"q": kg, "from": steel_src[sec_id]}}
             it["pieces"] = pieces
+            it["by_src"] = {m: ln * sec["kg_m"] for m, ln in steel_mem[sec_id].items()}
+            it["calc"] = {m: [f"ยาว {ln:.2f} ม. × {sec['kg_m']:g} กก./ม. = {ln*sec['kg_m']:.2f} กก."] for m, ln in steel_mem[sec_id].items()}
         # ทาสีกันสนิม: เส้นรอบรูปหน้าตัด × ความยาวจริง (ไม่รวมเผื่อ) — เหล็กรีดเย็นคิด 2 ด้าน (ตกลงกับ Earth 18 ต.ค. 2569)
-        paint, srcs, unk = 0.0, [], []
+        paint, srcs, unk, pbs = 0.0, [], [], {}
         for sec_id, L in steel_len.items():
             per = steel_perimeter(self.secs[sec_id])
             if per is None:
@@ -503,11 +521,14 @@ class Takeoff:
                 continue
             paint += per * L
             srcs += steel_src[sec_id]
+            for m, ln in steel_mem[sec_id].items():
+                pbs[m] = pbs.get(m, 0) + per * ln
         if paint:
             it = self.add("1.1.19", "paint_rust", "ทาสีกันสนิมโครงเหล็ก", "ตร.ม.", paint, None, task="roof_frame",
                           note="เส้นรอบรูปหน้าตัด × ความยาวจริง; เหล็กรีดเย็นนับผิว 2 ด้าน")
             it["from"] = srcs
             it["parts"] = {"roof_frame": {"q": paint, "from": srcs}}
+            it["by_src"] = pbs
         if unk:
             self.note("ทาสีกันสนิม: ยังไม่รู้เส้นรอบรูปหน้าตัด " + ", ".join(unk))
 
@@ -544,7 +565,8 @@ class Takeoff:
             opens = sum(ot[o["type"]]["w"] * ot[o["type"]]["h"] for o in open_by_wall[w["id"]] if o["type"] in ot)
             net = max(gross - opens, 0)
             self.add("1.2.3", f"wall_{w['kind']}", WALL_NAME.get(w["kind"], "ผนัง") + f" หนา {w['t']*100:g} ซม.", "ตร.ม.",
-                     net, w["id"], task="wall")
+                     net, w["id"], task="wall",
+                     calc=f"ยาว {L:.2f}{f' − หักเสา {ded:.2f}' if ded else ''} × สูง {H:.2f} = {gross:.2f} ตร.ม." + (f" หักช่องเปิด {opens:.2f} → สุทธิ {net:.2f} ตร.ม." if opens else ""))
             sides = w.get("finish_sides", 2)
             if w.get("plaster") and sides:
                 self.add("1.2.4", "plaster_wall", "ฉาบปูนเรียบผนัง", "ตร.ม.", net * sides, w["id"], task="plaster")
@@ -668,12 +690,12 @@ class Takeoff:
                "soil": pl.get("drain_material", "PVC ชั้น 8.5"), "waste": pl.get("drain_material", "PVC ชั้น 8.5"),
                "vent": pl.get("drain_material", "PVC ชั้น 8.5"), "rain": pl.get("drain_material", "PVC ชั้น 8.5"),
                "drain": pl.get("drain_material", "PVC ชั้น 8.5")}
-        runs = defaultdict(float); src = defaultdict(list); est_note = defaultdict(list)
+        runs = defaultdict(float); src = defaultdict(list); est_note = defaultdict(list); plen = defaultdict(dict)
         drawn = defaultdict(list)    # system -> จุดปลายท่อที่เขียนไว้
         for p in pl.get("pipes", []):
             Lp = sum(math.dist(p["pts"][i], p["pts"][i + 1]) for i in range(len(p["pts"]) - 1))
             k = (p["system"], p.get("material") or mat[p["system"]], p["dia"])
-            runs[k] += Lp; src[k].append(p["id"])
+            runs[k] += Lp; src[k].append(p["id"]); plen[k][p["id"]] = Lp
             drawn[p["system"]] += [p["pts"][0], p["pts"][-1]]
         # ประมาณแนวท่อสุขภัณฑ์ที่ไม่มีท่อของระบบนั้นมาถึง
         need = defaultdict(list)     # (system, dia) -> fixtures
@@ -706,7 +728,7 @@ class Takeoff:
                     rp.append(list(tgt["xyz"]))
                 self.routes.append({"id": f"PP-{sysn}-{f.get('id') or f['type']}", "kind": "pipe", "system": sysn, "dia": dia,
                                     "estimated": True, "from": f.get("id"), "pts": rp})
-                runs[k] += Lr; src[k].append(f.get("id") or f["type"])
+                runs[k] += Lr; src[k].append(f.get("id") or f["type"]); plen[k][f.get("id") or f["type"]] = plen[k].get(f.get("id") or f["type"], 0) + Lr
                 est_note[k].append(f.get("id") or f["type"])
                 done.append([f["xyz"][0], f["xyz"][1], zr]); left.remove((f, dia))
         if not runs:
@@ -720,7 +742,7 @@ class Takeoff:
                 note += f" · ประมาณแนวท่อให้ (แบบไม่ได้เขียน): {', '.join(est_note[k])} — ตรวจกับแบบ"
             it = self.add("1.3", key, f"ท่อ{SYS_NAME.get(sysn, sysn)} {m_} ⌀ {dia}", "ม.", Lp, None,
                           waste=self.s["pipe_waste"], task="mep_rough", note=note)
-            it["from"] = src[k]; it["parts"] = {"mep_rough": {"q": Lp, "from": src[k]}}
+            it["from"] = src[k]; it["parts"] = {"mep_rough": {"q": Lp, "from": src[k]}}; it["by_src"] = dict(plen[k])
             if est_note[k]:
                 it["estimated"] = True
             fit_of["water" if sysn in ("cw", "hw") else "drain"].append(key)
@@ -749,6 +771,9 @@ class Takeoff:
             it = self.add("1.1.9", f"rebar_{kind}{dia}", f"เหล็กเสริม {grade} ({kind}) Ø {dia} มม.", "กก.", kg, None,
                           waste=w, task="rebar", note=f"ยาวรวม {L:.2f} ม. × {kg_per_m(dia):.3f} กก./ม.")
             it["from"] = list(per.keys())
+            it["by_src"] = {mid: ln * kg_per_m(dia) for mid, ln in per.items()}
+            it["calc"] = {mid: list(self.rebar_calc.get((dia, mid), [])) + [f"รวม {ln:.2f} ม. × {kg_per_m(dia):.3f} = {ln*kg_per_m(dia):.2f} กก."]
+                          for mid, ln in per.items()}
             it["parts"] = {}
             for mid, ln in per.items():
                 t = self.src_task.get(mid, "rebar")
@@ -763,6 +788,11 @@ class Takeoff:
                           task="rebar", note="30 กก. ต่อเหล็กเสริม 1,000 กก. (คิดจากน้ำหนักรวมเผื่อ)")
             f = self.s["tie_wire_per_ton"] / 1000.0
             it["parts"] = {t: {"q": v["q"] * f, "from": []} for t, v in all_parts.items()}
+            wsum = {}
+            for dia, per in self.rebar_len.items():
+                for mid, ln in per.items():
+                    wsum[mid] = wsum.get(mid, 0) + ln * kg_per_m(dia) * (1 + REBAR_WASTE.get(dia, 0.15)) * f
+            it["by_src"] = wsum; it["from"] = list(wsum)
 
     # ------------------------------------------------------------ output
     def result(self, price_map=None):
@@ -782,6 +812,10 @@ class Takeoff:
                 row["price_ref"] = {"kind": "pct", **it["pct"]}
             if it.get("estimated"):
                 row["status"] = "assumed"
+            if it.get("by_src"):
+                row["by_src"] = {k: round(v, 4) for k, v in it["by_src"].items() if v}
+            if it.get("calc"):
+                row["calc"] = it["calc"]
             parts = it.get("parts") or {}
             tot = sum(v["q"] for v in parts.values())
             if tot > 0:

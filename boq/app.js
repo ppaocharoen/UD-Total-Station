@@ -512,6 +512,7 @@ function renderClash() {
   const bt = S.boq.clash_bt || (S.model.meta && S.model.meta.building_type) || 'public';
   $('#clash-bt').value = bt;
   const all = BmClash.check(S.model, { buildingType: bt }), ack = S.boq.clash_ack || {};
+  S.clashAll = all.filter(c => !ack[c.key]);
   const showInfo = $('#clash-info').checked, showAck = $('#clash-ack').checked;
   const list = all.filter(c => (showInfo || c.sev !== 'info') && (showAck || !ack[c.key]));
   const nErr = all.filter(c => c.sev === 'error' && !ack[c.key]).length, nWarn = all.filter(c => c.sev === 'warn' && !ack[c.key]).length;
@@ -618,7 +619,7 @@ function setClip(z) {
 }
 function applyPreset(name) {
   const v = S.viewer; if (!v) return;
-  v.highlight([]); $('#pick-info').innerHTML = '';
+  v.highlight([]); $('#pick-info').innerHTML = ''; $('#pick-info').classList.remove('on');
   v.setXray(false);
   const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'เหล็กรูปพรรณ'].includes(g),
     roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g) }[name];
@@ -707,16 +708,126 @@ function tlPlay() {
 }
 function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
-  S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => {
-    if (!d || !d.id) { $('#pick-info').innerHTML = ''; S.viewer.highlight([]); return; }
-    const items = (S.priced || []).filter(r => (r.from || []).includes(d.id));
-    $('#pick-info').innerHTML = `<div class="side-top"><h2 style="font-size:18px;margin:0">ชิ้นส่วน</h2><button class="btn small" onclick="this.closest('.pick').innerHTML='';S.viewer.highlight([])">✕</button></div><div class="kv"><b>id</b><span class="mono">${esc(d.id)}</span><b>กลุ่ม</b><span>${esc(d.group)}</span><b>รายละเอียด</b><span>${esc(d.info || '')}</span></div>
-      <p class="hint" style="margin-top:8px">อยู่ในรายการ BOQ ${items.length} รายการ:</p><ul class="hint" style="margin-left:18px">${items.map(r => `<li>${esc(r.group_code)} ${esc(r.name)}</li>`).join('')}</ul>`;
-    S.viewer.highlight([d.id]);
-  } });
+  S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => showPick(d) });
   if (S.model) buildLayers(S.viewer.load(S.model));
   const sel = S.selKey && (S.priced || []).find(r => r.key === S.selKey);
   if (sel) S.viewer.highlight(sel.from || []);
+}
+
+// ------------------------------------------------------------------ กล่องข้อมูลชิ้นส่วน
+const TYPE_TH = { column: 'เสา', beam: 'คาน', tie_beam: 'คานคอดิน', lintel: 'ทับหลัง', rafter: 'จันทัน', purlin: 'แป', truss: 'โครงถัก', brace: 'ค้ำยัน',
+  spread: 'ฐานราก', pile_cap: 'ฐานรากบนเข็ม', cast: 'พื้นหล่อในที่', ground: 'พื้นวางบนดิน', precast: 'พื้นสำเร็จรูป' };
+const WALL_TH = { brick_mon: 'ผนังก่ออิฐมอญครึ่งแผ่น', brick_mon_full: 'ผนังก่ออิฐมอญเต็มแผ่น', aac: 'ผนังก่ออิฐมวลเบา', block: 'ผนังก่อคอนกรีตบล็อก', block_07: 'ผนังก่อคอนกรีตบล็อก 7 ซม.', gypsum: 'ผนังเบา', glass: 'ผนังกระจก' };
+const f2 = x => (+x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const lvlOf = z => { const L = (S.model.levels || []).filter(l => Math.abs(l.z - z) < 0.02)[0]; return (L ? L.name + ' ' : '') + (z >= 0 ? '+' : '') + (+z).toFixed(2); };
+function elemIndex() {
+  if (S._elIdx && S._elIdx.m === S.model) return S._elIdx.map;
+  const m = S.model, map = {};
+  const put = (set, arr) => (arr || []).forEach(e => e && e.id && (map[e.id] = { set, e }));
+  put('members', m.members); put('supports', m.supports); put('slabs', m.slabs); put('walls', m.walls); put('openings', m.openings);
+  put('roofs', m.roofs); put('finishes', m.finishes);
+  const mep = m.mep || {}, pl = mep.plumbing || {}, el = mep.electrical || {};
+  put('pipes', pl.pipes); put('fixtures', pl.fixtures); put('equipment', pl.equipment); put('points', el.points); put('panels', el.panels);
+  put('routes', (m.quantities || {}).routes);
+  S._elIdx = { m, map }; return map;
+}
+function rebarTxt(rb) {
+  if (!rb) return '';
+  const bar = v => v ? `${v[0]}-${v[1] < 10 ? 'RB' : 'DB'}${v[1]}` : '', out = [];
+  if (rb.main) out.push('เหล็กยืน ' + bar(rb.main));
+  if (rb.top) out.push('บน ' + bar(rb.top)); if (rb.bot) out.push('ล่าง ' + bar(rb.bot));
+  if (rb.extra_top) out.push('เสริมบน ' + bar(rb.extra_top)); if (rb.extra_bot) out.push('เสริมล่าง ' + bar(rb.extra_bot));
+  if (rb.stirrup) out.push(`ปลอก ${rb.stirrup[0] < 10 ? 'RB' : 'DB'}${rb.stirrup[0]}@${rb.stirrup[1]}${rb.stirrup[2] ? '/' + rb.stirrup[2] : ''}`);
+  if (rb.bars_x) out.push('แนว x ' + bar(rb.bars_x)); if (rb.bars_y) out.push('แนว y ' + bar(rb.bars_y));
+  if (rb.mesh) out.push(`ตะแกรง ${rb.mesh[0] < 10 ? 'RB' : 'DB'}${rb.mesh[0]}@${rb.mesh[1]}${rb.mesh[2] > 1 ? ' ' + rb.mesh[2] + ' ชั้น' : ''}`);
+  if (rb.wire_mesh) out.push('ตะแกรงสำเร็จรูป ' + rb.wire_mesh);
+  return out.join(' · ');
+}
+function elemSpec(id) {
+  const hit = elemIndex()[id]; if (!hit) return null;
+  const { set, e } = hit, m = S.model, sec = e.section && (m.sections || []).find(x => x.id === e.section);
+  const nd = k => (m.nodes || []).find(n => n.id === k), design = ((m.design || {})[set] || {})[id];
+  let title = '', mark = e.mark || '', lines = [];
+  if (set === 'members') {
+    title = TYPE_TH[e.type] || e.type;
+    const a = nd(e.i), b = nd(e.j), L = a && b ? Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) : 0;
+    if (sec && sec.kind === 'rc_rect') lines.push(`คสล. ${sec.b * 100}×${sec.h * 100} ซม. · ${e.material || ''}`);
+    else if (sec) lines.push(`${sec.name || sec.id}${sec.kg_m ? ` · ${sec.kg_m} กก./ม.` : ''}`);
+    if (a && b) lines.push(e.type === 'column' ? `ระดับ ${lvlOf(Math.min(a.z, b.z))} → ${lvlOf(Math.max(a.z, b.z))} · สูง ${f2(L)} ม.` : `ยาว ${f2(L)} ม. · ระดับ ${lvlOf(Math.max(a.z, b.z))}`);
+  } else if (set === 'supports') {
+    title = TYPE_TH[e.kind] || 'ฐานราก';
+    lines.push(`${f2(e.b)}×${f2(e.d)} ม. หนา ${f2(e.h)} ม. · ${e.material || ''}`, `ท้องฐาน ${lvlOf(e.bottom)}`);
+    if (e.piles) lines.push(`เสาเข็ม ${e.piles.type} ยาว ${e.piles.length} ม. × ${e.piles.n} ต้น`);
+  } else if (set === 'slabs') {
+    title = TYPE_TH[e.kind] || 'พื้น'; lines.push(`หนา ${e.t * 100} ซม. · ${e.material || ''} · ระดับ ${lvlOf(e.top)}`);
+    if (e.use) lines.push('ใช้งาน: ' + e.use);
+  } else if (set === 'walls') {
+    title = WALL_TH[e.kind] || 'ผนัง'; lines.push(`หนา ${e.t * 100} ซม. · สูง ${f2(e.top - e.bottom)} ม. (${lvlOf(e.bottom)} → ${lvlOf(e.top)})`);
+    lines.push([e.plaster && 'ฉาบ', e.paint && 'ทาสี', e.exterior && 'ผนังภายนอก', e.finish_sides && `${e.finish_sides} ด้าน`].filter(Boolean).join(' · '));
+  } else if (set === 'openings') {
+    const t = (m.opening_types || {})[e.type] || {}; title = 'ช่องเปิด'; mark = e.type;
+    lines.push(`${t.desc || ''} ${t.w || ''}×${t.h || ''} ม.${t.sill ? ` ขอบล่าง +${t.sill}` : ''}`.trim());
+  } else if (set === 'roofs') { title = 'หลังคา'; lines.push(`${e.cover || ''} · ลาด ${e.pitch || 0}°`); }
+  else if (set === 'pipes') { title = 'ท่อ'; lines.push(`ระบบ ${e.system} ⌀${e.dia}${e.material ? ' ' + e.material : ''}`); }
+  else if (set === 'routes') { title = e.kind === 'pipe' ? 'ท่อ (แนวประมาณ)' : 'ท่อร้อยสาย (แนวประมาณ)'; lines.push(e.kind === 'pipe' ? `ระบบ ${e.system} ⌀${e.dia}` : `วงจร ${e.circuit}`, 'แนวนี้ระบบประมาณให้ ตรวจกับแบบ'); }
+  else if (set === 'fixtures') { title = 'สุขภัณฑ์'; mark = e.type; }
+  else if (set === 'equipment') { title = 'อุปกรณ์'; lines.push(`${e.kind} ${e.size || ''}`); }
+  else title = set;
+  const rb = design && design.rebar; if (rb) lines.push(rebarTxt(rb));
+  return { set, e, title, mark, lines: lines.filter(Boolean), note: e.note, src: e.src, status: e.status };
+}
+function elemQty(id) {
+  const rows = (S.priced || []), out = [], calc = [];
+  let value = 0, partial = [];
+  rows.forEach(r => {
+    const bs = r.by_src;
+    if (bs && bs[id]) {
+      const tot = Object.values(bs).reduce((a, b) => a + b, 0), sh = tot ? bs[id] / tot : 0;
+      out.push({ key: r.key, name: r.name, unit: r.unit, q: bs[id], val: sh * (r.total || 0), noPrice: r.warns.includes('ยังไม่มีราคา'), calc: (r.calc || {})[id] || [] });
+      value += sh * (r.total || 0);
+    } else if ((r.from || []).includes(id)) partial.push(r.name);
+  });
+  return { rows: out, value, calc, partial };
+}
+function showPick(d) {
+  const box = $('#pick-info');
+  if (!d || !d.id) { box.innerHTML = ''; box.classList.remove('on'); S.viewer.highlight([]); return; }
+  S.viewer.highlight([d.id]);
+  const sp = elemSpec(d.id), q = elemQty(d.id), id = d.id;
+  const tasks = (S.plan ? S.plan.tasks : []).filter(t => (t.from || []).includes(id));
+  const res = (S.model.results || {}).members && S.model.results.members[id];
+  const cl = (S.clashAll || []).filter(c => c.ids.includes(id));
+  const st = sp && sp.status === 'assumed' ? '<span class="pill warn">สมมติ</span>' : sp && sp.src ? `<span class="pill">แบบ ${esc(sp.src)}</span>` : '';
+  let h = `<div class="pk-grab"></div><div class="pk-head"><div><span class="pk-type">${esc(sp ? sp.title : d.group)}</span> <b class="mono">${esc(id)}</b>${sp && sp.mark ? ` <span class="pk-mark">· ${esc(sp.mark)}</span>` : ''} ${st}</div><button class="btn small" data-pk="close">✕</button></div>`;
+  if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+  else if (d.info) h += `<div class="pk-spec"><div>${esc(d.info)}</div></div>`;
+  if (q.rows.length) {
+    h += `<div class="pk-sec"><div class="pk-lbl">ปริมาณของชิ้นนี้ (ไม่รวมเผื่อ) · กดรายการเพื่อไปที่ ปร.1</div><table class="pk-q">${q.rows.map(r => `<tr data-pk-row="${esc(r.key)}"><td>${esc(r.name)}${r.calc.map(c => `<div class="pk-calc">${esc(c)}</div>`).join('')}</td><td class="r">${f2(r.q)}</td><td>${esc(r.unit)}</td></tr>`).join('')}</table></div>`;
+    const np = q.rows.filter(r => r.noPrice).length;
+    h += `<div class="pk-val"><span>มูลค่าชิ้นนี้ <small>(ค่าวัสดุ+ค่าแรง รวมเผื่อ ไม่รวม F)</small></span><b>${f2(q.value)} <small>บาท</small></b></div>`;
+    if (np) h += `<div class="hint warnline">${np} รายการยังไม่มีราคา — มูลค่ายังไม่ครบ</div>`;
+    if (q.partial.length) h += `<div class="hint">ไม่แยกรายชิ้น (คิดรวมทั้งโครงการ): ${q.partial.map(esc).join(', ')}</div>`;
+  } else if (q.partial.length) h += `<div class="pk-sec hint">อยู่ในรายการ: ${q.partial.map(esc).join(', ')} (คิดรวม ไม่แยกรายชิ้น)</div>`;
+  if (tasks.length) h += `<div class="pk-sec"><div class="pk-lbl">งานในแผน</div>${tasks.map(t => `<a class="pk-link" data-pk-task="${esc(t.id)}">${esc(t.label)}</a> <span class="hint">(${thDate(t.start)} – ${thDate(t.finish)})</span>`).join('<br>')}</div>`;
+  if (res) {
+    const row = (k, u) => res[k] ? `<tr><td>${k}</td><td class="r">${f2(res[k].max)}</td><td class="hint">${esc(res[k].combo_max || '')}</td><td class="r">${f2(res[k].min)}</td><td class="hint">${esc(res[k].combo_min || '')}</td><td>${u}</td></tr>` : '';
+    h += `<div class="pk-sec"><div class="pk-lbl">แรงจาก SAP2000 ${S.model.results.stale ? '<span class="pill warn">โมเดลแก้หลังวิเคราะห์</span>' : ''}</div>
+      <table class="pk-q"><tr class="hint"><td></td><td class="r">สูงสุด</td><td></td><td class="r">ต่ำสุด</td><td></td><td></td></tr>${row('P', 'kgf')}${row('V2', 'kgf')}${row('M3', 'kgf-m')}${row('T', 'kgf-m')}</table></div>`;
+  }
+  if (cl.length) h += `<div class="pk-sec"><div class="pk-lbl">Clash</div>${cl.map(c => `<a class="pk-link" data-pk-clash="1"><span class="pill ${SEV[c.sev][1]}">${SEV[c.sev][0]}</span> ${esc(c.title)}</a>`).join('<br>')}</div>`;
+  if (sp && sp.note) h += `<div class="pk-sec hint">หมายเหตุ: ${esc(sp.note)}</div>`;
+  box.innerHTML = h; box.classList.add('on'); box.scrollTop = 0;
+  box.querySelector('[data-pk=close]').onclick = () => showPick(null);
+  box.querySelectorAll('[data-pk-task]').forEach(a => a.onclick = () => { setDock('gantt'); selectTask(a.dataset.pkTask); });
+  box.querySelectorAll('[data-pk-row]').forEach(tr => tr.onclick = () => gotoRow(tr.dataset.pkRow));
+  box.querySelectorAll('[data-pk-clash]').forEach(a => a.onclick = () => setDock('clash'));
+  // มือถือ: ปัดลงที่แถบจับเพื่อปิด
+  const g = box.querySelector('.pk-grab'); let y0 = null;
+  g.ontouchstart = e => { y0 = e.touches[0].clientY; }; g.ontouchend = e => { if (y0 !== null && e.changedTouches[0].clientY - y0 > 50) showPick(null); y0 = null; };
+}
+function gotoRow(key) {
+  S.selKey = key; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'pr1').click(); renderPR1();
+  setTimeout(() => { const tr = $(`#pr1-table tr[data-key="${CSS.escape(key)}"]`); if (tr) { tr.scrollIntoView({ block: 'center' }); tr.classList.add('sel'); } }, 120);
 }
 
 // ------------------------------------------------------------------ events
