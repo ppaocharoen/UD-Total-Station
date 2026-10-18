@@ -199,7 +199,7 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
 .pick:empty{display:none}
 
 @media(max-width:1700px){.logo-sub{display:none}}
-@media(max-width:1250px){.meta-bar .meta-price{display:none}}
+@media(max-width:1500px){.meta-bar .meta-price{display:none}}
 .bnav,.bmore,.dock-tab .sm{display:none}
 @media(max-width:800px){
   #boot .boot-txt{font-size:18px;white-space:pre-wrap;max-width:92vw}
@@ -279,3 +279,5 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
   #page-plan .card{page-break-inside:avoid}
 }
 .chip[data-scope]{font-family:var(--f-th)}.chip[data-scope].on{background:var(--green);color:#000;border-color:var(--green)}
+.side-sum .kv{font-size:12px;margin-bottom:6px}.side-sum em{font-style:normal;font-family:var(--f-mono);color:var(--green2)}.side-sum em.hot{color:var(--amber);font-size:14px}.side-sum .pk-link{font-size:12px}
+.side-sum .ss-warn{color:var(--amber)}

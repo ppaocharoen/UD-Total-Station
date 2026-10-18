@@ -387,7 +387,7 @@ function _renderPlan() {
   $$('#pl-table tr.row').forEach(tr => tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION'].includes(e.target.tagName)) return; selectTask(tr.dataset.task); }));
   renderGantt(plan, inst, '#pl-gantt'); renderSCurve(plan, inst, '#pl-scurve', true); renderInst(inst, contract, '#pl-inst', true);
   renderGantt(plan, inst, '#dk-gantt-svg'); renderSCurve(plan, inst, '#dk-scurve-svg', false); renderInst(inst, contract, '#dk-inst-table', false);
-  renderHud(T, plan); renderDockBoq(T, plan);
+  renderHud(T, plan); renderDockBoq(T, plan); renderSideSum(T, plan);
 }
 function selectTask(id) {
   const t = S.plan && S.plan.tasks.find(x => x.id === id); if (!t) return;
@@ -543,6 +543,30 @@ function kpiHtml(T, plan) {
   return k('ค่าวัสดุ', fmt(mat, 0), 'บ.') + k('ค่าแรง', fmt(lab, 0), 'บ.') + k('ค่างานต้นทุน', fmt(T.cost, 0), 'บ.') +
     k(`ราคากลาง (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
     (plan ? k('ระยะเวลา', plan.calDays, 'วัน') : '');
+}
+function renderSideSum(T, plan) {
+  const pr = T.pr, area = +S.boq.project.area || 0, q = S.model.quantities || {};
+  const sum = (test, unit) => r2(pr.filter(r => test(r.key) && (!unit || r.unit === unit)).reduce((a, r) => a + (+r.qty || 0), 0));
+  const it = [
+    ['ราคากลาง', fmt(T.grand, 0), 'บาท', true],
+    area ? ['เฉลี่ยต่อพื้นที่', fmt(r2(T.grand / area), 0), `บาท/ตร.ม. (${fmt(area)} ตร.ม.)`] : null,
+    plan ? ['ระยะเวลา', plan.calDays, `วัน (${thDate(plan.start)} – ${thDate(plan.finish)})`] : null,
+    ['คอนกรีตโครงสร้าง', fmt(sum(k => k.startsWith('conc_'), 'ลบ.ม.')), 'ลบ.ม.'],
+    ['เหล็กเสริม', fmt(sum(k => k.startsWith('rebar_'), 'กก.'), 0), 'กก.'],
+    ['เหล็กรูปพรรณ', fmt(sum(k => k.startsWith('steel_'), 'กก.'), 0), 'กก.'],
+    ['ไม้แบบ', fmt(sum(k => k === 'formwork')), 'ตร.ม.'],
+    ['ผนัง', fmt(sum(k => k.startsWith('wall_'))), 'ตร.ม.'],
+    ['หลังคา', fmt(sum(k => k.startsWith('cover_'))), 'ตร.ม.'],
+    ['จุดไฟฟ้า', sum(k => k.startsWith('pt_')), 'จุด'],
+    ['สายไฟ', fmt(sum(k => k.startsWith('wire_'), 'ม.'), 0), 'ม.'],
+    ['ท่อประปา/ระบายน้ำ', fmt(sum(k => k.startsWith('pipe_'), 'ม.'), 0), 'ม.'],
+  ].filter(x => x && x[1] !== 0 && x[1] !== '0' && x[1] !== '0.00');
+  const nNo = pr.filter(r => r.warns.includes('ยังไม่มีราคา')).length, nAs = pr.filter(r => r.status === 'assumed').length, nNote = (q.notes || []).length;
+  $('#side-sum').innerHTML = `<div class="kv">${it.map(([l, v, u, hot]) => `<b>${l}</b><span><em class="${hot ? 'hot' : ''}">${v}</em> ${u}</span>`).join('')}</div>` +
+    (nNo ? `<a class="pk-link ss-warn" data-ss="pr1">⚠ ยังไม่มีราคา ${nNo} รายการ</a><br>` : '') +
+    (nAs ? `<a class="pk-link ss-warn" data-ss="pr1">⚠ ปริมาณประมาณ ${nAs} รายการ (ตรวจกับแบบ)</a><br>` : '') +
+    (nNote ? `<a class="pk-link" data-ss="project">ข้อสมมติจากตัวถอดปริมาณ ${nNote} ข้อ</a>` : '');
+  $$('#side-sum [data-ss]').forEach(a => a.onclick = () => $$('#tabs .nav-tab').find(x => x.dataset.tab === a.dataset.ss).click());
 }
 function renderHud(T, plan) {
   const m = S.model; if (!m) return;
