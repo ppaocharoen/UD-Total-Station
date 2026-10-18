@@ -466,3 +466,5 @@ html.dos .side-sum em{color:var(--dos-blue)}
 }
 @media print{html.dos h2{background:none;border:none;padding:0}html.dos .card,html.dos .sum-doc{box-shadow:none}}
 @media print{html,html.dos{background:#fff!important}}
+
+.legal{margin:4px 0 8px;border:1px solid var(--border);padding:4px 8px}.legal summary{cursor:pointer;color:var(--green);font-size:13px}

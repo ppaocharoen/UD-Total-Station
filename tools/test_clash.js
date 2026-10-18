@@ -56,5 +56,16 @@ check('C2 คาน B9 ปลายลอย', has(C.check(m), 'C2', 'error', 'B
 m = clone(); m.mep.plumbing.pipes.push({ id: 'P-X', system: 'cw', dia: '1/2"', pts: [[-0.5, 0.0, 1.0], [0.5, 0.0, 1.0]] });
 check('A1 ท่อ P-X ลอดเสา C1-1A-2 = error', has(C.check(m), 'A1', 'error', 'P-X', 'C1-1A-2'));
 
+// ประเภทอาคารตามกฎหมาย
+let L = C.classify(clone());
+check('ความสูงตามกฎหมาย หลังคาจั่ว = ยอดผนัง 2.90 ม.', Math.abs(L.H - 2.9) < 1e-6);
+check('พื้นที่รวม 32 ตร.ม. · ช่วงโครงหลังคา 4.00 ม.', L.areaTotal === 32 && L.roofSpan === 4);
+check('อาคารตัวอย่างไม่เข้าข่ายประเภทพิเศษ', !L.items.some(i => i.yes));
+check('เจ้าของเทศบาล → หมายเหตุ ม.7', L.notes.some(n => n.includes('ม.7')));
+m = clone(); m.roofs[0].outline = [[-0.8, -0.8], [8.8, -0.8], [8.8, 11.8], [-0.8, 11.8]];
+L = C.classify(m); check('โครงหลังคาช่วง 11 ม. → อาคารพิเศษ (ค)', L.roofSpan === 11 && L.items.find(i => i.name.startsWith('อาคารพิเศษ')).yes);
+m = clone(); m.roofs.forEach(r => { r.form = 'flat'; }); m.slabs.push({ id: 'S-R', kind: 'roof', level: 'ROOF', t: 0.1, top: 24.0, polygon: [[0, 0], [8, 0], [8, 4], [0, 4]] });
+L = C.classify(m); check('หลังคาแบน ดาดฟ้า +24.00 → อาคารสูง', L.H === 24 && L.items[0].yes);
+
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);

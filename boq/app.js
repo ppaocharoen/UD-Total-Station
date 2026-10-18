@@ -822,6 +822,12 @@ function renderDiff() {
 const SEV = { error: ['ร้ายแรง', 'err'], warn: ['เตือน', 'warn'], info: ['ข้อมูล', ''] };
 function renderClash() {
   if (!S.model) return;
+  const L = BmClash.classify(S.model), yes = L.items.filter(i => i.yes);
+  $('#legal-sum').textContent = yes.length ? '· ' + yes.map(i => i.name.split(' (')[0]).join(', ') : '· อาคารทั่วไป';
+  $('#legal').innerHTML = `<div class="kv" style="margin:6px 0"><b>ความสูงตามกฎหมาย</b><span>${L.H.toFixed(2)} ม. (วัดจากพื้นดินถึง${esc(L.how)})</span><b>จำนวนชั้น / พื้นที่</b><span>${L.storeys} ชั้น · รวม ${L.areaTotal.toLocaleString()} ตร.ม. · ชั้นมากสุด ${L.areaMax.toLocaleString()} ตร.ม.</span><b>ช่วงยาวสุด</b><span>คาน ${L.span.toFixed(2)} ม. · โครงหลังคา ${L.roofSpan.toFixed(2)} ม.</span></div>
+    <table class="mini-boq">${L.items.map(i => `<tr><td><span class="pill ${i.yes ? 'warn' : 'ok'}">${i.yes ? 'เข้าข่าย' : 'ไม่เข้าข่าย'}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(i.law)}</td><td>${esc(i.name)}<span class="src">${esc(i.why)}${i.note ? ' · ' + esc(i.note) : ''}</span></td></tr>`).join('')}</table>
+    <ul class="hint" style="margin:6px 0 0 18px">${L.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+    <div class="hint" style="margin-top:4px">อ้างอิง: พ.ร.บ.ควบคุมอาคาร 2522 (แก้ไขถึงฉบับที่ 5 พ.ศ. 2558) · กฎกระทรวงฉบับที่ 55 (2543) — ตรวจกับราชกิจจานุเบกษาก่อนใช้อ้างอิงทางกฎหมาย</div>`;
   const bt = S.boq.clash_bt || (S.model.meta && S.model.meta.building_type) || 'public';
   $('#clash-bt').value = bt;
   const all = BmClash.check(S.model, { buildingType: bt }), ack = S.boq.clash_ack || {};
