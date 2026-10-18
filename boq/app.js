@@ -625,7 +625,7 @@ function buildLayers(groups) {
     $$('.preset').forEach(b => b.classList.remove('on'));
     syncLayers();
   });
-  S.scopeKey = ''; syncLayers(); buildClip(); buildScope(); tlReset(); renderClash();
+  S.scopeKey = ''; S.typeSel = null; syncLayers(); buildClip(); buildScope(); buildTypes(); tlReset(); renderClash();
 }
 function syncLayers() { $$('#layer-list .chip').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
 function buildClip() {
@@ -634,6 +634,32 @@ function buildClip() {
   $('#clip-level').innerHTML = '<option value="">ไม่ตัด (ทั้งหมด)</option>' + lv.map(l => `<option value="${l.z}">ถึงระดับ ${esc(l.name)} (${l.z >= 0 ? '+' : ''}${(+l.z).toFixed(2)})</option>`).join('');
   const zr = $('#clip-z'); zr.min = v.bbox.min.y.toFixed(2); zr.max = (v.bbox.max.y + 0.05).toFixed(2); zr.value = zr.max; zr.disabled = true;
   $('#clip-label').textContent = '';
+}
+const TPAL = [0xff5370, 0x40c4ff, 0xffd740, 0x69f0ae, 0xe040fb, 0xff9100, 0x18ffff, 0xb2ff59, 0xff80ab, 0x7c4dff, 0xffab40, 0x64ffda, 0xeeff41, 0x536dfe];
+function buildTypes() {
+  const m = S.model, v = S.viewer; if (!m || !v) return;
+  const cats = [], add = (cat, mark, id) => { let c = cats.find(x => x.cat === cat); if (!c) cats.push(c = { cat, t: [] });
+    let t = c.t.find(x => x.mark === mark); if (!t) c.t.push(t = { mark, ids: [] }); t.ids.push(id); };
+  const MT = { column: 'เสา', beam: 'คาน', tie_beam: 'คาน', lintel: 'คาน', rafter: 'โครงหลังคา', purlin: 'โครงหลังคา', truss: 'โครงหลังคา', brace: 'โครงหลังคา' };
+  (m.supports || []).forEach(x => add('ฐานราก', x.mark || x.kind, x.id));
+  (m.members || []).forEach(x => add(MT[x.type] || x.type, x.mark || x.section, x.id));
+  (m.slabs || []).forEach(x => add('พื้น', x.mark || x.kind, x.id));
+  (m.walls || []).forEach(x => add('ผนัง', (WALL_TH[x.kind] || x.kind).replace('ผนัง', '') + ` ${x.t * 100}`, x.id));
+  (m.openings || []).forEach(x => add('ประตู-หน้าต่าง', x.type, x.id));
+  let k = 0; const col = {};
+  cats.forEach(c => c.t.forEach(t => { t.color = TPAL[k++ % TPAL.length]; t.ids.forEach(id => { col[id] = t.color; }); }));
+  S.types = { cats, col };
+  const hex = n => '#' + n.toString(16).padStart(6, '0');
+  $('#type-list').innerHTML = cats.map(c => `<div class="tl-cat"><span class="hint">${esc(c.cat)}</span><div class="chips">${c.t.map((t, i) =>
+    `<span class="chip on" data-type="${esc(c.cat)}|${i}" style="color:${hex(t.color)}"><i style="background:${hex(t.color)}"></i><span style="color:var(--text)">${esc(t.mark)}</span><em>${t.ids.length}</em></span>`).join('')}</div></div>`).join('');
+  $$('#type-list [data-type]').forEach(ch => ch.onclick = () => {
+    const [cat, i] = ch.dataset.type.split('|'), t = cats.find(c => c.cat === cat).t[+i];
+    const same = S.typeSel === ch.dataset.type; S.typeSel = same ? null : ch.dataset.type;
+    $$('#type-list [data-type]').forEach(x => x.classList.toggle('sel', x.dataset.type === S.typeSel));
+    v.highlight(same ? [] : t.ids); if (!same) toast(`${cat} ${t.mark}: ${t.ids.length} ชิ้น`);
+  });
+  v.setTypeColors(S.tcolOn ? col : null);
+  $('#b-tcol').classList.toggle('primary', !!S.tcolOn);
 }
 const autoFold = () => { if (innerWidth < 800) $('#stage').classList.add('collapsed'); };   // มือถือ: เลือกแล้วพับเมนูให้เห็นโมเดล
 function buildScope() {
@@ -961,6 +987,7 @@ function bind() {
   const fitStage = () => { const bn = $('#bnav'), bh = bn && getComputedStyle(bn).display !== 'none' ? bn.offsetHeight : 0; $('#stage').style.height = Math.max(bh ? 300 : 420, innerHeight - $('.topbar').offsetHeight - bh) + 'px'; };
   addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
+  $('#b-tcol').onclick = () => { S.tcolOn = !S.tcolOn; if (S.viewer && S.types) S.viewer.setTypeColors(S.tcolOn ? S.types.col : null); $('#b-tcol').classList.toggle('primary', S.tcolOn); $('#b-tcol').textContent = S.tcolOn ? 'กลับเป็นสีวัสดุ' : 'ระบายสีตามชนิด'; };
   $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };
   $('#clash-info').onchange = renderClash; $('#clash-ack').onchange = renderClash;
   $('#f-old').onchange = async e => {
