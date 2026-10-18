@@ -67,5 +67,22 @@ L = C.classify(m); check('โครงหลังคาช่วง 11 ม. →
 m = clone(); m.roofs.forEach(r => { r.form = 'flat'; }); m.slabs.push({ id: 'S-R', kind: 'roof', level: 'ROOF', t: 0.1, top: 24.0, polygon: [[0, 0], [8, 0], [8, 4], [0, 4]] });
 L = C.classify(m); check('หลังคาแบน ดาดฟ้า +24.00 → อาคารสูง', L.H === 24 && L.items[0].yes);
 
+// กฎกระทรวง 55 ข้อ 33/41/44/50
+const SB = clone().site.existing.boundary, st = (r, c) => (r.find(x => x.code === c) || {}).status;
+let R = C.siteCheck(clone(), {});
+check('ไม่มีข้อมูลที่ดิน → ข้อมูลไม่ครบทุกข้อ (ไม่ตัดสิน)', R.every(x => x.status === 'missing'));
+R = C.siteCheck(clone(), { boundary: SB, off: { c33: 1, c41: 1, c44: 1, c50: 1 } });
+check('ปิดทุกข้อ → ไม่คิด', R.every(x => x.status === 'off'));
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }] });
+check('ตัวอย่าง ถนน 8 ม. ด้านใต้ → ผ่านทุกข้อ', ['ข้อ 33', 'ข้อ 41', 'ข้อ 44', 'ข้อ 50'].every(c => st(R, c) === 'pass'));
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [] });
+check('ไม่ระบุถนน → ข้อ 41/44 ข้อมูลไม่ครบ แต่ข้อ 50 ยังตรวจ', st(R, 'ข้อ 41') === 'missing' && st(R, 'ข้อ 50') === 'pass');
+const near = [[-1, -1], [13, -1], [13, 9], [-1, 9]];   // เขตที่ดินห่างผนังมีประตู W-A12 แค่ 1 ม.
+R = C.siteCheck(clone(), { boundary: near, use: 'public', roads: [{ edge: 0, width: 4 }] });
+check('ผนังมีช่องเปิดห่างเขต 1 ม. → ข้อ 50 ไม่ผ่าน', st(R, 'ข้อ 50') === 'fail');
+check('ถนน 4 ม. อาคารสาธารณะ ห่างกึ่งกลาง 3 ม. < 6 → ข้อ 41 ไม่ผ่าน', st(R, 'ข้อ 41') === 'fail');
+R = C.siteCheck(clone(), { landArea: 40, use: 'res' });
+check('ที่ดิน 40 ตร.ม. อยู่อาศัย (ปกคลุม 53.76) → ข้อ 33 ไม่ผ่าน', st(R, 'ข้อ 33') === 'fail');
+
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);

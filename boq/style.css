@@ -468,3 +468,5 @@ html.dos .side-sum em{color:var(--dos-blue)}
 @media print{html,html.dos{background:#fff!important}}
 
 .legal{margin:4px 0 8px;border:1px solid var(--border);padding:4px 8px}.legal summary{cursor:pointer;color:var(--green);font-size:13px}
+.site-form{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.site-form label.ck{flex-direction:row;align-items:center;gap:6px}
+.site-road{display:flex;gap:6px;margin:4px 0}.site-road select{flex:1;min-width:0}.site-road input{width:90px}

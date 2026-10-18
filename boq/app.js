@@ -820,6 +820,41 @@ function renderDiff() {
 
 // ------------------------------------------------------------------ Clash
 const SEV = { error: ['ร้ายแรง', 'err'], warn: ['เตือน', 'warn'], info: ['ข้อมูล', ''] };
+// กฎกระทรวง 55 ข้อ 33/41/44/50 — ข้อมูลที่ดินเก็บใน S.boq.site · ไม่ครบ = "ข้อมูลไม่ครบ" (ไม่ตัดสิน) · ปิดรายข้อได้
+const USE_LBL = { res: 'อยู่อาศัย / อยู่อาศัยรวม', public: 'อาคารสาธารณะ', commercial: 'พาณิชย์ / โรงงาน / ห้องแถว', other: 'อาคารอื่นที่ไม่ใช่อยู่อาศัย' };
+function siteCfg() {
+  const st = S.boq.site = Object.assign({ useModel: true, landArea: '', use: 'auto', roads: [], coverExtra: '', off: {} }, S.boq.site || {});
+  const mb = S.model.site && S.model.site.existing && S.model.site.existing.boundary;
+  const occ = String((S.model.meta || {}).occupancy || '');
+  const auto = /อยู่อาศัย|บ้าน|หอพัก|อพาร์ต|คอนโด/.test(occ) ? 'res' : /หอประชุม|โรงมหรสพ|สถานศึกษา|โรงเรียน|โรงพยาบาล|ตลาด|สนามกีฬา|ศาสนสถาน|หอสมุด/.test(occ) ? 'public' : /ร้าน|พาณิชย์|โรงงาน|ตึกแถว|คลังสินค้า/.test(occ) ? 'commercial' : 'other';
+  return { st, mb, auto, cfg: { boundary: st.useModel && mb ? mb : null, landArea: +st.landArea || 0, use: st.use === 'auto' ? auto : st.use, roads: st.roads, coverExtra: +st.coverExtra || 0, off: st.off } };
+}
+function renderSiteLaw(L) {
+  const box = $('#site-law'); if (!box) return;
+  const { st, mb, auto, cfg } = siteCfg(), res = BmClash.siteCheck(S.model, cfg, L), B = cfg.boundary;
+  const ST = { pass: ['ผ่าน', 'ok'], fail: ['ไม่ผ่าน', 'err'], missing: ['ข้อมูลไม่ครบ', 'warn'], off: ['ไม่คิด', ''], na: ['ไม่บังคับ', ''] };
+  const edgeOpt = sel => (B || []).map((_, i) => `<option value="${i}" ${+sel === i ? 'selected' : ''}>${esc(BmClash.edgeLabel(B, i))}</option>`).join('');
+  box.innerHTML = `<h4 style="margin:10px 0 4px;color:var(--green)">ระยะร่นและที่ว่าง (กฎกระทรวง 55)</h4>
+    <div class="form-grid site-form">
+      <label class="ck"><input type="checkbox" data-st="useModel" ${st.useModel ? 'checked' : ''} ${mb ? '' : 'disabled'}> ใช้เขตที่ดินจากโมเดล${mb ? ` (${mb.length} มุม)` : ' — โมเดลไม่มีเขตที่ดิน'}</label>
+      <label>พื้นที่ดิน (ตร.ม.) ${B ? '<span class="hint">คิดจากเขตที่ดินแล้ว</span>' : ''}<input data-st="landArea" inputmode="decimal" value="${esc(st.landArea)}" ${B ? 'disabled' : ''} placeholder="ใช้ตรวจข้อ 33 เมื่อไม่มีเขตที่ดิน"></label>
+      <label>ประเภทการใช้ (ข้อ 33/41)<select data-st="use"><option value="auto" ${st.use === 'auto' ? 'selected' : ''}>อัตโนมัติ: ${esc(USE_LBL[auto])}</option>${Object.entries(USE_LBL).map(([k, v]) => `<option value="${k}" ${st.use === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+      <label>พื้นที่ปกคลุมอื่นนอกหลังคาอาคาร (ตร.ม.)<input data-st="coverExtra" inputmode="decimal" value="${esc(st.coverExtra)}" placeholder="เช่น โรงจอดรถ ศาลา"></label>
+    </div>
+    <div class="hint" style="margin-top:6px">ถนนสาธารณะที่ติดที่ดิน (ข้อ 41/44)</div>
+    ${(st.roads || []).map((r, i) => `<div class="site-road"><select data-road="${i}" data-rf="edge" ${B ? '' : 'disabled'}>${edgeOpt(r.edge) || '<option>ไม่มีเขตที่ดิน</option>'}</select><input data-road="${i}" data-rf="width" inputmode="decimal" value="${esc(r.width)}" placeholder="กว้าง (ม.)"><button class="btn small" data-road-del="${i}">ลบ</button></div>`).join('')}
+    <button class="btn small" id="road-add" ${B ? '' : 'disabled'}>+ เพิ่มถนน</button>
+    <table class="mini-boq" style="margin-top:6px">${res.map(r => `<tr><td><span class="pill ${ST[r.status][1]}">${ST[r.status][0]}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(r.code)}</td><td>${esc(r.title)}<span class="src">${esc(r.detail)}${r.need ? ' → ' + esc(r.need) : ''}</span></td><td><label class="hint" style="white-space:nowrap"><input type="checkbox" data-off="${r.code === 'ข้อ 33' ? 'c33' : r.code === 'ข้อ 41' ? 'c41' : r.code === 'ข้อ 44' ? 'c44' : 'c50'}" ${r.status === 'off' ? 'checked' : ''}> ไม่คิด</label></td></tr>`).join('')}</table>
+    <div class="hint">แนวอาคาร = ผนัง เสา พื้น (ไม่รวมชายคา) · ข้อ 44 ใช้ความสูงตามกฎหมายที่แนวอาคารใกล้ถนนที่สุด (ปลอดภัยไว้ก่อน) · เขตที่ดินที่ติดถนนถือเป็นเขตถนน</div>`;
+  const save = () => { autosave(); renderClash(); };
+  box.querySelectorAll('[data-st]').forEach(el => el.onchange = () => { st[el.dataset.st] = el.type === 'checkbox' ? el.checked : el.value; save(); });
+  box.querySelectorAll('[data-rf]').forEach(el => el.onchange = () => { st.roads[+el.dataset.road][el.dataset.rf] = el.dataset.rf === 'edge' ? +el.value : el.value; save(); });
+  box.querySelectorAll('[data-road-del]').forEach(b => b.onclick = () => { st.roads.splice(+b.dataset.roadDel, 1); save(); });
+  const add = box.querySelector('#road-add'); if (add) add.onclick = () => { st.roads.push({ edge: 0, width: '' }); save(); };
+  box.querySelectorAll('[data-off]').forEach(el => el.onchange = () => { st.off[el.dataset.off] = el.checked; if (!el.checked) delete st.off[el.dataset.off]; save(); });
+  const nf = res.filter(r => r.status === 'fail').length, nm = res.filter(r => r.status === 'missing').length;
+  $('#legal-sum').textContent += (nf ? ` · ไม่ผ่าน ${nf} ข้อ` : '') + (nm ? ` · ข้อมูลไม่ครบ ${nm} ข้อ` : '');
+}
 function renderClash() {
   if (!S.model) return;
   const L = BmClash.classify(S.model), yes = L.items.filter(i => i.yes);
@@ -827,7 +862,9 @@ function renderClash() {
   $('#legal').innerHTML = `<div class="kv" style="margin:6px 0"><b>ความสูงตามกฎหมาย</b><span>${L.H.toFixed(2)} ม. (วัดจากพื้นดินถึง${esc(L.how)})</span><b>จำนวนชั้น / พื้นที่</b><span>${L.storeys} ชั้น · รวม ${L.areaTotal.toLocaleString()} ตร.ม. · ชั้นมากสุด ${L.areaMax.toLocaleString()} ตร.ม.</span><b>ช่วงยาวสุด</b><span>คาน ${L.span.toFixed(2)} ม. · โครงหลังคา ${L.roofSpan.toFixed(2)} ม.</span></div>
     <table class="mini-boq">${L.items.map(i => `<tr><td><span class="pill ${i.yes ? 'warn' : 'ok'}">${i.yes ? 'เข้าข่าย' : 'ไม่เข้าข่าย'}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(i.law)}</td><td>${esc(i.name)}<span class="src">${esc(i.why)}${i.note ? ' · ' + esc(i.note) : ''}</span></td></tr>`).join('')}</table>
     <ul class="hint" style="margin:6px 0 0 18px">${L.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+    <div id="site-law"></div>
     <div class="hint" style="margin-top:4px">อ้างอิง: พ.ร.บ.ควบคุมอาคาร 2522 (แก้ไขถึงฉบับที่ 5 พ.ศ. 2558) · กฎกระทรวงฉบับที่ 55 (2543) — ตรวจกับราชกิจจานุเบกษาก่อนใช้อ้างอิงทางกฎหมาย</div>`;
+  renderSiteLaw(L);
   const bt = S.boq.clash_bt || (S.model.meta && S.model.meta.building_type) || 'public';
   $('#clash-bt').value = bt;
   const all = BmClash.check(S.model, { buildingType: bt }), ack = S.boq.clash_ack || {};
