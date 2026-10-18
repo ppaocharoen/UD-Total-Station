@@ -563,8 +563,8 @@ function renderSideSum(T, plan) {
   ].filter(x => x && x[1] !== 0 && x[1] !== '0' && x[1] !== '0.00');
   const nNo = pr.filter(r => r.warns.includes('ยังไม่มีราคา')).length, nAs = pr.filter(r => r.status === 'assumed').length, nNote = (q.notes || []).length;
   $('#side-sum').innerHTML = `<div class="kv">${it.map(([l, v, u, hot]) => `<b>${l}</b><span><em class="${hot ? 'hot' : ''}">${v}</em> ${u}</span>`).join('')}</div>` +
-    (nNo ? `<a class="pk-link ss-warn" data-ss="pr1">⚠ ยังไม่มีราคา ${nNo} รายการ</a><br>` : '') +
-    (nAs ? `<a class="pk-link ss-warn" data-ss="pr1">⚠ ปริมาณประมาณ ${nAs} รายการ (ตรวจกับแบบ)</a><br>` : '') +
+    (nNo ? `<a class="pk-link ss-warn" data-ss="pr1">[!] ยังไม่มีราคา ${nNo} รายการ</a><br>` : '') +
+    (nAs ? `<a class="pk-link ss-warn" data-ss="pr1">[!] ปริมาณประมาณ ${nAs} รายการ (ตรวจกับแบบ)</a><br>` : '') +
     (nNote ? `<a class="pk-link" data-ss="project">ข้อสมมติจากตัวถอดปริมาณ ${nNote} ข้อ</a>` : '');
   $$('#side-sum [data-ss]').forEach(a => a.onclick = () => $$('#tabs .nav-tab').find(x => x.dataset.tab === a.dataset.ss).click());
 }
@@ -588,7 +588,7 @@ function renderDockBoq(T, plan) {
 function setDock(name) {
   $$('.dock-tab[data-dock]').forEach(t => t.classList.toggle('active', t.dataset.dock === name));
   $$('.dock-pane').forEach(p => p.classList.toggle('active', p.id === 'dk-' + name));
-  $('#dock').classList.remove('min'); $('#dock-min').textContent = '▾ ย่อ';
+  $('#dock').classList.remove('min'); $('#dock-min').textContent = '− ย่อ';
 }
 // ------------------------------------------------------------------ บูต / CRT
 function bootRain() {
@@ -614,12 +614,14 @@ function setCrt(on) {
 // ------------------------------------------------------------------ 3D
 function buildLayers(groups) {
   const v = S.viewer;
-  $('#layer-list').innerHTML = groups.map(g => {
+  const ov = [['grid', 'เส้นกริด', '#18ffff', (S.model.grids || []).length], ['ground', 'พื้นดิน', '#00ff41', '']].filter(o => o[3] !== 0);
+  $('#layer-list').innerHTML = ov.map(([k, t, col, n]) => `<span class="chip ${v[k + 'On'] === false ? '' : 'on'}" data-ov="${k}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${t}</span><em>${n}</em></span>`).join('') + groups.map(g => {
     const kids = v.groups[g].children, n = new Set(kids.map(m => m.userData.id || m.uuid)).size;
     const col = '#' + ((kids[0] && kids[0].userData.baseColor) || 0x888888).toString(16).padStart(6, '0');
     return `<span class="chip" data-layer="${esc(g)}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${esc(g)}</span><em>${n}</em></span>`;
   }).join('');
-  $$('#layer-list .chip').forEach(ch => ch.onclick = () => {
+  $$('#layer-list [data-ov]').forEach(ch => ch.onclick = () => { const k = ch.dataset.ov, on = v[k + 'On'] === false; v.setOverlay(k, on); ch.classList.toggle('on', on); });
+  $$('#layer-list [data-layer]').forEach(ch => ch.onclick = () => {
     const g = ch.dataset.layer, on = !v.groups[g].visible;
     if (g === 'เหล็กเสริม') v.setXray(on); else v.setVisible(g, on);
     $$('.preset').forEach(b => b.classList.remove('on'));
@@ -627,7 +629,7 @@ function buildLayers(groups) {
   });
   S.scopeKey = ''; S.typeSel = null; syncLayers(); buildClip(); buildScope(); buildTypes(); tlReset(); renderClash();
 }
-function syncLayers() { $$('#layer-list .chip').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
+function syncLayers() { $$('#layer-list [data-layer]').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
 function buildClip() {
   const m = S.model, v = S.viewer; if (!m || !v || !v.bbox) return;
   const lv = (m.levels || []).slice().sort((a, b) => a.z - b.z);
@@ -712,7 +714,7 @@ function tlReset() {
   const p = S.plan;
   if (!p) { $('#tl-label').textContent = 'เปิดโมเดลและโหลดราคาก่อน แผนงานจึงจะพร้อม'; return; }
   $('#tl-day').max = p.calDays; $('#tl-day').value = p.calDays;
-  $('#tl-label').textContent = `ลากแถบหรือกด ▶ เพื่อดูลำดับก่อสร้าง ${p.calDays} วัน (${thDate(p.start)} – ${thDate(p.finish)})`;
+  $('#tl-label').textContent = `ลากแถบหรือกด เล่น เพื่อดูลำดับก่อสร้าง ${p.calDays} วัน (${thDate(p.start)} – ${thDate(p.finish)})`;
 }
 function tlPrepare() {
   const p = S.plan, v = S.viewer; if (!p || !v) return null;
@@ -775,12 +777,12 @@ function tlDone() {
   $('#tl-fill').style.width = '100%';
   if (S.plan) { $('#tl-day').value = S.plan.calDays; $('#tl-label').textContent = `อาคารเสร็จ · ${S.plan.calDays} วัน (${thDate(S.plan.start)} – ${thDate(S.plan.finish)})`; }
 }
-function tlStop() { clearInterval(TL.timer); TL.timer = null; $('#tl-play').textContent = '▶ เล่น'; }
+function tlStop() { clearInterval(TL.timer); TL.timer = null; $('#tl-play').textContent = '» เล่น'; }
 function tlPlay() {
   if (TL.timer) return tlStop();
   if (!S.plan) return toast('แผนงานยังไม่พร้อม');
   let d = (TL.day === null || TL.day >= S.plan.calDays) ? 0 : TL.day;
-  $('#tl-play').textContent = '⏸ หยุด'; setDock('time');
+  $('#tl-play').textContent = '‖ หยุด'; setDock('time');
   const ms = Math.max(60, Math.min(250, 12000 / S.plan.calDays)) / (+$('#tl-speed').value || 1);
   TL.timer = setInterval(() => { d++; if (d >= S.plan.calDays) { tlDone(); return; } tlSet(d); }, ms);
 }
@@ -876,7 +878,7 @@ function showPick(d) {
   const res = (S.model.results || {}).members && S.model.results.members[id];
   const cl = (S.clashAll || []).filter(c => c.ids.includes(id));
   const st = sp && sp.status === 'assumed' ? '<span class="pill warn">สมมติ</span>' : sp && sp.src ? `<span class="pill">แบบ ${esc(sp.src)}</span>` : '';
-  let h = `<div class="pk-grab"></div><div class="pk-head"><div><span class="pk-type">${esc(sp ? sp.title : d.group)}</span> <b class="mono">${esc(id)}</b>${sp && sp.mark ? ` <span class="pk-mark">· ${esc(sp.mark)}</span>` : ''} ${st}</div><button class="btn small" data-pk="close">✕</button></div>`;
+  let h = `<div class="pk-grab"></div><div class="pk-head"><div><span class="pk-type">${esc(sp ? sp.title : d.group)}</span> <b class="mono">${esc(id)}</b>${sp && sp.mark ? ` <span class="pk-mark">· ${esc(sp.mark)}</span>` : ''} ${st}</div><button class="btn small" data-pk="close">×</button></div>`;
   if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
   else if (d.info) h += `<div class="pk-spec"><div>${esc(d.info)}</div></div>`;
   if (q.rows.length) {
@@ -912,7 +914,7 @@ function gotoRow(key) {
 function showLog() {
   let m = $('#log-modal');
   if (!m) { m = document.createElement('div'); m.id = 'log-modal'; m.className = 'modal'; document.body.appendChild(m); m.onclick = e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); }; }
-  m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">${esc(UD_VERSION.name)} v${UD_VERSION.v}</h2><button class="btn small" data-close="1">✕</button></div>
+  m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">${esc(UD_VERSION.name)} v${UD_VERSION.v}</h2><button class="btn small" data-close="1">×</button></div>
     <p class="hint">เลขใหญ่.เลขย่อย — แก้เล็กเปลี่ยนเลขย่อย แก้ใหญ่เปลี่ยนเลขใหญ่</p>
     <table class="mini-boq">${UD_VERSION.log.map(([v, d, t]) => `<tr><td class="mono" style="color:var(--green);white-space:nowrap">v${v}</td><td class="mono" style="color:var(--text3);white-space:nowrap">${d}</td><td>${esc(t)}</td></tr>`).join('')}</table></div>`;
   m.classList.add('on');
@@ -1004,7 +1006,7 @@ function bind() {
   $('#b-diff-3d').onclick = () => { if (!S.diffIds) return toast('เปิดรุ่นก่อนก่อน'); $$('#tabs .nav-tab').find(x => x.dataset.tab === 'model').click(); setTimeout(() => S.viewer && S.viewer.highlight(S.diffIds), 80); toast(`ไฮไลต์ชิ้นที่เพิ่ม/แก้ ${S.diffIds.length} ชิ้น`); };
   $('#b-diff-clear').onclick = () => { S.old = null; S.diffIds = null; $('#diff-status').textContent = ''; renderDiff(); };
   $$('.dock-tab[data-dock]').forEach(t => t.onclick = () => setDock(t.dataset.dock));
-  $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '▴ ขยาย' : '▾ ย่อ'; };
+  $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '+ ขยาย' : '− ย่อ'; };
   $('#dk-q').oninput = () => renderPlan();
   $('#b-crt').onclick = () => setCrt(document.body.classList.contains('nocrt'));
   try { if (localStorage.getItem('udboq:crt') === '0') setCrt(false); } catch (er) { /* */ }

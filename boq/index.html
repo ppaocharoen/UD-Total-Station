@@ -94,9 +94,9 @@
   <div class="stage" id="stage">
     <div class="viewer" id="viewer"></div>
     <div class="hud glass" id="hud"><div class="t">ยังไม่ได้เปิดโครงการ</div><div class="s"></div></div>
-    <button class="btn small side-open glass" id="b-side-open">☰ เมนู</button>
+    <button class="btn small side-open glass" id="b-side-open">≡ เมนู</button>
     <aside class="side glass" id="model-side">
-      <div class="side-top"><h2>ชั้นข้อมูล</h2><button class="btn small" id="b-side-close" title="พับเก็บเมนู">◀ พับ</button></div>
+      <div class="side-top"><h2>ชั้นข้อมูล</h2><button class="btn small" id="b-side-close" title="พับเก็บเมนู">« พับ</button></div>
       <div class="chips" id="layer-list"></div>
       <h2>ชุดแสดงผล</h2>
       <div class="btn-grid">
@@ -127,14 +127,14 @@
     <div class="pick glass" id="pick-info"></div>
     <div class="dock glass" id="dock">
       <div class="dock-tabs">
-        <div class="dock-tab active" data-dock="time">▶ <span class="lg">ลำดับก่อสร้าง</span><span class="sm">ลำดับ</span></div><div class="dock-tab" data-dock="gantt">Gantt</div>
+        <div class="dock-tab active" data-dock="time">» <span class="lg">ลำดับก่อสร้าง</span><span class="sm">ลำดับ</span></div><div class="dock-tab" data-dock="gantt">Gantt</div>
         <div class="dock-tab" data-dock="scurve">S-Curve</div><div class="dock-tab" data-dock="inst">งวดงาน</div><div class="dock-tab" data-dock="boq">BOQ</div><div class="dock-tab" data-dock="clash">Clash <span id="clash-n"></span></div>
-        <div class="sp"></div><div class="dock-tab" id="dock-min">▾<span class="lg"> ย่อ</span></div>
+        <div class="sp"></div><div class="dock-tab" id="dock-min">−<span class="lg"> ย่อ</span></div>
       </div>
       <div class="dock-body">
         <div class="dock-pane active" id="dk-time">
           <div class="tl-row">
-            <button class="btn small" id="tl-play">▶ เล่น</button>
+            <button class="btn small" id="tl-play">» เล่น</button>
             <select id="tl-speed" title="ความเร็ว"><option value="0.5">ช้า</option><option value="1" selected>ปกติ</option><option value="2">เร็ว</option><option value="4">เร็วมาก</option></select>
             <input type="range" id="tl-day" min="0" max="1" step="1" value="1">
             <button class="btn small" id="tl-done">อาคารเสร็จ</button>
