@@ -279,7 +279,9 @@ function svSave(it) {   // บันทึก + สำรองเข้าค�
   it.updated = new Date().toISOString(); applyPr23Survey(); autosave(); applySurvey(); priceAll(); if (/^pr[23]:/.test(it.target)) renderPR23();
   clearTimeout(svSave._t); svSave._t = setTimeout(() => {
     const imgs = {}; (it.quotes || []).forEach(q => (q.imgs || []).forEach(id => { if (S.img[id]) imgs[id] = S.img[id]; }));
-    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '' });
+    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '' })
+      .then(() => { if (Survey.remote()) libStatus('บันทึกเข้าคลังกลางแล้ว'); })
+      .catch(er => { libStatus('บันทึกเข้าคลังกลางไม่ได้: ' + er.message + ' (เก็บในเครื่องไว้ก่อน)', true); });
   }, 800);
 }
 async function svLibHint(card, it) {
@@ -287,15 +289,46 @@ async function svLibHint(card, it) {
   const m = Survey.libMatch(await Survey.libAll(), it.name, it.unit).filter(x => x.key !== Survey.libKey(it.name, it.unit) || !(it.quotes || []).length);
   if (!m.length) { el.textContent = ''; return; }
   el.innerHTML = 'คลังราคาสืบ: ' + m.map((x, i) => { const a = Survey.ageDays(x.updated); return `<a class="pk-link" data-libuse="${i}">${esc(x.name)} · ${x.quotes.length} เจ้า · ${a} วันก่อน${x.project ? ' (' + esc(x.project) + ')' : ''}</a>${a > 90 ? ' <span class="pill warn">เกิน 90 วัน</span>' : ''}`; }).join(' · ');
-  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = () => {
+  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = async () => {
     const x = m[+a.dataset.libuse];
-    Object.entries(x.imgs || {}).forEach(([id, d]) => { S.img[id] = d; Survey.imgPut(id, d); });
+    toast('กำลังดึงจากคลัง…');
+    for (const [id, v] of Object.entries(x.imgs || {})) { const d = await Survey.libImg(v).catch(() => null); if (d) { S.img[id] = d; Survey.imgPut(id, d); } }
     it.quotes = (it.quotes || []).concat(x.quotes.map(q => Object.assign({}, q, { id: Survey.uid('q'), note: (q.note ? q.note + ' · ' : '') + 'จากคลัง' })));
     if (!it.reason && x.reason) it.reason = x.reason;
     svSave(it); renderSurvey(); renderPR1(); renderSummary(); toast(`ดึง ${x.quotes.length} เจ้าจากคลังแล้ว — ตรวจวันที่สืบ`);
   });
 }
+function libStatus(msg, err) {
+  const c = Survey.cfg();
+  $('#sv-libst').innerHTML = (c.url ? `คลังราคาสืบ: <b style="color:var(--green)">คลังกลาง (Google Sheet)</b>${c.team ? '' : ' · <span style="color:var(--amber)">ยังไม่ใส่รหัสทีม (อ่านได้อย่างเดียว)</span>'}` : 'คลังราคาสืบ: เก็บในเครื่องนี้ (ยังไม่ได้ตั้งคลังกลาง)')
+    + (msg ? ` · <span style="color:var(${err ? '--red' : '--text3'})">${esc(msg)}</span>` : '');
+}
+function libConfig() {
+  const c = Survey.cfg(); let m = $('#lib-modal');
+  if (!m) { m = document.createElement('div'); m.id = 'lib-modal'; m.className = 'modal'; document.body.appendChild(m); }
+  m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">คลังราคาสืบกลาง</h2><button class="btn small" data-close="1">×</button></div>
+    <p class="hint">ราคาสืบเก็บใน Google Sheet กลาง ทุกคนที่เปิดเว็บเห็นคลังเดียวกัน · เพิ่ม/แก้ต้องมีรหัสทีม (เก็บในเบราว์เซอร์นี้)</p>
+    <div class="form-grid"><label>Web app URL (Apps Script)<input id="lib-url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label>
+    <label>รหัสทีม<input id="lib-team" type="password" value="${esc(c.team || '')}"></label></div>
+    <div class="btn-row"><button class="btn small primary" id="lib-save">บันทึกและทดสอบ</button><button class="btn small" id="lib-off">ใช้คลังในเครื่อง</button><button class="btn small" id="lib-push">ส่งคลังในเครื่องขึ้นคลังกลาง</button></div>
+    <div class="hint" id="lib-msg"></div></div>`;
+  m.classList.add('on');
+  m.onclick = e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); };
+  $('#lib-save').onclick = async () => {
+    const n = { url: $('#lib-url').value.trim(), team: $('#lib-team').value };
+    try { const r = await Survey.ping(n); if (!r.ok) throw new Error(r.error); Survey.setCfg(n); $('#lib-msg').textContent = 'เชื่อมต่อแล้ว: ' + r.name; libStatus(); }
+    catch (er) { $('#lib-msg').textContent = 'เชื่อมต่อไม่ได้: ' + er.message; }
+  };
+  $('#lib-off').onclick = () => { Survey.setCfg({}); libStatus(); m.classList.remove('on'); };
+  $('#lib-push').onclick = async () => {
+    const loc = await Survey.localAll(); let ok = 0, bad = 0;
+    for (const x of loc) { try { await Survey.libPut(x.key, x); ok++; } catch (er) { bad++; $('#lib-msg').textContent = er.message; } }
+    $('#lib-msg').textContent = `ส่งขึ้นคลังกลาง ${ok} รายการ${bad ? ` · ไม่สำเร็จ ${bad}` : ''}`;
+  };
+}
 function bindSurvey() {
+  libStatus();
+  $('#sv-libcfg').onclick = libConfig;
   $('#sv-list').addEventListener('click', e => {
     const card = e.target.closest('[data-svi]'); if (!card) return;
     const tid = card.dataset.svi, t = { target: tid, name: card.querySelector('.sv-head b').textContent, unit: (card.querySelector('.sv-head .hint').textContent.match(/\[(.*)\]/) || [])[1] || '' };
