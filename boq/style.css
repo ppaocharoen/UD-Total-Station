@@ -53,7 +53,21 @@ table.boq tr.warn td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
 input.price{width:96px;text-align:right;padding:3px 6px;font-family:'IBM Plex Mono',monospace;font-size:12px}
 input.price.ov{border-color:var(--amber)}
 input.cell{width:100%;padding:3px 6px;font-size:13px}
-.model-wrap{display:grid;grid-template-columns:260px 1fr;gap:16px;height:calc(100vh - 100px)}
+.model-wrap{display:grid;grid-template-columns:270px 1fr;gap:16px;height:calc(100vh - 100px)}
+.model-wrap.collapsed{grid-template-columns:0 1fr;gap:0}
+.model-wrap.collapsed .model-side{display:none}
+.viewer-col{display:flex;flex-direction:column;gap:10px;min-width:0;position:relative}
+.viewer-col .viewer{flex:1}
+.side-open{display:none;position:absolute;top:10px;left:10px;z-index:5}
+.model-wrap.collapsed .side-open{display:inline-flex}
+.side-top{display:flex;justify-content:space-between;align-items:center}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.btn-grid .btn.small{margin:0;justify-content:center}
+.btn.on{border-color:var(--accent);background:var(--accent-dim)}
+.timeline{margin-bottom:0;padding:10px 12px}
+.tl-row{display:flex;gap:10px;align-items:center}
+.tl-row input[type=range]{flex:1}
+#clip-level{width:100%}
 .model-side{overflow:auto;margin-bottom:0}
 .viewer{background:#0b0d12;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;min-height:420px}
 #layer-list label{display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 0}
@@ -84,7 +98,7 @@ textarea{background:var(--bg);border:1px solid var(--border);color:var(--text);b
 .scurve .cut{stroke:var(--green);stroke-dasharray:4 3}
 input.days{width:56px;text-align:right;padding:3px 6px;font-family:'IBM Plex Mono',monospace;font-size:12px}
 input.days.ov{border-color:var(--amber)}
-@media(max-width:800px){.model-wrap{grid-template-columns:1fr;height:auto}.viewer{height:60vh}.meta-bar{display:none}}
+@media(max-width:800px){.model-wrap{grid-template-columns:1fr;height:auto}.viewer-col{order:-1}.model-wrap.collapsed{grid-template-columns:1fr}.viewer{height:60vh;flex:none}.meta-bar{display:none}.tl-row{flex-wrap:wrap}}
 @media print{
   body{background:#fff;color:#000;font-size:12px}
   .topbar,.toolbar .btn-row,.no-print,#b-addrow,.btn{display:none!important}

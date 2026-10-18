@@ -73,16 +73,42 @@
 
 <!-- ================================================================ โมเดล 3D -->
 <section class="page" id="page-model">
-  <div class="model-wrap">
-    <aside class="model-side card">
-      <h2>ชั้นข้อมูล</h2>
+  <div class="model-wrap" id="model-wrap">
+    <aside class="model-side card" id="model-side">
+      <div class="side-top"><h2>มุมมอง</h2><button class="btn small" id="b-side-close" title="พับเก็บเมนู">◀ พับ</button></div>
+      <div class="btn-grid">
+        <button class="btn small" data-view="iso">มุมเฉียง</button><button class="btn small" data-view="iso2">มุมเฉียงหลัง</button>
+        <button class="btn small" data-view="top">ด้านบน</button><button class="btn small" data-view="front">ด้านหน้า</button>
+        <button class="btn small" data-view="right">ด้านขวา</button><button class="btn small" data-view="left">ด้านซ้าย</button>
+      </div>
+      <h2 style="margin-top:12px">ชุดแสดงผล</h2>
+      <div class="btn-grid">
+        <button class="btn small preset" data-preset="all">อาคารครบ</button><button class="btn small preset" data-preset="struct">โครงสร้าง</button>
+        <button class="btn small preset" data-preset="rebar">เหล็กเสริม (เอกซเรย์)</button><button class="btn small preset" data-preset="roof">โครงหลังคา</button>
+      </div>
+      <h2 style="margin-top:12px">ตัดดูถึงระดับ</h2>
+      <select id="clip-level"><option value="">ไม่ตัด (ทั้งหมด)</option></select>
+      <input type="range" id="clip-z" min="0" max="1" step="0.05" style="width:100%;margin-top:6px" disabled>
+      <div class="hint" id="clip-label"></div>
+      <h2 style="margin-top:12px">ชั้นข้อมูล</h2>
       <div id="layer-list"></div>
       <button class="btn small" id="b-fit">มุมมองทั้งหมด</button>
       <button class="btn small" id="b-clear">ล้างไฮไลต์</button>
       <h2 style="margin-top:14px">ชิ้นส่วนที่เลือก</h2>
       <div id="pick-info" class="hint">คลิกชิ้นส่วนในโมเดล</div>
     </aside>
-    <div class="viewer" id="viewer"></div>
+    <div class="viewer-col">
+      <button class="btn small side-open" id="b-side-open">☰ เมนู</button>
+      <div class="viewer" id="viewer"></div>
+      <div class="timeline card" id="timeline">
+        <div class="tl-row">
+          <button class="btn small" id="tl-play">▶ เล่นลำดับก่อสร้าง</button>
+          <input type="range" id="tl-day" min="0" max="1" step="1" value="1">
+          <button class="btn small" id="tl-done">อาคารเสร็จ</button>
+        </div>
+        <div class="hint" id="tl-label">เปิดโมเดลและโหลดราคาก่อน แผนงานจึงจะพร้อม</div>
+      </div>
+    </div>
   </div>
 </section>
 

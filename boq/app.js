@@ -353,7 +353,9 @@ function _renderPlan() {
   });
   if (!S.model || !S.db) { $('#pl-sum').textContent = S.model ? 'กำลังโหลดราคา…' : 'เปิดโมเดลก่อน'; return; }
   const { T, plan, inst, contract } = computePlan();
+  const planChanged = !S.plan || S.plan.finish !== plan.finish || S.plan.total !== plan.total || S.plan.start !== plan.start;
   S.plan = plan; S.inst = inst;
+  if (planChanged && TL.day === null && !TL.timer) tlReset();
   $('#pl-start').value = pl.start; $('#pl-n').value = pl.inst.n; $('#pl-mode').value = pl.inst.mode;
   $('#pl-hol').value = (pl.holidays || []).join('\n');
   $('#pl-sum').innerHTML = `<div class="kv">
@@ -423,7 +425,14 @@ function renderSCurve(plan, inst) {
     const i = c.findIndex(p => p.date === k.due); if (i < 0) return;
     g += `<line class="cut" x1="${X(i + 1)}" y1="${Y(0)}" x2="${X(i + 1)}" y2="${Y(c[i].pct)}"/><circle cx="${X(i + 1)}" cy="${Y(c[i].pct)}" r="3.5" fill="var(--green)"><title>งวด ${k.no} · ${thDate(k.due)} · ผลงานตามแผน ${c[i].pct.toFixed(2)}%</title></circle><text x="${X(i + 1) - 4}" y="${Y(c[i].pct) - 6}" text-anchor="end" style="fill:var(--green)">${c[i].pct.toFixed(1)}%</text>`;
   });
-  $('#pl-scurve').innerHTML = g + '</svg>';
+  $('#pl-scurve').innerHTML = g + `<text x="${W - r}" y="${t + 8}" text-anchor="end">คลิกกราฟเพื่อดูอาคาร ณ วันนั้นในแท็บโมเดล 3D</text></svg>`;
+  const svg = $('#pl-scurve svg'); svg.style.cursor = 'pointer';
+  svg.onclick = e => {
+    const rc = svg.getBoundingClientRect(), xv = (e.clientX - rc.left) / rc.width * W;
+    const day = Math.max(1, Math.min(c.length, Math.round((xv - l) / sx)));
+    $$('#tabs .nav-tab').find(x => x.dataset.tab === 'model').click();
+    setTimeout(() => tlSet(day), 50);
+  };
 }
 function renderInst(inst, contract) {
   const fc = S.boq.factor, L = inst.list;
@@ -439,8 +448,112 @@ function renderInst(inst, contract) {
 
 // ------------------------------------------------------------------ 3D
 function buildLayers(groups) {
-  $('#layer-list').innerHTML = groups.map(g => `<label><input type="checkbox" checked data-layer="${esc(g)}"> ${esc(g)}</label>`).join('');
-  $$('#layer-list input').forEach(cb => cb.onchange = () => S.viewer.setVisible(cb.dataset.layer, cb.checked));
+  $('#layer-list').innerHTML = groups.map(g => `<label><input type="checkbox" ${S.viewer.groups[g].visible ? 'checked' : ''} data-layer="${esc(g)}"> ${esc(g)}</label>`).join('');
+  $$('#layer-list input').forEach(cb => cb.onchange = () => {
+    if (cb.dataset.layer === 'เหล็กเสริม') { S.viewer.setXray(cb.checked); syncLayers(); return; }
+    S.viewer.setVisible(cb.dataset.layer, cb.checked);
+  });
+  buildClip(); tlReset();
+}
+function syncLayers() { $$('#layer-list input').forEach(cb => { const g = S.viewer.groups[cb.dataset.layer]; if (g) cb.checked = g.visible; }); }
+function buildClip() {
+  const m = S.model, v = S.viewer; if (!m || !v || !v.bbox) return;
+  const lv = (m.levels || []).slice().sort((a, b) => a.z - b.z);
+  $('#clip-level').innerHTML = '<option value="">ไม่ตัด (ทั้งหมด)</option>' + lv.map(l => `<option value="${l.z}">ถึงระดับ ${esc(l.name)} (${l.z >= 0 ? '+' : ''}${(+l.z).toFixed(2)})</option>`).join('');
+  const zr = $('#clip-z'); zr.min = v.bbox.min.y.toFixed(2); zr.max = (v.bbox.max.y + 0.05).toFixed(2); zr.value = zr.max; zr.disabled = true;
+  $('#clip-label').textContent = '';
+}
+function setClip(z) {
+  const zr = $('#clip-z');
+  if (z === null) { S.viewer.setClip(null); zr.disabled = true; zr.value = zr.max; $('#clip-label').textContent = ''; $('#clip-level').value = ''; return; }
+  S.viewer.setClip(z); zr.disabled = false; zr.value = z;
+  $('#clip-label').textContent = `แสดงเฉพาะส่วนที่ต่ำกว่า ${z >= 0 ? '+' : ''}${(+z).toFixed(2)} ม.`;
+}
+function applyPreset(name) {
+  const v = S.viewer; if (!v) return;
+  v.setXray(false);
+  const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'เหล็กรูปพรรณ'].includes(g),
+    roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g) }[name];
+  if (name === 'rebar') v.setXray(true);
+  else Object.keys(v.groups).forEach(g => v.setVisible(g, show(g)));
+  $$('.preset').forEach(b => b.classList.toggle('on', b.dataset.preset === name));
+  syncLayers();
+}
+
+// ------------------------------------------------------------------ timelapse ลำดับก่อสร้าง
+const TL = { day: null, timer: null, model: null };
+function tlReset() {
+  tlStop(); TL.day = null; TL.model = null;
+  if (S.viewer) S.viewer.setState(null);
+  const p = S.plan;
+  if (!p) { $('#tl-label').textContent = 'เปิดโมเดลและโหลดราคาก่อน แผนงานจึงจะพร้อม'; return; }
+  $('#tl-day').max = p.calDays; $('#tl-day').value = p.calDays;
+  $('#tl-label').textContent = `ลากแถบหรือกด ▶ เพื่อดูลำดับก่อสร้าง ${p.calDays} วัน (${thDate(p.start)} – ${thDate(p.finish)})`;
+}
+function tlPrepare() {
+  const p = S.plan, v = S.viewer; if (!p || !v) return null;
+  if (TL.model && TL.model.plan === p) return TL.model;
+  const primary = {}, also = {};
+  p.tasks.forEach(t => t.from.forEach(id => { if (!primary[id]) primary[id] = t.id; else (also[id] = also[id] || []).push(t.id); }));
+  const zOf = {};
+  v.meshes().forEach(m => { const u = m.userData; if (!u.id || u.rebar) return; const z = u.z, x = u.pos0.x; if (!zOf[u.id] || z < zOf[u.id][0]) zOf[u.id] = [z, x]; });
+  const rank = {}, count = {}, ord = {};   // ลำดับประกอบ: เสา/จันทันก่อน คาน แล้วจึงแป
+  (S.model.members || []).forEach(x => { ord[x.id] = { column: 0, rafter: 0, purlin: 2 }[x.type] ?? 1; });
+  p.tasks.forEach(t => {
+    const ids = t.from.filter(id => zOf[id]).sort((a, b) => (ord[a] || 1) - (ord[b] || 1) || zOf[a][0] - zOf[b][0] || zOf[a][1] - zOf[b][1]);
+    count[t.id] = ids.length; ids.forEach((id, k) => { (rank[t.id] = rank[t.id] || {})[id] = k; });
+  });
+  return (TL.model = { plan: p, primary, rank, count, task: Object.fromEntries(p.tasks.map(t => [t.id, t])) });
+}
+function tlProg(t, date) {
+  if (!t || date < t.start) return 0;
+  if (date >= t.finish) return 1;
+  const a = Schedule.parse(t.start), b = Schedule.parse(t.finish), d = Schedule.parse(date);
+  return ((d - a) / 864e5 + 1) / ((b - a) / 864e5 + 1);
+}
+function tlSet(day) {
+  const M = tlPrepare(); if (!M) return;
+  const p = M.plan, v = S.viewer;
+  day = Math.max(0, Math.min(p.calDays, day)); TL.day = day; $('#tl-day').value = day;
+  if (day >= p.calDays) { tlDone(); return; }
+  const date = day === 0 ? Schedule.iso(Schedule.addDays(Schedule.parse(p.start), -1)) : Schedule.iso(Schedule.addDays(Schedule.parse(p.start), day - 1));
+  const prog = {}; p.tasks.forEach(t => { prog[t.id] = tlProg(t, date); });
+  const step = (tid, id) => { const n = M.count[tid] || 1, k = (M.rank[tid] || {})[id] || 0; return prog[tid] * n - k; };   // >0 = เริ่มชิ้นนี้แล้ว
+  const BRICK = 0xb5654a, PLASTER = 0xd9d4ca, PAINT = 0xf3efe6;
+  if (v.groups['เหล็กเสริม']) v.groups['เหล็กเสริม'].visible = true;
+  v.setState(u => {
+    if (!u.id) return u.group === 'งานระบบ' ? { visible: (prog.mep_fix ?? 1) >= 0.5 } : null;
+    // แผ่นหลังคาโผล่ตอนงานมุง (id หลังคาอยู่ในงานโครงหลังคาด้วยเพราะคิดพื้นที่โครงหลังคา)
+    const tid = (u.group === 'หลังคา' && M.task.roof_cover && M.task.roof_cover.from.includes(u.id)) ? 'roof_cover' : M.primary[u.id]; if (!tid) return null;
+    const s0 = step(tid, u.id);
+    if (u.rebar) return { visible: s0 > 0 && (M.task[tid].kind === 'footing' || M.task[tid].kind === 'lift') };
+    if (s0 <= 0) return { visible: false };
+    const st = {};
+    if (u.growFrom) st.grow = Math.max(0, Math.min(1, (s0 - 0.4) / 0.6)); else if (s0 < 0.5) st.visible = false;
+    if (u.group === 'ผนัง') {
+      st.color = BRICK;
+      if (M.task.plaster && step('plaster', u.id) >= 1) st.color = PLASTER;
+      if (M.task.paint && step('paint', u.id) >= 1) st.color = PAINT;
+    }
+    return st;
+  });
+  const cv = p.curve[Math.max(0, day - 1)], now = p.tasks.filter(t => prog[t.id] > 0 && prog[t.id] < 1);
+  $('#tl-label').innerHTML = `<b>วันที่ ${day}/${p.calDays}</b> · ${thDate(date)} · ผลงานตามแผน <b style="color:var(--green)">${day ? cv.pct.toFixed(1) : '0.0'}%</b>` +
+    (now.length ? ` · กำลังทำ: ${now.map(t => `<span class="pill" style="border-color:${t.color}">${esc(t.label.replace(/ — .*/, ''))} ${Math.round(prog[t.id] * 100)}%</span>`).join('')}` : '');
+}
+function tlDone() {
+  tlStop(); TL.day = null;
+  if (S.viewer) { S.viewer.setState(null); if (S.viewer.groups['เหล็กเสริม']) S.viewer.groups['เหล็กเสริม'].visible = S.viewer.xray; }
+  if (S.plan) { $('#tl-day').value = S.plan.calDays; $('#tl-label').textContent = `อาคารเสร็จ · ${S.plan.calDays} วัน (${thDate(S.plan.start)} – ${thDate(S.plan.finish)})`; }
+}
+function tlStop() { clearInterval(TL.timer); TL.timer = null; $('#tl-play').textContent = '▶ เล่นลำดับก่อสร้าง'; }
+function tlPlay() {
+  if (TL.timer) return tlStop();
+  if (!S.plan) return toast('แผนงานยังไม่พร้อม');
+  let d = (TL.day === null || TL.day >= S.plan.calDays) ? 0 : TL.day;
+  $('#tl-play').textContent = '⏸ หยุด';
+  const ms = Math.max(60, Math.min(250, 12000 / S.plan.calDays));
+  TL.timer = setInterval(() => { d++; if (d >= S.plan.calDays) { tlDone(); return; } tlSet(d); }, ms);
 }
 function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
@@ -505,6 +618,16 @@ function bind() {
   $('#pl-hol').onchange = e => { S.boq.plan.holidays = e.target.value.split(/\s+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)); autosave(); renderPlan(); };
   $('#pl-reauto').onclick = () => { const ins = S.boq.plan.inst; ins.assign = {}; if (ins.mode === 'manual' && S.plan) ins.assign = Schedule.autoAssign(S.plan, +ins.n || 1); autosave(); renderPlan(); toast('แบ่งงวดอัตโนมัติใหม่แล้ว'); };
   $('#pl-resetdur').onclick = () => { S.boq.plan.durations = {}; autosave(); renderPlan(); };
+  $$('[data-view]').forEach(b => b.onclick = () => S.viewer && S.viewer.setView(b.dataset.view));
+  $$('[data-preset]').forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
+  $('#clip-level').onchange = e => setClip(e.target.value === '' ? null : +e.target.value + 0.02);
+  $('#clip-z').oninput = e => setClip(+e.target.value);
+  $('#b-side-close').onclick = () => { $('#model-wrap').classList.add('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '1'); } catch (er) { /* */ } };
+  $('#b-side-open').onclick = () => { $('#model-wrap').classList.remove('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '0'); } catch (er) { /* */ } };
+  try { if (localStorage.getItem('udboq:side') === '1') $('#model-wrap').classList.add('collapsed'); } catch (er) { /* */ }
+  $('#tl-play').onclick = tlPlay;
+  $('#tl-day').oninput = e => { tlStop(); tlSet(+e.target.value); };
+  $('#tl-done').onclick = tlDone;
   $('#b-fit').onclick = () => S.viewer && S.viewer.fit();
   $('#b-clear').onclick = () => S.viewer && S.viewer.highlight([]);
 }
