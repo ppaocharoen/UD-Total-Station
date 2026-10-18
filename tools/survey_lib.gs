@@ -4,7 +4,7 @@
  * อ่าน: ทุกคน · เขียน/ลบ: ต้องมีรหัสทีม (ตั้งใน Project Settings → Script properties: TEAM_KEY)
  *
  * วิธีติดตั้ง (ครั้งเดียว):
- *  1) สร้าง Google Sheet ใหม่ ชื่อ "UD คลังราคาสืบ" → Extensions → Apps Script → วางไฟล์นี้แทนโค้ดเดิม → ใส่ SHEET_ID → Save
+ *  1) script.google.com → New project → วางไฟล์นี้ → Save → เลือกฟังก์ชัน setup → ▷ เรียกใช้ (อนุญาตสิทธิ์) — สร้างชีต "UD คลังราคาสืบ" ให้เอง
  *  2) Project Settings → Script properties → Add: TEAM_KEY = <รหัสทีม>
  *  3) Deploy → New deployment → Web app · Execute as: Me · Who has access: Anyone → Deploy → อนุญาตสิทธิ์ → คัดลอก Web app URL
  *  4) เอา URL ใส่ในเว็บ (แท็บราคาสืบ → ตั้งค่าคลังกลาง) หรือส่งให้ผู้ดูแลใส่ใน lib/version.js (LIB_URL)
@@ -12,7 +12,7 @@
  * เว็บเรียกแบบ text/plain (ไม่มี preflight) — doGet: list / img · doPost: put / del
  */
 const SHEET = 'library', FOLDER = 'UD Survey Images';
-const SHEET_ID = '';   // id ของ Google Sheet (จาก URL .../spreadsheets/d/<id>/edit) — จำเป็นเมื่อเปิดผ่านเว็บแอป
+const SHEET_ID = '';   // ว่างไว้ได้: ใช้ชีตที่ setup() สร้าง (เก็บ id ใน Script properties) หรือชีตที่ผูกสคริปต์
 const HEAD = ['key', 'name', 'unit', 'quotes', 'reason', 'updated', 'project', 'by', 'imgs'];
 
 function sheet_() {
@@ -21,7 +21,18 @@ function sheet_() {
   if (!sh) { sh = ss.insertSheet(SHEET); sh.appendRow(HEAD); sh.setFrozenRows(1); }
   return sh;
 }
-function ss_() { return SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet(); }
+function ss_() {
+  const id = SHEET_ID || PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+}
+/** รันครั้งเดียวในตัวแก้ไข (▷ เรียกใช้ setup): สร้างชีตคลังในบัญชีที่รันสคริปต์ + โฟลเดอร์ภาพ */
+function setup() {
+  const p = PropertiesService.getScriptProperties();
+  let ss = null; try { ss = ss_(); } catch (e) { ss = null; }
+  if (!ss) { ss = SpreadsheetApp.create('UD คลังราคาสืบ'); p.setProperty('SHEET_ID', ss.getId()); }
+  sheet_(); folder_();
+  Logger.log('ชีตคลัง: ' + ss.getUrl());
+}
 function folder_() {
   const it = DriveApp.getFoldersByName(FOLDER);
   return it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER);
