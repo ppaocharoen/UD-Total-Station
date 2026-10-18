@@ -4,7 +4,7 @@
  * อ่าน: ทุกคน · เขียน/ลบ: ต้องมีรหัสทีม (ตั้งใน Project Settings → Script properties: TEAM_KEY)
  *
  * วิธีติดตั้ง (ครั้งเดียว):
- *  1) สร้าง Google Sheet ใหม่ ชื่อ "UD คลังราคาสืบ" → Extensions → Apps Script → วางไฟล์นี้แทนโค้ดเดิม → Save
+ *  1) สร้าง Google Sheet ใหม่ ชื่อ "UD คลังราคาสืบ" → Extensions → Apps Script → วางไฟล์นี้แทนโค้ดเดิม → ใส่ SHEET_ID → Save
  *  2) Project Settings → Script properties → Add: TEAM_KEY = <รหัสทีม>
  *  3) Deploy → New deployment → Web app · Execute as: Me · Who has access: Anyone → Deploy → อนุญาตสิทธิ์ → คัดลอก Web app URL
  *  4) เอา URL ใส่ในเว็บ (แท็บราคาสืบ → ตั้งค่าคลังกลาง) หรือส่งให้ผู้ดูแลใส่ใน lib/version.js (LIB_URL)
@@ -12,14 +12,16 @@
  * เว็บเรียกแบบ text/plain (ไม่มี preflight) — doGet: list / img · doPost: put / del
  */
 const SHEET = 'library', FOLDER = 'UD Survey Images';
+const SHEET_ID = '';   // id ของ Google Sheet (จาก URL .../spreadsheets/d/<id>/edit) — จำเป็นเมื่อเปิดผ่านเว็บแอป
 const HEAD = ['key', 'name', 'unit', 'quotes', 'reason', 'updated', 'project', 'by', 'imgs'];
 
 function sheet_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = ss_();
   let sh = ss.getSheetByName(SHEET);
   if (!sh) { sh = ss.insertSheet(SHEET); sh.appendRow(HEAD); sh.setFrozenRows(1); }
   return sh;
 }
+function ss_() { return SHEET_ID ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet(); }
 function folder_() {
   const it = DriveApp.getFoldersByName(FOLDER);
   return it.hasNext() ? it.next() : DriveApp.createFolder(FOLDER);
@@ -40,7 +42,7 @@ function doGet(e) {
       if (!inLib) return out_({ ok: false, error: 'ไม่ใช่ภาพในคลัง' });   // อ่านได้เฉพาะภาพในโฟลเดอร์คลัง
       return out_({ ok: true, data: 'data:' + f.getMimeType() + ';base64,' + Utilities.base64Encode(f.getBlob().getBytes()) });
     }
-    if (a === 'ping') return out_({ ok: true, name: SpreadsheetApp.getActiveSpreadsheet().getName() });
+    if (a === 'ping') return out_({ ok: true, name: ss_().getName() });
     return out_({ ok: false, error: 'unknown action' });
   } catch (err) { return out_({ ok: false, error: String(err) }); }
 }
