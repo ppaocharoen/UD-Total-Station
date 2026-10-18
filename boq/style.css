@@ -345,3 +345,112 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
 /* ปุ่มสลับ Perspective / Parallel */
 .seg{display:flex;gap:0}.seg .btn{flex:1;border-radius:0}.seg .btn:first-child{border-radius:6px 0 0 6px}.seg .btn:last-child{border-radius:0 6px 6px 0}
 .seg .btn.on{background:var(--green,#00ff66);color:#000;border-color:var(--green,#00ff66)}
+
+/* =====================================================================
+   ธีม DOS SHELL (สว่าง) — แบบ MS-DOS Shell 4.0/5.0 (IBM CUA ปี 1990)
+   สี EGA: น้ำเงิน #0000A8 · ฟ้าเขียว #00A8A8 · เทา #A8A8A8 · เทาเข้ม #545454 · ขาว · ดำ
+   เปิดด้วย <html class="dos"> (ปุ่ม THEME ที่แถบบน)
+   ===================================================================== */
+html.dos{
+  --bg:#a8a8a8;--bg2:#fff;--bg3:#e8e8e8;--solid:#fff;
+  --border:#545454;--border2:#000;
+  --green:#0000a8;--green2:#0000a8;--accent:#0000a8;--accent2:#00a8a8;--accent-dim:rgba(0,0,168,.10);
+  --amber:#a85400;--amber-dim:rgba(168,84,0,.12);--red:#a80000;--red-dim:rgba(168,0,0,.10);--cyan:#0000a8;
+  --text:#000;--text2:#202020;--text3:#545454;
+  --glow:none;--glow2:none;--radius:0;--radius-sm:0;
+  --dos-blue:#0000a8;--dos-cyan:#00a8a8;--dos-gray:#a8a8a8;--dos-dgray:#545454;
+  --f-th:'Sarabun','Share Tech Mono',sans-serif;
+  background:var(--dos-gray);
+}
+html.dos body{background:var(--dos-gray);color:#000}
+html.dos ::selection{background:var(--dos-blue);color:#fff}
+html.dos body::after,html.dos body::before{display:none}   /* ไม่มีเส้นสแกน CRT */
+html.dos *{text-shadow:none!important}
+html.dos ::-webkit-scrollbar-track{background:#fff;border-left:1px solid #000}
+html.dos ::-webkit-scrollbar-thumb{background:var(--dos-dgray);border:2px solid #fff}
+html.dos #b-crt{display:none}
+/* บูต: จอฟ้าแบบ DOS */
+html.dos #boot{background:var(--dos-blue)}html.dos #boot canvas{display:none}
+html.dos #boot .boot-txt{background:var(--dos-blue);color:#fff;border:2px double #fff}
+/* แถบหัว = แถบชื่อโปรแกรม (น้ำเงิน ตัวขาว) */
+html.dos .topbar{background:var(--dos-blue);border-bottom:2px solid #000;box-shadow:none}
+html.dos .logo{color:#fff}html.dos .logo-ver,html.dos .logo-sub{color:#fff;border-color:#fff}
+html.dos .nav-tab{color:#fff}html.dos .nav-tab::before,html.dos .nav-tab::after{color:#a8a8ff}
+html.dos .nav-tab:hover{color:#ffff55}
+html.dos .nav-tab.active{background:#fff;color:#000;box-shadow:none}html.dos .nav-tab.active::before,html.dos .nav-tab.active::after{color:#000}
+html.dos .meta-proj{color:#fff}html.dos .meta-price{color:#c0c0ff}
+html.dos .crt-btn{background:var(--dos-cyan);border:1px solid #000;color:#000}html.dos .crt-btn:hover{background:#fff;color:#000}
+/* หน้าต่าง/การ์ด: ขาว ขอบดำ หัวข้อเป็นแถบฟ้าเขียว */
+html.dos .card,html.dos .sum-doc{background:#fff;border:1px solid #000;backdrop-filter:none;box-shadow:3px 3px 0 #545454}
+html.dos .card::before,html.dos .card::after{display:none}
+html.dos h2{font-family:var(--f-crt);color:#000;background:var(--dos-cyan);padding:0 8px;border:1px solid #000;letter-spacing:.5px}
+html.dos h2::before{content:'';}
+html.dos h2 .hint{color:#000}
+html.dos h3,html.dos .sum-doc h3{color:var(--dos-blue)}
+html.dos .hint{color:var(--dos-dgray)}
+/* ปุ่ม: ขาว ขอบดำ · ชี้/เลือก = แถบน้ำเงินตัวขาว */
+html.dos .btn{background:#fff;border:1px solid #000;color:#000;box-shadow:2px 2px 0 #000}
+html.dos .btn:hover{background:var(--dos-blue);color:#fff;border-color:#000;box-shadow:2px 2px 0 #000}
+html.dos .btn:active{transform:translate(2px,2px);box-shadow:none}
+html.dos .btn.primary,html.dos .btn.on{background:var(--dos-blue);color:#fff;border-color:#000}
+html.dos .btn.primary:hover{background:#0000ff;color:#fff}
+html.dos .btn[disabled]{opacity:.45;box-shadow:none}
+html.dos .seg .btn.on{background:var(--dos-blue);color:#fff}
+html.dos input,html.dos select,html.dos textarea{background:#fff;border:1px solid #000;color:#000}
+html.dos input:focus,html.dos select:focus,html.dos textarea:focus{border-color:var(--dos-blue);box-shadow:0 0 0 1px var(--dos-blue)}
+html.dos input[type=date]{color-scheme:light}
+html.dos input.price.ov,html.dos input.days.ov{color:var(--amber);border-color:var(--amber)}
+/* ตาราง */
+html.dos table.boq th{background:var(--dos-cyan);color:#000;border-color:#000}
+html.dos table.boq td{border-color:#545454;background:#fff}
+html.dos table.boq td.r,html.dos .mini-boq td.r,html.dos table.pk-q td.r{color:#000}
+html.dos table.boq tr.grp td{background:#d8d8d8;color:#000}
+html.dos table.boq tr.sub td{background:#ececec}
+html.dos table.boq tr.total td{background:var(--dos-gray);color:#000}
+html.dos table.boq tr.row:hover td,html.dos .mini-boq tr:hover td,html.dos table.pk-q tr[data-pk-row]:hover td{background:#e0e0ff}
+html.dos table.boq tr.row.sel td,html.dos .mini-boq tr.sel td{background:var(--dos-blue);color:#fff}
+html.dos table.boq tr.row.sel td.r{color:#fff}
+html.dos .src{color:var(--dos-dgray)}
+/* ป้าย/ชิป/การ์ดตัวเลข */
+html.dos .pill{background:#fff;border:1px solid #000;color:#000}
+html.dos .pill.ok{color:#006000;border-color:#006000}html.dos .pill.warn{color:var(--amber);border-color:var(--amber)}html.dos .pill.err{color:#fff;background:var(--red);border-color:#000}
+html.dos .chip{background:#fff;border:1px solid #000;color:#545454}
+html.dos .chip.on{color:#000;border-color:#000}html.dos .chip.on i{box-shadow:none;outline:1px solid #000}
+html.dos .chip[data-scope].on,html.dos #type-list .chip.sel{background:var(--dos-blue);color:#fff;border-color:#000}
+html.dos .chip[data-scope].on em,html.dos #type-list .chip.sel span{color:#fff!important}
+html.dos .kpi{background:#fff;border:1px solid #000}html.dos .kpi b{color:var(--dos-blue);font-family:var(--f-crt)}
+html.dos .kpi.hot{border-color:var(--amber)}html.dos .kpi.hot b{color:var(--amber)}
+html.dos .bigtotal{color:var(--dos-blue)}
+html.dos .toast{background:var(--dos-cyan);color:#000;border:1px solid #000;box-shadow:3px 3px 0 #000}
+html.dos .modal{background:rgba(0,0,0,.35)}
+/* หน้า 3D: พื้นเทา แผงลอยเป็นหน้าต่างขาว */
+html.dos .stage{background:var(--dos-gray)}
+html.dos .glass{background:#fff;border:1px solid #000;backdrop-filter:none;box-shadow:4px 4px 0 #545454}
+html.dos .hud .t{color:#000}html.dos .hud .t .tag{background:var(--dos-cyan);color:#000;border:1px solid #000}html.dos .hud .s{color:#000}
+html.dos .dock-tabs{background:var(--dos-cyan);border-bottom:1px solid #000}
+html.dos .dock-tab{color:#000}html.dos .dock-tab:hover{background:#fff}html.dos .dock-tab.active{background:var(--dos-blue);color:#fff}
+html.dos .tl-bar{background:#fff;border:1px solid #000}html.dos .tl-bar i{background:var(--dos-blue);box-shadow:none}
+html.dos .pk-type{color:var(--amber)}html.dos .pk-head b{color:var(--dos-blue)}html.dos .pk-calc{color:#000}html.dos .pk-val b{color:var(--amber)}
+html.dos .pk-link{color:var(--dos-blue)}
+/* กราฟ */
+html.dos .gantt .grid,html.dos .scurve .grid{stroke:rgba(0,0,0,.15)}
+html.dos .scurve .ln{stroke:var(--dos-blue);filter:none}html.dos .scurve .wk{fill:rgba(0,0,168,.18)}
+html.dos .gantt .bar.sel{stroke:#000}
+/* ราคาสืบ */
+html.dos .sv-q{background:#f4f4f4;border-color:#545454}
+html.dos .sv-card.open{border-color:var(--dos-blue);box-shadow:3px 3px 0 var(--dos-blue)}
+html.dos .sv-calc{color:#000}html.dos .sv-th{background:#fff;border-color:#000}
+html.dos .sv-th button{background:#fff;color:var(--red)}
+html.dos .img-modal img{border-color:#000}
+html.dos .side-sum em{color:var(--dos-blue)}
+/* มือถือ: แถบล่าง = แถบสถานะฟ้าเขียว */
+@media(max-width:800px){
+  html.dos .bnav{background:var(--dos-cyan);border-top:2px solid #000;box-shadow:none}
+  html.dos .bnav button{color:#000}html.dos .bnav button i{color:#000}
+  html.dos .bnav button.active{background:var(--dos-blue);color:#fff;box-shadow:none}html.dos .bnav button.active i{color:#fff}
+  html.dos .bmore button{background:#fff;border:1px solid #000;color:#000}
+  html.dos #pr1-table tr.row{background:#fff;border-color:#000}
+  html.dos #pr1-table tr.total td{background:var(--dos-gray)}
+  html.dos #pr1-table td.c-tot{color:var(--dos-blue)}
+}
+@media print{html.dos h2{background:none;border:none;padding:0}html.dos .card,html.dos .sum-doc{box-shadow:none}}

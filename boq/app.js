@@ -912,6 +912,13 @@ function bootDone(msg) {
   $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; ${esc(msg)}\n&gt; ready<span class="cur">_</span>`;
   setTimeout(() => { el.classList.add('off'); setTimeout(() => { S.stopRain && S.stopRain(); el.remove(); }, 700); }, Math.max(300, 1400 - (Date.now() - S.bootAt)));
 }
+/** ธีม: terminal (มืด, The Matrix) / dos (สว่าง แบบ MS-DOS Shell) — จำไว้ในเครื่อง */
+function setTheme(name) {
+  const dos = name === 'dos'; document.documentElement.classList.toggle('dos', dos);
+  $('#b-theme').textContent = 'THEME:' + (dos ? 'DOS SHELL' : 'TERMINAL');
+  if (S.viewer) S.viewer.setTheme(dos ? 'dos' : 'terminal');
+  try { localStorage.setItem('udboq:theme', dos ? 'dos' : 'terminal'); } catch (e) { /* */ }
+}
 function setCrt(on) {
   document.body.classList.toggle('nocrt', !on); $('#b-crt').textContent = 'CRT:' + (on ? 'ON' : 'OFF');
   try { localStorage.setItem('udboq:crt', on ? '1' : '0'); } catch (e) { /* */ }
@@ -936,12 +943,32 @@ function buildLayers(groups) {
   S.scopeKey = ''; S.typeSel = null; syncLayers(); buildClip(); buildScope(); buildTypes(); tlReset(); renderClash();
 }
 function syncLayers() { $$('#layer-list [data-layer]').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
+// ตัดดูโมเดล: แนวระดับ (Z) หรือแนวตั้งตามแกน X / Y ของแบบ · เลือกระดับ/แนวกริด หรือเลื่อนอิสระ · กลับด้านได้
+const CLIP = { ax: 'Z', c: null, flip: false };
+function clipOpts(ax) {
+  const m = S.model;
+  if (ax === 'Z') return (m.levels || []).slice().sort((a, b) => a.z - b.z).map(l => ({ v: +l.z + 0.02, t: `ถึงระดับ ${l.name} (${l.z >= 0 ? '+' : ''}${(+l.z).toFixed(2)})` }));
+  return (m.grids || []).filter(g => g.axis === ax).sort((a, b) => a.coord - b.coord).map(g => ({ v: +g.coord, t: `แนวกริด ${g.name} (${ax} = ${(+g.coord).toFixed(2)} ม.)` }));
+}
 function buildClip() {
   const m = S.model, v = S.viewer; if (!m || !v || !v.bbox) return;
-  const lv = (m.levels || []).slice().sort((a, b) => a.z - b.z);
-  $('#clip-level').innerHTML = '<option value="">ไม่ตัด (ทั้งหมด)</option>' + lv.map(l => `<option value="${l.z}">ถึงระดับ ${esc(l.name)} (${l.z >= 0 ? '+' : ''}${(+l.z).toFixed(2)})</option>`).join('');
-  const zr = $('#clip-z'); zr.min = v.bbox.min.y.toFixed(2); zr.max = (v.bbox.max.y + 0.05).toFixed(2); zr.value = zr.max; zr.disabled = true;
-  $('#clip-label').textContent = '';
+  const gn = ax => (m.grids || []).filter(g => g.axis === ax).map(g => g.name);
+  ['X', 'Y'].forEach(ax => { const n = gn(ax), b = $(`#clip-ax [data-ax=${ax}]`); if (b) b.textContent = n.length ? `แนว ${n[0]}–${n[n.length - 1]}` : `แนวตั้ง ${ax}`; });
+  CLIP.c = null; CLIP.flip = false;
+  const ax = CLIP.ax, [lo, hi] = v.range(ax);
+  $('#clip-level').innerHTML = '<option value="">ไม่ตัด (ทั้งหมด)</option>' + clipOpts(ax).map(o => `<option value="${o.v}">${esc(o.t)}</option>`).join('');
+  const zr = $('#clip-z'); zr.min = (lo - 0.05).toFixed(2); zr.max = (hi + 0.05).toFixed(2); zr.step = ax === 'Z' ? 0.05 : 0.1;
+  $$('#clip-ax [data-ax]').forEach(b => b.classList.toggle('on', b.dataset.ax === ax));
+  setClip(CLIP.c);
+}
+function setClip(c) {
+  const zr = $('#clip-z'), on = c !== null && c !== undefined; CLIP.c = on ? +c : null;
+  $('#clip-flip').disabled = $('#clip-look').disabled = !on;
+  if (!on) { S.viewer.setSection(null); zr.disabled = true; zr.value = CLIP.ax === 'Z' ? zr.max : zr.min; $('#clip-label').textContent = ''; $('#clip-level').value = ''; return; }
+  S.viewer.setSection({ axis: CLIP.ax, c: CLIP.c, flip: CLIP.flip }); zr.disabled = false; zr.value = CLIP.c;
+  const opt = [...$('#clip-level').options].find(o => o.value !== '' && Math.abs(+o.value - CLIP.c) < 1e-6); $('#clip-level').value = opt ? opt.value : '';
+  const n = (+CLIP.c).toFixed(2), side = CLIP.ax === 'Z' ? (CLIP.flip ? 'สูงกว่า' : 'ต่ำกว่า') : (CLIP.flip ? 'มากกว่า' : 'น้อยกว่า');
+  $('#clip-label').textContent = CLIP.ax === 'Z' ? `แสดงเฉพาะส่วนที่${side} ${CLIP.c >= 0 ? '+' : ''}${n} ม.` : `ตัดแนวตั้งที่ ${CLIP.ax} = ${n} ม. · แสดงฝั่งที่ ${CLIP.ax} ${side} ${n}`;
 }
 const TPAL = [0xff5370, 0x40c4ff, 0xffd740, 0x69f0ae, 0xe040fb, 0xff9100, 0x18ffff, 0xb2ff59, 0xff80ab, 0x7c4dff, 0xffab40, 0x64ffda, 0xeeff41, 0x536dfe];
 function buildTypes() {
@@ -993,12 +1020,6 @@ function buildScope() {
     $$('[data-scope]').forEach(x => x.classList.toggle('on', x.dataset.scope === k));
     $('#scope-label').textContent = !o ? '' : o.l ? (o.l.z === null ? 'หลังคาและโครงหลังคาเหล็ก' : `ชั้น ${o.l.name}: พื้น/คานที่ระดับ ${o.l.z >= 0 ? '+' : ''}${(+o.l.z).toFixed(2)} กับเสา/ผนังที่ตั้งจากระดับนี้`) : `แนวกริด ${o.g.name} (${o.g.axis === 'X' ? 'x' : 'y'} = ${o.g.coord}) ระยะ ±0.30 ม. มองตั้งฉาก`;
   });
-}
-function setClip(z) {
-  const zr = $('#clip-z');
-  if (z === null) { S.viewer.setClip(null); zr.disabled = true; zr.value = zr.max; $('#clip-label').textContent = ''; $('#clip-level').value = ''; return; }
-  S.viewer.setClip(z); zr.disabled = false; zr.value = z;
-  $('#clip-label').textContent = `แสดงเฉพาะส่วนที่ต่ำกว่า ${z >= 0 ? '+' : ''}${(+z).toFixed(2)} ม.`;
 }
 function applyPreset(name) {
   const v = S.viewer; if (!v) return;
@@ -1096,6 +1117,7 @@ function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
   S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => showPick(d) });
   try { if (localStorage.getItem('udboq:proj') === 'para') $('#proj-seg [data-proj=para]').click(); } catch (e) { /* */ }
+  if (document.documentElement.classList.contains('dos')) S.viewer.setTheme('dos');
   if (S.model) buildLayers(S.viewer.load(S.model));
   const sel = S.selKey && (S.priced || []).find(r => r.key === S.selKey);
   if (sel) S.viewer.highlight(sel.from || []);
@@ -1245,6 +1267,7 @@ function bind() {
     if (go === 'more') { $('#bmore-meta').innerHTML = $('#meta-proj').innerHTML + '<br>' + $('#meta-price').innerHTML; return $('#bmore').classList.toggle('on'); }
     if (go === 'log') { $('#bmore').classList.remove('on'); return showLog(); }
     if (go === 'crt') { $('#b-crt').click(); return $('#bmore').classList.remove('on'); }
+    if (go === 'theme') { $('#b-theme').click(); return $('#bmore').classList.remove('on'); }
     $$('#tabs .nav-tab').find(x => x.dataset.tab === go).click();
   });
   $('#f-model').onchange = async e => { try { const f = await readFile(e.target); loadModel(f.text, f.name); toast('เปิดโมเดลแล้ว'); } catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); } e.target.value = ''; };
@@ -1298,7 +1321,11 @@ function bind() {
   $$('#side [data-view], .side [data-view], .btn-grid [data-view]').forEach(b => b.onclick = () => { if (S.viewer) S.viewer.setView(b.dataset.view); autoFold(); });
   $$('#proj-seg [data-proj]').forEach(b => b.onclick = () => { const on = b.dataset.proj === 'para'; if (S.viewer) S.viewer.setParallel(on); $$('#proj-seg [data-proj]').forEach(x => x.classList.toggle('on', x === b)); try { localStorage.setItem('udboq:proj', on ? 'para' : 'persp'); } catch (e) { /* */ } });
   $$('[data-preset]').forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
-  $('#clip-level').onchange = e => setClip(e.target.value === '' ? null : +e.target.value + 0.02);
+  $('#clip-level').onchange = e => setClip(e.target.value === '' ? null : +e.target.value);
+  $$('#clip-ax [data-ax]').forEach(b => b.onclick = () => { if (CLIP.ax === b.dataset.ax) return; CLIP.ax = b.dataset.ax; CLIP.c = null; CLIP.flip = false; buildClip(); });
+  $('#clip-flip').onclick = () => { CLIP.flip = !CLIP.flip; setClip(CLIP.c); };
+  $('#clip-look').onclick = () => { if (!S.viewer || CLIP.c === null) return; const f = CLIP.flip;   // มองตั้งฉากเข้าหาหน้าตัด
+    S.viewer.setView(CLIP.ax === 'Z' ? 'top' : CLIP.ax === 'X' ? (f ? 'left' : 'right') : (f ? 'front' : 'back')); autoFold(); };
   $('#clip-z').oninput = e => setClip(+e.target.value);
   $('#b-side-close').onclick = () => { $('#stage').classList.add('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '1'); } catch (er) { /* */ } };
   $('#b-side-open').onclick = () => { $('#stage').classList.remove('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '0'); } catch (er) { /* */ } };
@@ -1326,6 +1353,8 @@ function bind() {
   $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '+ ขยาย' : '− ย่อ'; };
   $('#dk-q').oninput = () => renderPlan();
   $('#b-crt').onclick = () => setCrt(document.body.classList.contains('nocrt'));
+  $('#b-theme').onclick = () => setTheme(document.documentElement.classList.contains('dos') ? 'terminal' : 'dos');
+  setTheme(document.documentElement.classList.contains('dos') ? 'dos' : 'terminal');
   try { if (localStorage.getItem('udboq:crt') === '0') setCrt(false); } catch (er) { /* */ }
   $('#tl-day').oninput = e => { tlStop(); tlSet(+e.target.value); };
   $('#tl-done').onclick = tlDone;
