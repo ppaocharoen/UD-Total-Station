@@ -184,6 +184,15 @@ model = {
                    {"id": "b", "panel": "LC", "desc": "เต้ารับ", "breaker": "MCB 1P 20A", "wire_size": 2.5, "conductors": 3}],
       "points": [{"type": "L", "xyz": [2.0, 2.0, 3.0], "circuit": "a"}, {"type": "L", "xyz": [6.0, 2.0, 3.0], "circuit": "a"},
                  {"type": "S", "xyz": [1.2, 0.1, F1 + 1.2], "circuit": "a"}, {"type": "P", "xyz": [7.9, 2.0, F1 + 0.3], "circuit": "b"}]
+    },
+    "plumbing": {
+      "fixture_types": {"WC": {"kind": "wc", "desc": "โถส้วมชักโครก"}, "LAV": {"kind": "lavatory", "desc": "อ่างล้างหน้าแขวนผนัง"},
+                        "FD": {"kind": "floor_drain", "desc": "ตะแกรงกันกลิ่น"}},
+      "fixtures": [{"id": "WC-1", "type": "WC", "xyz": [7.4, 3.5, F1]}, {"id": "LAV-1", "type": "LAV", "xyz": [6.6, 3.7, F1]},
+                   {"id": "FD-1", "type": "FD", "xyz": [7.0, 3.0, F1]}],
+      "pipes": [{"id": "V-1", "system": "vent", "dia": '2"', "pts": [[7.6, 3.9, F1], [7.6, 3.9, 3.5]]}],
+      "equipment": [{"id": "ST-1", "kind": "septic_tank", "xyz": [9.5, 3.5, -0.6], "size": "1,600 ลิตร"},
+                    {"id": "MT-1", "kind": "meter", "xyz": [-1.0, 0.5, F1], "size": '1/2"'}]
     }
   },
   "loads": {

@@ -16,6 +16,11 @@
   หลังคา   9.6x5.6/cos20° = 57.21 ตร.ม.; วัสดุมุง x1.03 = 58.93
   แป C75   8 เส้น x 9.6 = 76.8 ม. x1.03 /6 = 13.18 → 13 ท่อน x 6 x 3.25 = 253.50 กก. (แปเป็นชิ้นส่วนจริง แบ่งช่วงที่จันทัน)
   จันทัน C100 6 x (2.0 + 0.8)/cos20° = 17.88 ม. x1.03 /6 = 3.07 → 3 ท่อน x 6 x 4.06 = 73.08 กก. (รวมส่วนยื่นชายคา)
+  สีกันสนิม C100: 2(0.10+2×0.05+2×0.02)=0.48 × 17.88 = 8.58; C75: 2(0.075+0.09+0.03)=0.39 × 76.8 = 29.95 → 38.53 ตร.ม.
+  ไฟฟ้า วงจร a (แผง LC 0.2,1.0 สูง 1.90; เดินท่อ 2.85): 0.95 + S(1.9+1.35) + L1(2.7) + L2(4.0) = 10.90
+        วงจร b: 0.95 + 8.7 + 2.25 = 11.90 → ท่อ 22.80 ×1.30 = 29.64; สาย 1.5 = 10.9×2×1.2 = 26.16; สาย 2.5 = 11.9×3×1.2 = 42.84
+  ท่อ (ประมาณแนว เดินใต้ดิน): โสโครก WC→ST 0.6+2.1+0.3 = 3.0 ×1.1 = 3.30; น้ำทิ้ง FD→ST 3.9 + LAV→FD 1.7 = 5.6 ×1.1 = 6.16
+        ประปา LAV→มาตร 0.5+10.8+0.5 = 11.8 + WC→LAV 1.5 = 13.3 ×1.1 = 14.63; ระบายอากาศ (เขียนไว้) 3.2 ×1.1 = 3.52
 """
 import json, os, sys
 
@@ -34,7 +39,10 @@ EXPECT = {
     "tie_wire": 15.62, "wall_brick_mon": 54.84, "plaster_wall": 109.68, "lintel": 17.10,
     "cover_metal_sheet": 58.93, "roof_frame_area": 57.21, "steel_C75x45x15x2.3": 253.50,
     "steel_C100x50x20x2.3": 73.08, "ridge_cap": 9.89, "open_W1": 2, "open_D1": 1, "paint_ext": 54.84,
-    "demo_ARC-2.9.17-a": 20.00,
+    "demo_ARC-2.9.17-a": 20.00, "paint_rust": 38.53,
+    'conduit_PVC 1/2"': 29.64, "wire_THW_1.5": 26.16, "wire_THW_2.5": 42.84,
+    'pipe_soil_PVC ชั้น 8.5_4"': 3.30, 'pipe_waste_PVC ชั้น 8.5_2"': 6.16, 'pipe_cw_PVC ชั้น 13.5_1/2"': 14.63,
+    'pipe_vent_PVC ชั้น 8.5_2"': 3.52, "fit_water": 1, "fit_drain": 1, "pipe_support": 1,
 }
 ok = "backfill" not in by
 print(("PASS" if ok else "FAIL"), "ไม่มีแถวถมคืนแยก (รวมใน 1.3)")
@@ -43,6 +51,13 @@ for k, v in EXPECT.items():
     good = got is not None and abs(got - v) < 0.005
     ok &= good
     print(("PASS" if good else "FAIL"), k, got, "คาด", v)
+
+good = by.get('pipe_cw_PVC ชั้น 13.5_1/2"', {}).get("status") == "assumed" and by.get('pipe_vent_PVC ชั้น 8.5_2"', {}).get("status") == "computed"
+ok &= good
+print(("PASS" if good else "FAIL"), "ท่อที่ประมาณแนวให้ติดป้าย assumed, ท่อที่เขียนไว้เป็น computed")
+good = by["fit_drain"]["price_ref"]["kind"] == "pct" and set(by["fit_drain"]["price_ref"]["of"]) == {'pipe_soil_PVC ชั้น 8.5_4"', 'pipe_waste_PVC ชั้น 8.5_2"', 'pipe_vent_PVC ชั้น 8.5_2"'}
+ok &= good
+print(("PASS" if good else "FAIL"), "ข้อต่อระบายน้ำคิด 40% จากท่อระบายน้ำ 3 รายการ")
 
 # กฎปัดเศษ
 for x, y in ((0.375, 0.38), (1.005, 1.01), (2.675, 2.68), (10.124, 10.12)):

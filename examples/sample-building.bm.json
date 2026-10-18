@@ -1939,6 +1939,92 @@
      "circuit": "b"
     }
    ]
+  },
+  "plumbing": {
+   "fixture_types": {
+    "WC": {
+     "kind": "wc",
+     "desc": "โถส้วมชักโครก"
+    },
+    "LAV": {
+     "kind": "lavatory",
+     "desc": "อ่างล้างหน้าแขวนผนัง"
+    },
+    "FD": {
+     "kind": "floor_drain",
+     "desc": "ตะแกรงกันกลิ่น"
+    }
+   },
+   "fixtures": [
+    {
+     "id": "WC-1",
+     "type": "WC",
+     "xyz": [
+      7.4,
+      3.5,
+      0.3
+     ]
+    },
+    {
+     "id": "LAV-1",
+     "type": "LAV",
+     "xyz": [
+      6.6,
+      3.7,
+      0.3
+     ]
+    },
+    {
+     "id": "FD-1",
+     "type": "FD",
+     "xyz": [
+      7.0,
+      3.0,
+      0.3
+     ]
+    }
+   ],
+   "pipes": [
+    {
+     "id": "V-1",
+     "system": "vent",
+     "dia": "2\"",
+     "pts": [
+      [
+       7.6,
+       3.9,
+       0.3
+      ],
+      [
+       7.6,
+       3.9,
+       3.5
+      ]
+     ]
+    }
+   ],
+   "equipment": [
+    {
+     "id": "ST-1",
+     "kind": "septic_tank",
+     "xyz": [
+      9.5,
+      3.5,
+      -0.6
+     ],
+     "size": "1,600 ลิตร"
+    },
+    {
+     "id": "MT-1",
+     "kind": "meter",
+     "xyz": [
+      -1.0,
+      0.5,
+      0.3
+     ],
+     "size": "1/2\""
+    }
+   ]
   }
  },
  "loads": {
@@ -2630,7 +2716,7 @@
   }
  ],
  "quantities": {
-  "model_hash": "b29ac0992a02d4ca",
+  "model_hash": "fcc10d805440f57b",
   "stale": false,
   "generated_by": "tools/takeoff.py",
   "settings": {
@@ -2645,16 +2731,20 @@
    "props_per_m_beam": 1.5,
    "props_per_m2_slab": 1.5,
    "steel_piece_len": 6.0,
-   "lintel_extra": 0.3
+   "lintel_extra": 0.3,
+   "pipe_waste": 0.1,
+   "branch_conduit_waste": 0.3,
+   "branch_wire_waste": 0.2,
+   "drain_run_depth": 0.3,
+   "cw_run_depth": 0.2
   },
   "notes": [
    "ปริมาณถมคืน (ข้อมูล) 9.32 ลบ.ม. — ไม่แยกรายการ เพราะค่าแรง ว480 ข้อ 1.3 รวมขุดและถมกลับแล้ว",
    "ทรายรอง 5 ซม. และคอนกรีตหยาบ 5 ซม. ใต้ฐานราก เป็นค่าตั้งต้น (แบบไม่ระบุ)",
    "เหล็กยืนคานวัดศูนย์ถึงศูนย์ ไม่รวมระยะทาบและงอขอ; ปลอกวัดเส้นรอบรูป 2(b+h) − 8×ระยะหุ้ม ไม่รวมขอ",
    "พื้น S1-1F: ยังไม่มีเหล็กเสริม",
-   "ทาสีกันสนิมโครงหลังคาเหล็ก ยังไม่คำนวณ — ต้องตกลงวิธีคิดพื้นที่ผิวเหล็ก",
    "เสาเอ็น-ทับหลัง: คิดเฉพาะรอบช่องเปิด (ทับหลัง+ธรณี ยาว w+2×0.30 และเสาเอ็น 2 ข้างสูง h) ยังไม่รวมเสาเอ็นกลางผนัง/ปลายผนัง",
-   "งานระบบรอบแรกนับเฉพาะจุดและอุปกรณ์ ยังไม่คิดความยาวสาย/ท่อ (รอหลักเกณฑ์ข้อ 4.3–4.4)"
+   "ไฟฟ้า: คิดเฉพาะวงจรย่อย (แผง → จุด) ยังไม่รวมสายเมน/สายป้อน และค่าธรรมเนียมการไฟฟ้า"
   ],
   "items": [
    {
@@ -3498,6 +3588,122 @@
     }
    },
    {
+    "key": "paint_rust",
+    "group_code": "1.1.19",
+    "group": "งานโครงหลังคา",
+    "name": "ทาสีกันสนิมโครงเหล็ก",
+    "unit": "ตร.ม.",
+    "qty": 38.53,
+    "qty_net": 38.53,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "RF1-1A-OH",
+     "RF1-1A",
+     "RF1-1B-OH",
+     "RF1-1B",
+     "RF1-2A-OH",
+     "RF1-2A",
+     "RF1-2B-OH",
+     "RF1-2B",
+     "RF1-3A-OH",
+     "RF1-3A",
+     "RF1-3B-OH",
+     "RF1-3B",
+     "P1-A1-1",
+     "P1-A1-2",
+     "P1-A1-3",
+     "P1-A1-4",
+     "P1-A2-1",
+     "P1-A2-2",
+     "P1-A2-3",
+     "P1-A2-4",
+     "P1-A3-1",
+     "P1-A3-2",
+     "P1-A3-3",
+     "P1-A3-4",
+     "P1-A4-1",
+     "P1-A4-2",
+     "P1-A4-3",
+     "P1-A4-4",
+     "P1-B1-1",
+     "P1-B1-2",
+     "P1-B1-3",
+     "P1-B1-4",
+     "P1-B2-1",
+     "P1-B2-2",
+     "P1-B2-3",
+     "P1-B2-4",
+     "P1-B3-1",
+     "P1-B3-2",
+     "P1-B3-3",
+     "P1-B3-4",
+     "P1-B4-1",
+     "P1-B4-2",
+     "P1-B4-3",
+     "P1-B4-4"
+    ],
+    "task": "roof_frame",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "เส้นรอบรูปหน้าตัด × ความยาวจริง; เหล็กรีดเย็นนับผิว 2 ด้าน",
+    "by_task": {
+     "roof_frame": {
+      "share": 1.0,
+      "from": [
+       "RF1-1A-OH",
+       "RF1-1A",
+       "RF1-1B-OH",
+       "RF1-1B",
+       "RF1-2A-OH",
+       "RF1-2A",
+       "RF1-2B-OH",
+       "RF1-2B",
+       "RF1-3A-OH",
+       "RF1-3A",
+       "RF1-3B-OH",
+       "RF1-3B",
+       "P1-A1-1",
+       "P1-A1-2",
+       "P1-A1-3",
+       "P1-A1-4",
+       "P1-A2-1",
+       "P1-A2-2",
+       "P1-A2-3",
+       "P1-A2-4",
+       "P1-A3-1",
+       "P1-A3-2",
+       "P1-A3-3",
+       "P1-A3-4",
+       "P1-A4-1",
+       "P1-A4-2",
+       "P1-A4-3",
+       "P1-A4-4",
+       "P1-B1-1",
+       "P1-B1-2",
+       "P1-B1-3",
+       "P1-B1-4",
+       "P1-B2-1",
+       "P1-B2-2",
+       "P1-B2-3",
+       "P1-B2-4",
+       "P1-B3-1",
+       "P1-B3-2",
+       "P1-B3-3",
+       "P1-B3-4",
+       "P1-B4-1",
+       "P1-B4-2",
+       "P1-B4-3",
+       "P1-B4-4"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "สีกันสนิม — เลือกรหัส/กรอกราคาสืบ; ค่าแรงทาสีโลหะ ว480 หมวดงานสี"
+    }
+   },
+   {
     "key": "cover_metal_sheet",
     "group_code": "1.2.1",
     "group": "งานหลังคา",
@@ -3869,6 +4075,367 @@
     }
    },
    {
+    "key": "fx_WC",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "โถส้วมชักโครก (โถส้วมชักโครก)",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "WC-1"
+    ],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_task": {
+     "mep_fix": {
+      "share": 1.0,
+      "from": [
+       "WC-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "สุขภัณฑ์ — ราคาสืบ"
+    }
+   },
+   {
+    "key": "fx_LAV",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "อ่างล้างหน้า (อ่างล้างหน้าแขวนผนัง)",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "LAV-1"
+    ],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_task": {
+     "mep_fix": {
+      "share": 1.0,
+      "from": [
+       "LAV-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "สุขภัณฑ์ — ราคาสืบ"
+    }
+   },
+   {
+    "key": "fx_FD",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ตะแกรงระบายน้ำพื้น (FD) (ตะแกรงกันกลิ่น)",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "FD-1"
+    ],
+    "task": "mep_fix",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_task": {
+     "mep_fix": {
+      "share": 1.0,
+      "from": [
+       "FD-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "สุขภัณฑ์ — ราคาสืบ"
+    }
+   },
+   {
+    "key": "eq_septic_tank",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ถังบำบัดน้ำเสียสำเร็จรูป 1,600 ลิตร",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "ST-1"
+    ],
+    "task": "mep_ext",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_task": {
+     "mep_ext": {
+      "share": 1.0,
+      "from": [
+       "ST-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "อุปกรณ์สุขาภิบาล — ราคาผู้ผลิต/สืบราคา"
+    }
+   },
+   {
+    "key": "eq_meter",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "มาตรวัดน้ำ 1/2\"",
+    "unit": "ชุด",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "MT-1"
+    ],
+    "task": "mep_ext",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_task": {
+     "mep_ext": {
+      "share": 1.0,
+      "from": [
+       "MT-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "อุปกรณ์สุขาภิบาล — ราคาผู้ผลิต/สืบราคา"
+    }
+   },
+   {
+    "key": "pipe_cw_PVC ชั้น 13.5_1/2\"",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ท่อประปา PVC ชั้น 13.5 ⌀ 1/2\"",
+    "unit": "ม.",
+    "qty": 14.63,
+    "qty_net": 13.3,
+    "waste": 0.1,
+    "waste_included": true,
+    "from": [
+     "LAV-1",
+     "WC-1"
+    ],
+    "task": "mep_rough",
+    "status": "assumed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวตามแนวท่อ + เผื่อ 10% · ประมาณแนวท่อให้ (แบบไม่ได้เขียน): LAV-1, WC-1 — ตรวจกับแบบ",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "LAV-1",
+       "WC-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ท่อ PVC/PP-R — เลือกรหัสพาณิชย์ตามชนิด/ขนาด หรือกรอกราคาสืบ; ค่าแรงวางท่อ ว480 หมวดสุขาภิบาล"
+    }
+   },
+   {
+    "key": "pipe_soil_PVC ชั้น 8.5_4\"",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ท่อโสโครก PVC ชั้น 8.5 ⌀ 4\"",
+    "unit": "ม.",
+    "qty": 3.3,
+    "qty_net": 3.0,
+    "waste": 0.1,
+    "waste_included": true,
+    "from": [
+     "WC-1"
+    ],
+    "task": "mep_rough",
+    "status": "assumed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวตามแนวท่อ + เผื่อ 10% · ประมาณแนวท่อให้ (แบบไม่ได้เขียน): WC-1 — ตรวจกับแบบ",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "WC-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ท่อ PVC/PP-R — เลือกรหัสพาณิชย์ตามชนิด/ขนาด หรือกรอกราคาสืบ; ค่าแรงวางท่อ ว480 หมวดสุขาภิบาล"
+    }
+   },
+   {
+    "key": "pipe_vent_PVC ชั้น 8.5_2\"",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ท่อระบายอากาศ PVC ชั้น 8.5 ⌀ 2\"",
+    "unit": "ม.",
+    "qty": 3.52,
+    "qty_net": 3.2,
+    "waste": 0.1,
+    "waste_included": true,
+    "from": [
+     "V-1"
+    ],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวตามแนวท่อ + เผื่อ 10%",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "V-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ท่อ PVC/PP-R — เลือกรหัสพาณิชย์ตามชนิด/ขนาด หรือกรอกราคาสืบ; ค่าแรงวางท่อ ว480 หมวดสุขาภิบาล"
+    }
+   },
+   {
+    "key": "pipe_waste_PVC ชั้น 8.5_2\"",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ท่อน้ำทิ้ง PVC ชั้น 8.5 ⌀ 2\"",
+    "unit": "ม.",
+    "qty": 6.16,
+    "qty_net": 5.6,
+    "waste": 0.1,
+    "waste_included": true,
+    "from": [
+     "FD-1",
+     "LAV-1"
+    ],
+    "task": "mep_rough",
+    "status": "assumed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ยาวตามแนวท่อ + เผื่อ 10% · ประมาณแนวท่อให้ (แบบไม่ได้เขียน): FD-1, LAV-1 — ตรวจกับแบบ",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "FD-1",
+       "LAV-1"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ท่อ PVC/PP-R — เลือกรหัสพาณิชย์ตามชนิด/ขนาด หรือกรอกราคาสืบ; ค่าแรงวางท่อ ว480 หมวดสุขาภิบาล"
+    }
+   },
+   {
+    "key": "fit_water",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ข้อต่อ ข้องอท่อประปา (วัสดุ 50% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
+    "unit": "งาน",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "pct",
+     "of": [
+      "pipe_cw_PVC ชั้น 13.5_1/2\""
+     ],
+     "mat": 0.5,
+     "lab_of_mat": 0.3
+    },
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": []
+     }
+    }
+   },
+   {
+    "key": "fit_drain",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "ข้อต่อ ข้องอท่อระบายน้ำ (วัสดุ 40% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
+    "unit": "งาน",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "pct",
+     "of": [
+      "pipe_soil_PVC ชั้น 8.5_4\"",
+      "pipe_vent_PVC ชั้น 8.5_2\"",
+      "pipe_waste_PVC ชั้น 8.5_2\""
+     ],
+     "mat": 0.4,
+     "lab_of_mat": 0.3
+    },
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": []
+     }
+    }
+   },
+   {
+    "key": "pipe_support",
+    "group_code": "1.3",
+    "group": "งานระบบประปา สุขาภิบาล และป้องกันอัคคีภัย",
+    "name": "อุปกรณ์ยึดและรองรับท่อ ทำความสะอาด ทาสี ทำสัญลักษณ์ท่อ (วัสดุ 10% ของค่าท่อ, ค่าแรง 30%)",
+    "unit": "งาน",
+    "qty": 1,
+    "qty_net": 1.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "price_ref": {
+     "kind": "pct",
+     "of": [
+      "pipe_cw_PVC ชั้น 13.5_1/2\"",
+      "pipe_soil_PVC ชั้น 8.5_4\"",
+      "pipe_vent_PVC ชั้น 8.5_2\"",
+      "pipe_waste_PVC ชั้น 8.5_2\""
+     ],
+     "mat": 0.1,
+     "lab_of_mat": 0.3
+    },
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": []
+     }
+    }
+   },
+   {
     "key": "pt_L",
     "group_code": "1.4",
     "group": "งานระบบไฟฟ้าและสื่อสาร",
@@ -3887,6 +4454,10 @@
       "share": 1.0,
       "from": []
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ดวงโคม/สวิตช์/เต้ารับ — ราคาสืบ"
     }
    },
    {
@@ -3908,6 +4479,10 @@
       "share": 1.0,
       "from": []
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ดวงโคม/สวิตช์/เต้ารับ — ราคาสืบ"
     }
    },
    {
@@ -3929,6 +4504,10 @@
       "share": 1.0,
       "from": []
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ดวงโคม/สวิตช์/เต้ารับ — ราคาสืบ"
     }
    },
    {
@@ -3954,6 +4533,99 @@
        "LC"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user"
+    }
+   },
+   {
+    "key": "conduit_PVC 1/2\"",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "ท่อร้อยสายวงจรย่อย PVC 1/2\"",
+    "unit": "ม.",
+    "qty": 29.64,
+    "qty_net": 22.8,
+    "waste": 0.3,
+    "waste_included": true,
+    "from": [
+     "LC"
+    ],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ประมาณจากตำแหน่งจุดในโมเดล เดินระดับฝ้าแบบมุมฉาก; เผื่อยาว 15% + เบ็ดเตล็ด 15%",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "LC"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "ท่อร้อยสาย — เลือกรหัสพาณิชย์/กรอกราคาสืบ; ค่าแรง ว480 หมวดไฟฟ้า"
+    }
+   },
+   {
+    "key": "wire_THW_1.5",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "สายไฟฟ้า THW 1.5 ตร.มม.",
+    "unit": "ม.",
+    "qty": 26.16,
+    "qty_net": 21.8,
+    "waste": 0.2,
+    "waste_included": true,
+    "from": [
+     "LC"
+    ],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "LC"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "สายไฟ — เลือกรหัสพาณิชย์ตามชนิด/ขนาด; ค่าแรง ว480 หมวดไฟฟ้า"
+    }
+   },
+   {
+    "key": "wire_THW_2.5",
+    "group_code": "1.4",
+    "group": "งานระบบไฟฟ้าและสื่อสาร",
+    "name": "สายไฟฟ้า THW 2.5 ตร.มม.",
+    "unit": "ม.",
+    "qty": 42.84,
+    "qty_net": 35.7,
+    "waste": 0.2,
+    "waste_included": true,
+    "from": [
+     "LC"
+    ],
+    "task": "mep_rough",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "note": "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%",
+    "by_task": {
+     "mep_rough": {
+      "share": 1.0,
+      "from": [
+       "LC"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "note": "สายไฟ — เลือกรหัสพาณิชย์ตามชนิด/ขนาด; ค่าแรง ว480 หมวดไฟฟ้า"
     }
    }
   ]
@@ -3968,21 +4640,14 @@
    "note": "สร้างไฟล์ตัวอย่าง"
   },
   {
-   "at": "2026-10-18T04:42:25+07:00",
+   "at": "2026-10-18T12:46:48+07:00",
    "by": "tools/takeoff.py",
    "sections": [
     "quantities"
    ]
   },
   {
-   "at": "2026-10-18T04:58:33+07:00",
-   "by": "tools/takeoff.py",
-   "sections": [
-    "quantities"
-   ]
-  },
-  {
-   "at": "2026-10-18T04:58:40+07:00",
+   "at": "2026-10-18T12:47:09+07:00",
    "by": "tools/takeoff.py",
    "sections": [
     "quantities"

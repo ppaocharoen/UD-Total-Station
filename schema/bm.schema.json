@@ -2173,9 +2173,10 @@
             "comp",
             "mat",
             "wage",
-            "user"
+            "user",
+            "pct"
           ],
-          "description": "comp = วัสดุมวลรวม (comp_id), mat = รหัสพาณิชย์, wage = รหัส ว480 คอลัมน์ G, user = กรอกเอง"
+          "description": "comp = วัสดุมวลรวม (comp_id), mat = รหัสพาณิชย์, wage = รหัส ว480 คอลัมน์ G, user = กรอกเอง, pct = คิดเป็น % ของค่าวัสดุแถวอื่น (ข้อต่อ/อุปกรณ์ยึดท่อ)"
         },
         "code": {
           "type": "string"
@@ -2183,6 +2184,21 @@
         "wage_code": {
           "type": "string",
           "description": "ค่าแรงคู่กับวัสดุ (ถ้ามี)"
+        },
+        "of": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "key ของแถวที่ใช้เป็นฐาน (pct)"
+        },
+        "mat": {
+          "type": "number",
+          "description": "สัดส่วนค่าวัสดุต่อฐาน (pct)"
+        },
+        "lab_of_mat": {
+          "type": "number",
+          "description": "สัดส่วนค่าแรงต่อค่าวัสดุของแถวนี้ (pct)"
         }
       }
     },
