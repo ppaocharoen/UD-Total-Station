@@ -104,7 +104,7 @@
     <div class="dock glass" id="dock">
       <div class="dock-tabs">
         <div class="dock-tab active" data-dock="time">▶ ลำดับก่อสร้าง</div><div class="dock-tab" data-dock="gantt">Gantt</div>
-        <div class="dock-tab" data-dock="scurve">S-Curve</div><div class="dock-tab" data-dock="inst">งวดงาน</div><div class="dock-tab" data-dock="boq">BOQ</div>
+        <div class="dock-tab" data-dock="scurve">S-Curve</div><div class="dock-tab" data-dock="inst">งวดงาน</div><div class="dock-tab" data-dock="boq">BOQ</div><div class="dock-tab" data-dock="clash">Clash <span id="clash-n"></span></div>
         <div class="sp"></div><div class="dock-tab" id="dock-min">▾ ย่อ</div>
       </div>
       <div class="dock-body">
@@ -120,6 +120,14 @@
         <div class="dock-pane" id="dk-gantt"><p class="hint">คลิกแถบงาน = ไฮไลต์ชิ้นส่วนของงานนั้น · เส้นประสีอำพัน = งวดงาน</p><div id="dk-gantt-svg"></div></div>
         <div class="dock-pane" id="dk-scurve"><p class="hint">เส้น = % ผลงานสะสมตามแผน · แท่ง = ค่างานรายสัปดาห์ · คลิกกราฟ = เลื่อนไปวันนั้น</p><div id="dk-scurve-svg"></div></div>
         <div class="dock-pane" id="dk-inst"><table class="boq" id="dk-inst-table"></table></div>
+        <div class="dock-pane" id="dk-clash">
+          <div class="tl-row" style="flex-wrap:wrap">
+            <label class="hint">ประเภทอาคาร (บันได กฎ 55) <select id="clash-bt"><option value="public">อาคารอื่น ข้อ 24 (≥ 2.10 ม.)</option><option value="residential">อยู่อาศัย ข้อ 23 (≥ 1.90 ม.)</option></select></label>
+            <label class="hint"><input type="checkbox" id="clash-info"> แสดงระดับข้อมูล (แนวท่อประมาณ ฯลฯ)</label>
+            <label class="hint"><input type="checkbox" id="clash-ack"> แสดงรายการที่ยอมรับแล้ว</label>
+          </div>
+          <table class="mini-boq" id="clash-table"></table>
+        </div>
         <div class="dock-pane" id="dk-boq"><div class="kpis" id="dk-kpis"></div><input id="dk-q" placeholder="ค้นหารายการ…" style="width:100%;margin-bottom:6px"><table class="mini-boq" id="dk-boq-table"></table></div>
       </div>
     </div>
@@ -202,6 +210,7 @@
 <script src="../lib/viewer3d.js"></script>
 <script src="../lib/schedule.js"></script>
 <script src="../lib/diff.js"></script>
+<script src="../lib/clash.js"></script>
 <script>
   // โค้ดคิดราคาใช้ร่วมกับ UD-Cost Hub; ทดสอบในเครื่องใส่ ?pricing=<url>
   (function () {

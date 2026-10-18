@@ -168,6 +168,7 @@ class Takeoff:
         self.rebar_len = defaultdict(lambda: defaultdict(float))   # dia -> member id -> m
         self.backfill = 0.0
         self.src_task = {}
+        self.routes = []          # แนวท่อ/สายที่ระบบประมาณให้ (ใช้ตรวจ clash และแสดง 3D)
 
     # ------------------------------------------------------------ accumulate
     def add(self, code, key, name, unit, qty, src=None, waste=0.0, count=False, task=None, note=None):
@@ -636,12 +637,17 @@ class Takeoff:
             pn = panels[c["panel"]]["xyz"]
             cur = (pn[0], pn[1])
             L = drop(pn[2])                       # แผงขึ้นไประดับเดินท่อ
+            path = [list(pn), [pn[0], pn[1], max(H, pn[2])]]
             left = list(pts)
             while left:
                 nxt = min(left, key=lambda q: abs(q["xyz"][0] - cur[0]) + abs(q["xyz"][1] - cur[1]))
                 L += abs(nxt["xyz"][0] - cur[0]) + abs(nxt["xyz"][1] - cur[1]) + drop(nxt["xyz"][2])
-                cur = (nxt["xyz"][0], nxt["xyz"][1])
+                x, y, z = nxt["xyz"]
+                self.routes.append({"id": f"EL-{cid}-{len(self.routes) + 1}", "kind": "conduit", "circuit": cid, "estimated": True,
+                                    "pts": [[cur[0], cur[1], H], [x, cur[1], H], [x, y, H], [x, y, min(z, H)]]})
+                cur = (x, y)
                 left.remove(nxt)
+            self.routes.append({"id": f"EL-{cid}-0", "kind": "conduit", "circuit": cid, "estimated": True, "pts": path})
             n = c.get("conductors") or 2
             if not c.get("conductors"):
                 self.note(f"ไฟฟ้า: วงจร {cid} ไม่ระบุจำนวนสาย — ใช้ 2 เส้น")
@@ -694,6 +700,12 @@ class Takeoff:
                 if q is tgt["xyz"]:
                     Lr += abs(tgt["xyz"][2] - zr)
                 k = (sysn, mat[sysn], dia)
+                fx, fy, fz = f["xyz"]
+                rp = [[fx, fy, fz], [fx, fy, zr], [q[0], fy, zr], [q[0], q[1], zr]]
+                if q is tgt["xyz"]:
+                    rp.append(list(tgt["xyz"]))
+                self.routes.append({"id": f"PP-{sysn}-{f.get('id') or f['type']}", "kind": "pipe", "system": sysn, "dia": dia,
+                                    "estimated": True, "from": f.get("id"), "pts": rp})
                 runs[k] += Lr; src[k].append(f.get("id") or f["type"])
                 est_note[k].append(f.get("id") or f["type"])
                 done.append([f["xyz"][0], f["xyz"][1], zr]); left.remove((f, dia))
@@ -804,7 +816,8 @@ def main():
     m = json.load(open(a.file, encoding="utf-8"))
     pm = json.load(open(a.price_map, encoding="utf-8")).get("map", {}) if os.path.exists(a.price_map) else None
     settings = ((m.get("quantities") or {}).get("settings")) or None
-    items, notes, used = run(m, settings, pm)
+    tk = Takeoff(m, settings).run()
+    items, notes, used = tk.result(pm), tk.notes, tk.s
     for r in items:
         w = f" (+{r['waste']*100:g}%)" if r["waste"] else ""
         print(f"{r['group_code']:<7} {r['name'][:58]:<58} {r['qty']:>12,.2f} {r['unit']}{w}")
@@ -820,7 +833,7 @@ def main():
                 wr.writerow([r["group_code"], r["name"], r["unit"], r["qty_net"], r["waste"] * 100, r["qty"], " ".join(r["from"])])
     if a.write:
         m["quantities"] = {"model_hash": qty_hash(m), "stale": False, "generated_by": "tools/takeoff.py",
-                           "settings": used, "notes": notes, "items": items}
+                           "settings": used, "notes": notes, "items": items, "routes": tk.routes}
         m.setdefault("history", []).append({"at": __import__("datetime").datetime.now().astimezone().isoformat(timespec="seconds"),
                                             "by": "tools/takeoff.py", "sections": ["quantities"]})
         json.dump(m, open(a.file, "w", encoding="utf-8"), ensure_ascii=False, indent=1)

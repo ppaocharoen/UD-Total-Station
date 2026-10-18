@@ -84,7 +84,7 @@ function loadModel(json, name) {
   }
   $('#meta-proj').textContent = p.name;
   $('#file-status').innerHTML = `เปิด <b>${esc(name)}</b>${saved ? ' · ดึงงาน BOQ ที่บันทึกไว้ในเบราว์เซอร์นี้' : ''}`;
-  if (S.viewer) buildLayers(S.viewer.load(m));
+  if (S.viewer) buildLayers(S.viewer.load(m)); else renderClash();
   renderAll();
 }
 function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return Math.abs(a) / 2; }
@@ -505,6 +505,35 @@ function renderDiff() {
   $('#diff-status').innerHTML = `เทียบ <b>${esc(S.old.name)}</b> (เดิม) กับ <b>${esc(S.modelName)}</b> (ปัจจุบัน) · ชิ้นส่วน เพิ่ม ${E.added.length} · ลบ ${E.removed.length} · แก้ ${E.changed.length}`;
 }
 
+// ------------------------------------------------------------------ Clash
+const SEV = { error: ['ร้ายแรง', 'err'], warn: ['เตือน', 'warn'], info: ['ข้อมูล', ''] };
+function renderClash() {
+  if (!S.model) return;
+  const bt = S.boq.clash_bt || (S.model.meta && S.model.meta.building_type) || 'public';
+  $('#clash-bt').value = bt;
+  const all = BmClash.check(S.model, { buildingType: bt }), ack = S.boq.clash_ack || {};
+  const showInfo = $('#clash-info').checked, showAck = $('#clash-ack').checked;
+  const list = all.filter(c => (showInfo || c.sev !== 'info') && (showAck || !ack[c.key]));
+  const nErr = all.filter(c => c.sev === 'error' && !ack[c.key]).length, nWarn = all.filter(c => c.sev === 'warn' && !ack[c.key]).length;
+  $('#clash-n').innerHTML = nErr ? `<span class="pill err">${nErr}</span>` : nWarn ? `<span class="pill warn">${nWarn}</span>` : '<span class="pill ok">0</span>';
+  S.clashes = list;
+  $('#clash-table').innerHTML = list.length ? list.map((c, i) => `<tr data-i="${i}"><td><span class="pill ${SEV[c.sev][1]}">${SEV[c.sev][0]}</span></td><td class="mono" style="color:var(--text3)">${c.code}</td>
+    <td>${esc(c.title)}<span class="src">${esc(c.detail)}</span></td>
+    <td><button class="btn small" data-ack="${esc(c.key)}">${ack[c.key] ? 'ยกเลิกยอมรับ' : 'ยอมรับ'}</button></td></tr>`).join('')
+    : `<tr><td class="hint">ไม่พบปัญหา${all.length ? ` (ซ่อน ${all.length} รายการ: ระดับข้อมูล/ยอมรับแล้ว)` : ''}</td></tr>`;
+  $$('#clash-table tr[data-i]').forEach(tr => tr.onclick = e => {
+    if (e.target.tagName === 'BUTTON') return;
+    const c = list[+tr.dataset.i]; $$('#clash-table tr').forEach(x => x.classList.toggle('sel', x === tr));
+    if (S.viewer) { S.viewer.highlight(c.ids); if (c.at) S.viewer.focus(c.at, 5); }
+  });
+  $$('#clash-table [data-ack]').forEach(b => b.onclick = () => {
+    const k = b.dataset.ack; S.boq.clash_ack = S.boq.clash_ack || {};
+    if (S.boq.clash_ack[k]) delete S.boq.clash_ack[k]; else S.boq.clash_ack[k] = { at: new Date().toISOString().slice(0, 10) };
+    autosave(); renderClash();
+  });
+  if (S.viewer) S.viewer.setMarkers(list.filter(c => c.sev !== 'info' || showInfo));
+}
+
 // ------------------------------------------------------------------ HUD / dock
 function kpiHtml(T, plan) {
   const mat = r2(T.pr.reduce((a, r) => a + (r.mat_amt || 0), 0)), lab = r2(T.pr.reduce((a, r) => a + (r.lab_amt || 0), 0));
@@ -571,7 +600,7 @@ function buildLayers(groups) {
     $$('.preset').forEach(b => b.classList.remove('on'));
     syncLayers();
   });
-  syncLayers(); buildClip(); tlReset();
+  syncLayers(); buildClip(); tlReset(); renderClash();
 }
 function syncLayers() { $$('#layer-list .chip').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
 function buildClip() {
@@ -752,6 +781,8 @@ function bind() {
   const fitStage = () => { $('#stage').style.height = Math.max(420, innerHeight - $('.topbar').offsetHeight) + 'px'; };
   addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
+  $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };
+  $('#clash-info').onchange = renderClash; $('#clash-ack').onchange = renderClash;
   $('#f-old').onchange = async e => {
     try { const f = await readFile(e.target); const m = JSON.parse(f.text); if (!m.schema_version) throw new Error('ไม่ใช่ไฟล์ .bm.json');
       if (!(m.quantities && m.quantities.items)) throw new Error('โมเดลรุ่นก่อนยังไม่ได้ถอดปริมาณ (รัน tools/takeoff.py --write)');
