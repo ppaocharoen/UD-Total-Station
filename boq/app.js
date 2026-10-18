@@ -762,9 +762,12 @@ function tlSet(day) {
     return st;
   });
   const cv = p.curve[Math.max(0, day - 1)], now = p.tasks.filter(t => prog[t.id] > 0 && prog[t.id] < 1);
+  const lastInst = ((S.inst && S.inst.list) || []).filter(c => c.due && c.due <= date).slice(-1)[0];
   $('#tl-fill').style.width = (day ? cv.pct : 0) + '%';
   $('#tl-label').innerHTML = `<b>วันที่ ${day}/${p.calDays}</b> · ${thDate(date)} · ผลงานตามแผน <b style="color:var(--green)">${day ? cv.pct.toFixed(1) : '0.0'}%</b>` +
-    (now.length ? ` · กำลังทำ: ${now.map(t => `<span class="pill" style="border-color:${t.color}">${esc(t.label.replace(/ — .*/, ''))} ${Math.round(prog[t.id] * 100)}%</span>`).join('')}` : '');
+    (lastInst ? ` · ถึง <b style="color:var(--amber)">งวด ${lastInst.no}</b> (${thDate(lastInst.due)})` : '') +
+    (now.length ? `<div class="tl-now">กำลังทำ (กดเพื่อดูชิ้นส่วน): ${now.map(t => `<span class="pill tl-task" data-tl-task="${esc(t.id)}" style="border-color:${t.color}">${esc(t.label.replace(/ — .*/, ''))} ${Math.round(prog[t.id] * 100)}%</span>`).join('')}</div>` : '');
+  $$('#tl-label [data-tl-task]').forEach(b => b.onclick = () => { tlStop(); selectTask(b.dataset.tlTask); });
 }
 function tlDone() {
   tlStop(); TL.day = null;
@@ -778,7 +781,7 @@ function tlPlay() {
   if (!S.plan) return toast('แผนงานยังไม่พร้อม');
   let d = (TL.day === null || TL.day >= S.plan.calDays) ? 0 : TL.day;
   $('#tl-play').textContent = '⏸ หยุด'; setDock('time');
-  const ms = Math.max(60, Math.min(250, 12000 / S.plan.calDays));
+  const ms = Math.max(60, Math.min(250, 12000 / S.plan.calDays)) / (+$('#tl-speed').value || 1);
   TL.timer = setInterval(() => { d++; if (d >= S.plan.calDays) { tlDone(); return; } tlSet(d); }, ms);
 }
 function initViewer() {
@@ -987,6 +990,7 @@ function bind() {
   const fitStage = () => { const bn = $('#bnav'), bh = bn && getComputedStyle(bn).display !== 'none' ? bn.offsetHeight : 0; $('#stage').style.height = Math.max(bh ? 300 : 420, innerHeight - $('.topbar').offsetHeight - bh) + 'px'; };
   addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
+  $('#tl-speed').onchange = () => { if (TL.timer) { tlStop(); tlPlay(); } };
   $('#b-tcol').onclick = () => { S.tcolOn = !S.tcolOn; if (S.viewer && S.types) S.viewer.setTypeColors(S.tcolOn ? S.types.col : null); $('#b-tcol').classList.toggle('primary', S.tcolOn); $('#b-tcol').textContent = S.tcolOn ? 'กลับเป็นสีวัสดุ' : 'ระบายสีตามชนิด'; };
   $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };
   $('#clash-info').onchange = renderClash; $('#clash-ack').onchange = renderClash;

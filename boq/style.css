@@ -282,3 +282,4 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
 .side-sum .kv{font-size:12px;margin-bottom:6px}.side-sum em{font-style:normal;font-family:var(--f-mono);color:var(--green2)}.side-sum em.hot{color:var(--amber);font-size:14px}.side-sum .pk-link{font-size:12px}
 .side-sum .ss-warn{color:var(--amber)}
 .tl-cat{margin-bottom:5px}.tl-cat .hint{font-size:11px;display:block;margin-bottom:2px}#type-list .chip.sel{background:rgba(0,255,65,.18);border-color:var(--green)}
+.tl-now{margin-top:4px}.tl-task{cursor:pointer;margin:2px 3px 0 0}.tl-task:hover{background:rgba(0,255,65,.12)}#tl-speed{width:auto;padding:3px 6px;font-size:13px}
