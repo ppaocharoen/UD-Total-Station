@@ -70,13 +70,15 @@ async function loadPrices() {
   }
   renderAll();
 }
+// วัสดุย่อยในวัสดุมวลรวม: มีรหัสวัสดุ → sub:<รหัส> · ไม่มีรหัส (เช่น ไม้อัดดำ) → subn:<ชื่อ|หน่วย>
+const subKey = it => it.itemCode ? 'sub:' + it.itemCode : 'subn:' + String(it.itemName || '').replace(/\s+/g, ' ').trim() + '|' + (it.unit || '');
 function hasCommerce(it) { return !!S.db.resolveMat(it).matItem; }
 function applySurvey() {
   if (!S.db) return;
   migrateSurvey();
-  const sv = {}; Object.values(S.boq.surveys || {}).forEach(it => { if (it.target && it.target.startsWith('sub:')) { const p = Survey.summary(it).price; if (p !== null) sv[it.target.slice(4)] = p; } });
+  const sv = {}; Object.values(S.boq.surveys || {}).forEach(it => { if (it.target && /^subn?:/.test(it.target)) { const p = Survey.summary(it).price; if (p !== null) sv[it.target] = p; } });
   S.db.compItems = S.baseCompItems.map(it => {
-    const p = sv[it.itemCode];
+    const p = sv[subKey(it)];
     return (p !== undefined && p !== '' && it.fixedPrice === null && !hasCommerce(it)) ? Object.assign({}, it, { fixedPrice: +p, surveyed: true }) : it;
   });
 }
@@ -117,8 +119,35 @@ function renderAll() {
   renderProject(); renderSurvey(); renderPR1(); renderPR23(); renderSummary(); renderPlan(); if (S.old) setTimeout(renderDiff, 0);
 }
 
+// ผู้ลงนาม: ประมาณราคา = ผู้ประมาณราคา 1 คน · กำหนดราคากลาง = คณะกรรมการ ≥ 3 คน มีประธาน 1 คนเสมอ (ตกลงกับ Earth 18 ต.ค. 2569)
+function people() {
+  const p = S.boq.project; p.mode = p.mode || 'reference';
+  let L = p.people || [];
+  if (p.mode === 'estimate') { const e = L.find(x => x.role === 'ผู้ประมาณราคา') || L[0] || {}; L = [{ role: 'ผู้ประมาณราคา', name: e.name || '', pos: e.pos || '' }]; }
+  else {
+    const ch = L.find(x => x.role === 'ประธานกรรมการ') || (L[0] && L[0].role === 'ผู้ประมาณราคา' ? L[0] : null) || {};
+    const mem = L.filter(x => x.role === 'กรรมการ');
+    while (mem.length < 2) mem.push({ role: 'กรรมการ', name: '', pos: '' });
+    L = [{ role: 'ประธานกรรมการ', name: ch.name || '', pos: ch.pos || '' }].concat(mem);
+  }
+  p.people = L; return L;
+}
+function renderPeople() {
+  const p = S.boq.project, L = people(), est = p.mode === 'estimate';
+  $('#people-title').textContent = est ? 'ผู้ประมาณราคา' : `คณะกรรมการกำหนดราคากลาง (${L.length} คน)`;
+  $('#people').innerHTML = L.map((x, i) => `<div class="ppl-row"><span class="ppl-role">${x.role}</span><input data-pp="${i}" data-pf="name" placeholder="ชื่อ-สกุล" value="${esc(x.name)}"><input data-pp="${i}" data-pf="pos" placeholder="ตำแหน่ง" value="${esc(x.pos)}">${!est && i >= 3 ? `<button class="btn small" data-ppdel="${i}">ลบ</button>` : ''}</div>`).join('') +
+    (est ? '' : `<button class="btn small" id="pp-add">+ เพิ่มกรรมการ</button>`);
+  $$('#people [data-pp]').forEach(el => el.onchange = () => { L[+el.dataset.pp][el.dataset.pf] = el.value; autosave(); renderSummary(); });
+  $$('#people [data-ppdel]').forEach(b => b.onclick = () => { L.splice(+b.dataset.ppdel, 1); autosave(); renderPeople(); renderSummary(); });
+  const add = $('#pp-add'); if (add) add.onclick = () => { L.push({ role: 'กรรมการ', name: '', pos: '' }); autosave(); renderPeople(); };
+}
+function sigHtml() {   // ส่วนลงนามท้ายแบบฟอร์ม (หน้าตาจริงรอแบบฟอร์มหน่วยงาน)
+  const L = people(), est = S.boq.project.mode === 'estimate';
+  return `<div class="sig">${L.map(x => `<div class="sig-b"><div>ลงชื่อ ......................................... ${est ? 'ผู้ประมาณราคา' : x.role}</div><div>(${esc(x.name || '.........................................')})</div><div>${esc(x.pos || 'ตำแหน่ง .........................................')}</div></div>`).join('')}</div>`;
+}
 function renderProject() {
-  $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? ''; });
+  $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? (el.dataset.k === 'mode' ? 'reference' : ''); });
+  renderPeople();
   $('#ff-adv').value = S.boq.factor.advance; $('#ff-ret').value = S.boq.factor.retention; $('#ff-loan').value = S.boq.factor.loanPct;
   $('#ff-src').textContent = FactorF.SOURCE;
   const m = S.model, box = $('#model-check');
@@ -139,18 +168,38 @@ function renderProject() {
 function renderSurvey() { clearTimeout(renderSurvey._t); renderSurvey._t = setTimeout(_renderSurvey, 0); }
 // ------------------------------------------------------------------ ราคาสืบ
 const isInfo = r => r.ref && r.ref.no_lab && !r.ref.need_mat && !r.ref.code && !r.ref.find;
-function surveyTargets() {   // รายการที่ต้องสืบ: แถว ปร.1 ที่ไม่มีราคาวัสดุ + วัสดุย่อยในวัสดุมวลรวมที่ไม่มีราคาพาณิชย์
-  const out = [];
-  (S.db ? priceAll() : []).forEach(r => {
-    if ((r.price_ref && ['pct', 'comp'].includes(r.price_ref.kind)) || isInfo(r) || r.unit === 'งาน') return;   // วัสดุมวลรวมคิดจากวัสดุย่อย (สืบที่วัสดุย่อย)
-    if (r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) out.push({ target: 'row:' + r.key, name: r.name, unit: r.unit, qty: r.qty, why: (r.warns || []).join(' · ') });
+function surveyTargets() {   // กลุ่ม: pr1 = วัสดุใน ปร.1 · sub = วัสดุย่อยในวัสดุมวลรวม · pr23 = ครุภัณฑ์/ค่าใช้จ่ายพิเศษที่เพิ่มเอง
+  const out = [], pr = S.db ? priceAll() : [];
+  pr.forEach(r => {
+    if ((r.price_ref && ['pct', 'comp'].includes(r.price_ref.kind)) || isInfo(r) || r.unit === 'งาน' || r.lab_only) return;   // วัสดุมวลรวมสืบที่วัสดุย่อย; ค่าแรงอย่างเดียวไม่ต้องสืบ
+    if (r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) out.push({ group: 'pr1', target: 'row:' + r.key, key: r.key, name: r.name, unit: r.unit, qty: r.qty, why: (r.warns || []).join(' · ') });
   });
   if (S.db) {
-    const used = new Set(S.baseCompItems.map(i => i.itemCode));
-    Object.entries(S.db.matRef).filter(([k, r]) => used.has(k) && !S.db.resolveMat({ itemCode: k, commodityCode: '' }).matItem && !r.compRef)
-      .forEach(([k, r]) => out.push({ target: 'sub:' + k, name: r.name, unit: r.unit, why: `วัสดุย่อยในวัสดุมวลรวม ${S.baseCompItems.filter(i => i.itemCode === k).length} รายการ` }));
+    // วัสดุมวลรวมที่โครงการนี้ใช้ (แถว ปร.1 ที่ผูก comp) → วัสดุย่อยที่ใช้จริง
+    const usedComp = {};
+    pr.filter(r => r.ref && r.ref.kind === 'comp').forEach(r => { const c = S.db.findComp(r.ref.code); if (c) (usedComp[c.id] = usedComp[c.id] || { c, rows: [] }).rows.push(r.name); });
+    const subs = {};
+    S.baseCompItems.forEach(it => {
+      if (it.fixedPrice !== null || hasCommerce(it)) return;
+      const sc = S.db.resolveCompRef(it); if (sc) return;   // คิดจากวัสดุมวลรวมย่อยอีกตัว
+      const k = subKey(it), ref = it.itemCode && S.db.matRef[it.itemCode];
+      const o = subs[k] = subs[k] || { group: 'sub', target: k, name: ref ? ref.name : it.itemName, unit: ref ? String(ref.unit).replace(/^บาท\//, '') : it.unit, comps: new Set(), used: [] };
+      o.comps.add(it.compId);
+      if (usedComp[it.compId] && !o.used.some(u => u.id === it.compId)) o.used.push({ id: it.compId, sub: usedComp[it.compId].c.sub, name: usedComp[it.compId].c.name, rows: usedComp[it.compId].rows });
+    });
+    Object.values(subs).forEach(o => {
+      o.why = o.used.length ? 'ใช้ในวัสดุมวลรวมของโครงการ: ' + o.used.map(u => `${u.sub} ${u.name} (${u.rows.join(', ')})`).join(' · ') : `อยู่ในวัสดุมวลรวม ${o.comps.size} รายการ (ไม่ได้ใช้ในโครงการนี้)`;
+      o.inProject = !!o.used.length; out.push(o);
+    });
   }
+  (S.boq.pr2 || []).forEach(r => { if (!r.id) r.id = Survey.uid('e'); if (r.name) out.push({ group: 'pr23', target: 'pr2:' + r.id, name: r.name, unit: r.unit, qty: r.qty, why: 'ปร.2 ครุภัณฑ์จัดซื้อ (ราคาไม่รวม VAT)' }); });
+  (S.boq.pr3 || []).forEach(r => { if (!r.id) r.id = Survey.uid('x'); if (r.name) out.push({ group: 'pr23', target: 'pr3:' + r.id, name: r.name, unit: r.unit, qty: r.qty, why: 'ปร.3 ค่าใช้จ่ายพิเศษตามข้อกำหนด' }); });
   return out;
+}
+// ราคาสืบของ ปร.2/ปร.3 → ราคาต่อหน่วยครุภัณฑ์ / ค่าใช้จ่ายรวม (= ราคาต่อหน่วย × จำนวน)
+function applyPr23Survey() {
+  (S.boq.pr2 || []).forEach(r => { const it = r.id && S.boq.surveys['pr2:' + r.id], p = it ? Survey.summary(it).price : null; if (p !== null) { r.price = p; r.price_src = Survey.srcText(it); } else delete r.price_src; });
+  (S.boq.pr3 || []).forEach(r => { const it = r.id && S.boq.surveys['pr3:' + r.id], p = it ? Survey.summary(it).price : null; if (p !== null) { r.amount = r2(p * (+r.qty || 1)); r.price_src = Survey.srcText(it) + ` × ${r.qty}`; } else delete r.price_src; });
 }
 function svItem(t) {   // รายการราคาสืบของเป้าหมาย (สร้างใหม่ถ้ายังไม่มี)
   const sv = S.boq.surveys; let it = sv[t.target];
@@ -163,15 +212,28 @@ function _renderSurvey() {
   if (!S.model) { box.innerHTML = '<div class="card hint">เปิดโมเดลก่อน</div>'; return; }
   migrateSurvey();
   const tg = surveyTargets(), have = new Set(tg.map(t => t.target));
-  const manual = Object.values(S.boq.surveys).filter(it => !have.has(it.target)).map(it => ({ target: it.target, name: it.name, unit: it.unit, why: it.target === 'manual' || it.target.startsWith('manual') ? 'เพิ่มเอง' : 'ไม่ได้ใช้ในงานนี้แล้ว' }));
+  const manual = Object.values(S.boq.surveys).filter(it => !have.has(it.target) && (it.quotes || []).length).map(it => ({ group: 'manual', target: it.target, name: it.name, unit: it.unit, why: it.target.startsWith('manual') ? 'เพิ่มเอง' : 'ไม่ได้ใช้ในงานนี้แล้ว (เก็บไว้เป็นหลักฐาน)' }));
   const all = tg.concat(manual).map(t => ({ t, it: S.boq.surveys[t.target], s: S.boq.surveys[t.target] ? Survey.summary(S.boq.surveys[t.target]) : { status: 'none', n: 0, price: null } }));
   const f = S.svf || 'todo';
-  const cnt = k => all.filter(x => x.s.status === k).length;
-  $('#sv-stat').innerHTML = `ทั้งหมด ${all.length} รายการ · <span style="color:var(--green)">ครบ 3 เจ้า ${cnt('ok')}</span> · <span style="color:var(--amber)">ไม่ครบ ${cnt('few')}</span> · <span style="color:var(--red)">ยังไม่สืบ ${cnt('none')}</span>`;
+  const rel = all.filter(x => x.t.group !== 'sub' || x.t.inProject || (x.it && (x.it.quotes || []).length));   // นับเฉพาะที่ใช้ในโครงการนี้
+  const cnt = k => rel.filter(x => x.s.status === k).length;
+  $('#sv-stat').innerHTML = `ใช้ในโครงการนี้ ${rel.length} รายการ · <span style="color:var(--green)">ครบ 3 เจ้า ${cnt('ok')}</span> · <span style="color:var(--amber)">ไม่ครบ ${cnt('few')}</span> · <span style="color:var(--red)">ยังไม่สืบ ${cnt('none')}</span>`;
   $('#sv-badge').innerHTML = cnt('none') ? `<span class="pill err">${cnt('none')}</span>` : '';
   $$('#sv-filter [data-svf]').forEach(c => c.classList.toggle('on', c.dataset.svf === f));
   const show = all.filter(x => x.t.target === S.svOpen || f === 'all' || (f === 'todo' ? x.s.status !== 'ok' : x.s.status === f));
-  box.innerHTML = show.length ? show.map(x => svCard(x)).join('') : '<div class="card hint">ไม่มีรายการในกลุ่มนี้</div>';
+  const GR = [['pr1', 'วัสดุในแบบ ปร.1'], ['sub', 'วัสดุย่อยในวัสดุมวลรวม (ใช้คิดราคาต่อหน่วยของ ปร.1)'], ['pr23', 'ครุภัณฑ์ ปร.2 / ค่าใช้จ่ายพิเศษ ปร.3'], ['manual', 'รายการอื่น']];
+  let html = '';
+  GR.forEach(([g, title]) => {
+    let list = show.filter(x => x.t.group === g); if (!list.length) return;
+    let extra = '';
+    if (g === 'sub') {
+      const other = list.filter(x => !x.t.inProject && x.t.target !== S.svOpen && !(x.it && (x.it.quotes || []).length));
+      list = list.filter(x => !other.includes(x));
+      if (other.length) extra = `<details class="sv-more"><summary class="hint">วัสดุย่อยอื่นที่ไม่ได้ใช้ในโครงการนี้ (${other.length})</summary>${other.map(x => svCard(x)).join('')}</details>`;
+    }
+    html += `<h3 class="sv-group">${title} <span class="hint">${list.length + (extra ? '' : '')} รายการ</span></h3>` + list.map(x => svCard(x)).join('') + extra;
+  });
+  box.innerHTML = html || '<div class="card hint">ไม่มีรายการในกลุ่มนี้</div>';
   if (S.svOpen) { const c = box.querySelector(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) c.classList.add('open'); }
 }
 const SVST = { ok: ['ครบ 3 เจ้า', 'ok'], few: ['ไม่ครบ 3 เจ้า', 'warn'], none: ['ยังไม่สืบ', 'err'] };
@@ -180,7 +242,7 @@ function svCard({ t, it, s }) {
   let h = `<div class="card sv-card ${open ? 'open' : ''}" data-svi="${esc(t.target)}">
     <div class="sv-head" data-svtoggle="1"><div><b>${esc(t.name)}</b> <span class="hint">[${esc(t.unit)}]</span>${t.qty ? ` <span class="hint">· ใช้ ${fmt(t.qty)} ${esc(t.unit)}</span>` : ''}
       <div class="hint">${esc(t.why || '')}</div></div>
-      <div class="sv-sum"><span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
+      <div class="sv-sum">${t.group === 'pr1' && s.status === 'none' ? `<button class="btn small" data-nomat="${esc(t.key)}" title="งานที่มีแต่ค่าแรง เช่น รื้อถอน ขุดดิน">ไม่มีค่าวัสดุ</button> ` : ''}<span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
   if (open) h += svEditor(t, it || svItem(t));
   return h + '</div>';
 }
@@ -214,7 +276,7 @@ function svEditor(t, it) {
   return h + '</div>';
 }
 function svSave(it) {   // บันทึก + สำรองเข้าคลังราคาสืบ (ใช้ข้ามโครงการ)
-  it.updated = new Date().toISOString(); autosave(); applySurvey(); priceAll();
+  it.updated = new Date().toISOString(); applyPr23Survey(); autosave(); applySurvey(); priceAll(); if (/^pr[23]:/.test(it.target)) renderPR23();
   clearTimeout(svSave._t); svSave._t = setTimeout(() => {
     const imgs = {}; (it.quotes || []).forEach(q => (q.imgs || []).forEach(id => { if (S.img[id]) imgs[id] = S.img[id]; }));
     if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '' });
@@ -238,6 +300,7 @@ function bindSurvey() {
     const card = e.target.closest('[data-svi]'); if (!card) return;
     const tid = card.dataset.svi, t = { target: tid, name: card.querySelector('.sv-head b').textContent, unit: (card.querySelector('.sv-head .hint').textContent.match(/\[(.*)\]/) || [])[1] || '' };
     const it = S.boq.surveys[tid] || svItem(t);
+    if (e.target.dataset.nomat) { const k = e.target.dataset.nomat; S.boq.overrides[k] = Object.assign(S.boq.overrides[k] || {}, { no_mat: true }); autosave(); renderSurvey(); renderPR1(); renderSummary(); toast('ตั้งเป็นค่าแรงอย่างเดียวแล้ว — ยกเลิกได้ที่ ปร.1'); return; }
     if (e.target.closest('[data-svtoggle]')) { S.svOpen = S.svOpen === tid ? null : tid; renderSurvey(); if (S.svOpen) setTimeout(() => { const c = $(`[data-svi="${CSS.escape(tid)}"]`); if (c) { svLibHint(c, it); c.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, 50); return; }
     if (e.target.dataset.qadd) { it.quotes.push({ id: Survey.uid('q'), channel: 'web', shop: '', contact: '', date: new Date().toISOString().slice(0, 10), price: '', qunit: it.unit, factor: 1, vat: true, note: '', imgs: [] }); svSave(it); renderSurvey(); return; }
     const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q);
@@ -332,7 +395,7 @@ function _renderPR1() {
           <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
             ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
-            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>` : ''}</td>
+            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${o.no_mat ? `<span class="src">ค่าแรงอย่างเดียว <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
           <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : fmt(r.qty)}</td>
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
           <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${o.mat !== undefined ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span></td>
@@ -350,6 +413,8 @@ function _renderPR1() {
   h += `<tr class="total"><td></td><td colspan="7">รวมค่างานต้นทุนทั้งหมด</td><td class="r c-tot">${fmt(r2(grand))}</td><td></td></tr></tbody>`;
   tb.innerHTML = h;
   $('#pr1-alert').textContent = warn ? `มี ${warn} รายการที่ยังไม่มีราคาหรือมีคำเตือน (แถบสีส้ม) — แก้ราคาในช่องได้โดยตรง` : '';
+  tb.querySelectorAll('[data-nomat],[data-unnomat]').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.nomat || b.dataset.unnomat;
+    S.boq.overrides[k] = Object.assign(S.boq.overrides[k] || {}, { no_mat: !!b.dataset.nomat }); if (!b.dataset.nomat) delete S.boq.overrides[k].no_mat; autosave(); renderPR1(); renderSummary(); renderSurvey(); });
   tb.querySelectorAll('[data-svgo]').forEach(b => b.onclick = e => { e.stopPropagation(); S.svOpen = 'row:' + b.dataset.svgo; S.svf = 'all'; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'survey').click(); renderSurvey(); setTimeout(() => { const c = $(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) { c.scrollIntoView({ block: 'start' }); svLibHint(c, S.boq.surveys[S.svOpen] || svItem({ target: S.svOpen, name: c.querySelector('.sv-head b').textContent, unit: '' })); } }, 80); });
   tb.querySelectorAll('tr.row').forEach(tr => {
     const key = tr.dataset.key;
@@ -407,15 +472,17 @@ function _renderPR23() {
     const c = pr2Row(r);
     h += `<tr><td class="r">${i + 1}</td><td><input class="cell" data-i="${i}" data-f="name" value="${esc(r.name)}"></td>
       <td class="r"><input class="price" data-i="${i}" data-f="qty" value="${esc(r.qty)}"></td><td><input class="cell" style="width:60px" data-i="${i}" data-f="unit" value="${esc(r.unit)}"></td>
-      <td class="r"><input class="price" data-i="${i}" data-f="price" value="${esc(r.price)}"></td><td class="r">${fmt(c.eq)}</td>
+      <td class="r">${r.price_src ? `${fmt(r.price)}<span class="src">${esc(r.price_src)}</span>` : `<input class="price" data-i="${i}" data-f="price" value="${esc(r.price)}">`}<button class="btn small sv-go" data-svpr="pr2:${esc(r.id || '')}">${r.price_src ? 'ดูราคาสืบ' : 'สืบราคา'}</button></td><td class="r">${fmt(c.eq)}</td>
       <td class="r"><input class="price" data-i="${i}" data-f="install" value="${esc(r.install)}"></td><td class="r">${fmt(c.inst)}</td>
       <td class="r">${fmt(r2(c.eq + c.inst))}</td><td><button class="btn small" data-del2="${i}">ลบ</button></td></tr>`;
   });
   t2.innerHTML = h;
   t2.querySelectorAll('input').forEach(el => el.onchange = () => {
-    const r = S.boq.pr2[+el.dataset.i]; r[el.dataset.f] = ['qty', 'price', 'install'].includes(el.dataset.f) ? +el.value || 0 : el.value;
+    const r = S.boq.pr2[+el.dataset.i]; r[el.dataset.f] = ['qty', 'price', 'install'].includes(el.dataset.f) ? +el.value || 0 : el.value; applyPr23Survey();
     autosave(); renderPR23(); renderSummary();
   });
+  const goSv = b => b.onclick = () => { if (!b.dataset.svpr.split(':')[1]) { surveyTargets(); renderPR23(); return toast('ใส่ชื่อรายการก่อน'); } S.svOpen = b.dataset.svpr; S.svf = 'all'; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'survey').click(); setTimeout(() => { const c = $(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) c.scrollIntoView({ block: 'start' }); }, 120); };
+  t2.querySelectorAll('[data-svpr]').forEach(goSv);
   t2.querySelectorAll('[data-del2]').forEach(b => b.onclick = () => { S.boq.pr2.splice(+b.dataset.del2, 1); autosave(); renderPR23(); renderSummary(); });
 
   const t3 = $('#pr3-table');
@@ -423,13 +490,14 @@ function _renderPR23() {
   S.boq.pr3.forEach((r, i) => {
     k += `<tr><td class="r">${i + 1}</td><td><input class="cell" list="pr3-list" data-i="${i}" data-f="name" value="${esc(r.name)}"></td>
       <td class="r"><input class="price" data-i="${i}" data-f="qty" value="${esc(r.qty)}"></td><td><input class="cell" style="width:60px" data-i="${i}" data-f="unit" value="${esc(r.unit)}"></td>
-      <td class="r"><input class="price" data-i="${i}" data-f="amount" value="${esc(r.amount)}"></td>
+      <td class="r">${r.price_src ? `${fmt(r.amount)}<span class="src">${esc(r.price_src)}</span>` : `<input class="price" data-i="${i}" data-f="amount" value="${esc(r.amount)}">`}<button class="btn small sv-go" data-svpr="pr3:${esc(r.id || '')}">${r.price_src ? 'ดูราคาสืบ' : 'สืบราคา'}</button></td>
       <td><input class="cell" data-i="${i}" data-f="note" value="${esc(r.note)}"></td><td><button class="btn small" data-del3="${i}">ลบ</button></td></tr>`;
   });
   k += `<tr class="total"><td></td><td colspan="3">รวมค่าใช้จ่ายพิเศษตามข้อกำหนดทุกรายการ</td><td class="r">${fmt(pr3Total())}</td><td colspan="2"></td></tr>`;
+  setTimeout(() => t3.querySelectorAll('[data-svpr]').forEach(goSv), 0);
   t3.innerHTML = k + `<datalist id="pr3-list">${PR3_TEMPLATES.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
   t3.querySelectorAll('input').forEach(el => el.onchange = () => {
-    const r = S.boq.pr3[+el.dataset.i]; r[el.dataset.f] = ['qty', 'amount'].includes(el.dataset.f) ? +el.value || 0 : el.value;
+    const r = S.boq.pr3[+el.dataset.i]; r[el.dataset.f] = ['qty', 'amount'].includes(el.dataset.f) ? +el.value || 0 : el.value; applyPr23Survey();
     autosave(); renderPR23(); renderSummary();
   });
   t3.querySelectorAll('[data-del3]').forEach(b => b.onclick = () => { S.boq.pr3.splice(+b.dataset.del3, 1); autosave(); renderPR23(); renderSummary(); });
@@ -463,7 +531,7 @@ function totals() {
   return { pr, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand };
 }
 function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box }) {
-  const sig = `<p class="hint" style="margin-top:18px;text-align:center">ประธานกรรมการกำหนดราคากลาง ............................ &nbsp; กรรมการ ............................ &nbsp; กรรมการ ............................</p>`;
+  const sig = sigHtml();
   box.innerHTML = `<div class="kpis no-print">${kpiHtml({ pr, cost, ff, grand }, S.plan)}</div>
   <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุปค่าก่อสร้าง ค่างานต้นทุน</h3>${head}
     <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>Factor F</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
@@ -1076,14 +1144,15 @@ function showLog() {
   let m = $('#log-modal');
   if (!m) { m = document.createElement('div'); m.id = 'log-modal'; m.className = 'modal'; document.body.appendChild(m); m.onclick = e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); }; }
   m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">${esc(UD_VERSION.name)} v${UD_VERSION.v}</h2><button class="btn small" data-close="1">×</button></div>
-    <p class="hint">เลขใหญ่.เลขย่อย — แก้เล็กเปลี่ยนเลขย่อย แก้ใหญ่เปลี่ยนเลขใหญ่</p>
+    <p class="hint">พัฒนาโดย <b style="color:var(--green)">patcharapol_bot</b> · เลขใหญ่.เลขย่อย — แก้เล็กเปลี่ยนเลขย่อย แก้ใหญ่เปลี่ยนเลขใหญ่</p>
     <table class="mini-boq">${UD_VERSION.log.map(([v, d, t]) => `<tr><td class="mono" style="color:var(--green);white-space:nowrap">v${v}</td><td class="mono" style="color:var(--text3);white-space:nowrap">${d}</td><td>${esc(t)}</td></tr>`).join('')}</table></div>`;
   m.classList.add('on');
 }
 function bind() {
   bindSurvey();
+  $('#credit').innerHTML = `UD Total Station v${UD_VERSION.v} · พัฒนาโดย <b>patcharapol_bot</b>`;
   $('#logo-ver').textContent = 'v' + UD_VERSION.v; $('#logo-ver').onclick = showLog;
-  $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; connecting UD-Cost Hub ...<span class="cur">_</span>`;
+  $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; dev: patcharapol_bot\n&gt; connecting UD-Cost Hub ...<span class="cur">_</span>`;
   $$('#tabs .nav-tab').forEach(t => t.onclick = () => {
     $$('#tabs .nav-tab').forEach(x => x.classList.toggle('active', x === t));
     $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t.dataset.tab));
@@ -1129,14 +1198,15 @@ function bind() {
   $$('#proj-form [data-k]').forEach(el => el.onchange = () => {
     S.boq.project[el.dataset.k] = el.type === 'number' ? (+el.value || '') : el.value;
     if (el.dataset.k === 'name') $('#meta-proj').textContent = el.value;
+    if (el.dataset.k === 'mode') renderPeople();
     autosave(); renderSummary(); renderPR1();
   });
   [['#ff-adv', 'advance'], ['#ff-ret', 'retention'], ['#ff-loan', 'loanPct']].forEach(([s, k]) => $(s).onchange = () => {
     S.boq.factor[k] = +$(s).value || 0; autosave(); renderSummary();
   });
   $('#b-addrow').onclick = addCustomRow;
-  $('#b-add-pr2').onclick = () => { S.boq.pr2.push({ name: '', qty: 1, unit: 'ชุด', price: 0, install: 0 }); autosave(); renderPR23(); };
-  $('#b-add-pr3').onclick = () => { S.boq.pr3.push({ name: '', qty: 1, unit: 'งาน', amount: 0, note: '' }); autosave(); renderPR23(); };
+  $('#b-add-pr2').onclick = () => { S.boq.pr2.push({ id: Survey.uid('e'), name: '', qty: 1, unit: 'ชุด', price: 0, install: 0 }); autosave(); renderPR23(); };
+  $('#b-add-pr3').onclick = () => { S.boq.pr3.push({ id: Survey.uid('x'), name: '', qty: 1, unit: 'งาน', amount: 0, note: '' }); autosave(); renderPR23(); };
   $('#pl-start').onchange = e => { S.boq.plan.start = e.target.value; autosave(); renderPlan(); };
   $('#pl-n').onchange = e => { S.boq.plan.inst.n = Math.max(1, Math.min(24, +e.target.value || 1)); S.boq.plan.inst.assign = {}; autosave(); renderPlan(); };
   $('#pl-mode').onchange = e => {

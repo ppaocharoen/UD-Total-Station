@@ -507,7 +507,8 @@ class Takeoff:
                     steel_len[spec["section"]] += L
                     steel_src[spec["section"]].append(rf["id"])
                     steel_mem[spec["section"]][rf["id"]] = steel_mem[spec["section"]].get(rf["id"], 0) + L
-            self.add("1.1.19", "roof_frame_area", "งานโครงหลังคา (พื้นที่ตามแนวลาด)", "ตร.ม.", area, rf["id"], task="roof_frame")
+            # พื้นที่โครงหลังคาตามแนวลาดเป็นข้อมูลเท่านั้น (ไม่มีค่างาน — ค่าแรงโครงหลังคาคิดต่อ กก. ในรายการเหล็กรูปพรรณ) ตกลงกับ Earth 18 ต.ค. 2569
+            self.note(f"หลังคา {rf['id']}: พื้นที่ตามแนวลาด {area:.2f} ตร.ม. (ข้อมูล ไม่คิดเงิน)")
         for sec_id, L in steel_len.items():
             sec = self.secs[sec_id]
             w = 0.05 if hip_roof else 0.03
