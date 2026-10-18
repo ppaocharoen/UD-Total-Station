@@ -24,6 +24,8 @@ function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 0, retention: 0, loanPct: 0 },
     overrides: {}, survey: {}, surveys: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
+/** คำเรียกตามประเภทงาน: กำหนดราคากลาง → ราคากลาง · ประมาณราคา → ราคาประมาณการ */
+const RG = () => (S.boq && S.boq.project && S.boq.project.mode === 'estimate' ? 'ราคาประมาณการ' : 'ราคากลาง');
 function newPlan() { return { start: '', workdays: [1, 2, 3, 4, 5, 6], holidays: [], durations: {}, inst: { n: 4, mode: 'auto', assign: {} } }; }
 
 // ------------------------------------------------------------------ util
@@ -135,6 +137,7 @@ function people() {
 }
 function renderPeople() {
   const p = S.boq.project, L = people(), est = p.mode === 'estimate';
+  if ($('#lbl-calc')) $('#lbl-calc').textContent = `คำนวณ${RG()}เมื่อวันที่`;
   $('#people-title').textContent = est ? 'ผู้ประมาณราคา' : `คณะกรรมการกำหนดราคากลาง (${L.length} คน)`;
   $('#people').innerHTML = L.map((x, i) => `<div class="ppl-row"><span class="ppl-role">${x.role}</span><input data-pp="${i}" data-pf="name" placeholder="ชื่อ-สกุล" value="${esc(x.name)}"><input data-pp="${i}" data-pf="pos" placeholder="ตำแหน่ง" value="${esc(x.pos)}">${!est && i >= 3 ? `<button class="btn small" data-ppdel="${i}">ลบ</button>` : ''}</div>`).join('') +
     (est ? '' : `<button class="btn small" id="pp-add">+ เพิ่มกรรมการ</button>`);
@@ -169,11 +172,13 @@ function renderProject() {
 function renderSurvey() { clearTimeout(renderSurvey._t); renderSurvey._t = setTimeout(_renderSurvey, 0); }
 // ------------------------------------------------------------------ ราคาสืบ
 const isInfo = r => r.ref && r.ref.no_lab && !r.ref.need_mat && !r.ref.code && !r.ref.find;
+/** รหัสอ้างอิงข้ามโครงการ: รหัสพาณิชย์ หรือรหัสแถวมาตรฐานของตัวถอดปริมาณ (ไม่ใช้แถวที่ตั้งตามเลขแบบ เช่น D1, fx_, pt_) */
+function refOfRow(r) { const c = r.ref && r.ref.kind === 'mat' && r.ref.code; if (c) return 'c:' + String(c).split(',')[0]; return /^(open_|fx_|pt_|eq_|manual)/.test(r.key) ? '' : 'k:' + r.key; }
 function surveyTargets() {   // กลุ่ม: pr1 = วัสดุใน ปร.1 · sub = วัสดุย่อยในวัสดุมวลรวม · pr23 = ครุภัณฑ์/ค่าใช้จ่ายพิเศษที่เพิ่มเอง
   const out = [], pr = S.db ? priceAll() : [];
   pr.forEach(r => {
     if ((r.price_ref && ['pct', 'comp'].includes(r.price_ref.kind)) || isInfo(r) || r.unit === 'งาน' || r.lab_only) return;   // วัสดุมวลรวมสืบที่วัสดุย่อย; ค่าแรงอย่างเดียวไม่ต้องสืบ
-    if (r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) out.push({ group: 'pr1', target: 'row:' + r.key, key: r.key, name: r.name, unit: r.unit, qty: r.qty, why: (r.warns || []).join(' · ') });
+    if (r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) out.push({ group: 'pr1', target: 'row:' + r.key, key: r.key, ref: refOfRow(r), name: r.name, unit: r.unit, qty: r.qty, why: (r.warns || []).join(' · ') });
   });
   if (S.db) {
     // วัสดุมวลรวมที่โครงการนี้ใช้ (แถว ปร.1 ที่ผูก comp) → วัสดุย่อยที่ใช้จริง
@@ -184,7 +189,7 @@ function surveyTargets() {   // กลุ่ม: pr1 = วัสดุใน ป
       if (it.fixedPrice !== null || hasCommerce(it)) return;
       const sc = S.db.resolveCompRef(it); if (sc) return;   // คิดจากวัสดุมวลรวมย่อยอีกตัว
       const k = subKey(it), ref = it.itemCode && S.db.matRef[it.itemCode];
-      const o = subs[k] = subs[k] || { group: 'sub', target: k, name: ref ? ref.name : it.itemName, unit: ref ? String(ref.unit).replace(/^บาท\//, '') : it.unit, comps: new Set(), used: [] };
+      const o = subs[k] = subs[k] || { group: 'sub', target: k, ref: k.startsWith('sub:') ? 'c:' + k.slice(4) : '', name: ref ? ref.name : it.itemName, unit: ref ? String(ref.unit).replace(/^บาท\//, '') : it.unit, comps: new Set(), used: [] };
       o.comps.add(it.compId);
       if (usedComp[it.compId] && !o.used.some(u => u.id === it.compId)) o.used.push({ id: it.compId, sub: usedComp[it.compId].c.sub, name: usedComp[it.compId].c.name, rows: usedComp[it.compId].rows });
     });
@@ -205,6 +210,7 @@ function applyPr23Survey() {
 function svItem(t) {   // รายการราคาสืบของเป้าหมาย (สร้างใหม่ถ้ายังไม่มี)
   const sv = S.boq.surveys; let it = sv[t.target];
   if (!it) it = sv[t.target] = { id: t.target, name: t.name, unit: t.unit, target: t.target, quotes: [], reason: '' };
+  if (t.ref && !it.ref) it.ref = t.ref;
   return it;
 }
 function renderSurvey() { clearTimeout(renderSurvey._t); renderSurvey._t = setTimeout(_renderSurvey, 0); }
@@ -235,6 +241,7 @@ function _renderSurvey() {
     html += `<h3 class="sv-group">${title} <span class="hint">${list.length + (extra ? '' : '')} รายการ</span></h3>` + list.map(x => svCard(x)).join('') + extra;
   });
   box.innerHTML = html || '<div class="card hint">ไม่มีรายการในกลุ่มนี้</div>';
+  const tmap = {}; all.forEach(x => { tmap[x.t.target] = x.t; }); libBadges(box, tmap);
   if (S.svOpen) { const c = box.querySelector(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) c.classList.add('open'); }
 }
 const SVST = { ok: ['ครบ 3 เจ้า', 'ok'], few: ['ไม่ครบ 3 เจ้า', 'warn'], none: ['ยังไม่สืบ', 'err'] };
@@ -280,23 +287,49 @@ function svSave(it) {   // บันทึก + สำรองเข้าค�
   it.updated = new Date().toISOString(); applyPr23Survey(); autosave(); applySurvey(); priceAll(); if (/^pr[23]:/.test(it.target)) renderPR23();
   clearTimeout(svSave._t); svSave._t = setTimeout(() => {
     const imgs = {}; (it.quotes || []).forEach(q => (q.imgs || []).forEach(id => { if (S.img[id]) imgs[id] = S.img[id]; }));
-    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '' })
+    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '', ref: it.ref || '' })
       .then(() => { if (Survey.remote()) libStatus('บันทึกเข้าคลังกลางแล้ว'); })
       .catch(er => { libStatus('บันทึกเข้าคลังกลางไม่ได้: ' + er.message + ' (เก็บในเครื่องไว้ก่อน)', true); });
   }, 800);
 }
-async function svLibHint(card, it) {
+async function svLibHint(card, it) {   // คลังราคาสืบของรายการนี้: ตรงแน่ / อาจตรงกับ / ค้นเอง
   const el = card.querySelector('[data-libhint]'); if (!el) return;
-  const m = Survey.libMatch(await Survey.libAll(), it.name, it.unit).filter(x => x.key !== Survey.libKey(it.name, it.unit) || !(it.quotes || []).length);
-  if (!m.length) { el.textContent = ''; return; }
-  el.innerHTML = 'คลังราคาสืบ: ' + m.map((x, i) => { const a = Survey.ageDays(x.updated); return `<a class="pk-link" data-libuse="${i}">${esc(x.name)} · ${x.quotes.length} เจ้า · ${a} วันก่อน${x.project ? ' (' + esc(x.project) + ')' : ''}</a>${a > 90 ? ' <span class="pill warn">เกิน 90 วัน</span>' : ''}`; }).join(' · ');
-  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = async () => {
-    const x = m[+a.dataset.libuse];
-    toast('กำลังดึงจากคลัง…');
-    for (const [id, v] of Object.entries(x.imgs || {})) { const d = await Survey.libImg(v).catch(() => null); if (d) { S.img[id] = d; Survey.imgPut(id, d); } }
-    it.quotes = (it.quotes || []).concat(x.quotes.map(q => Object.assign({}, q, { id: Survey.uid('q'), note: (q.note ? q.note + ' · ' : '') + 'จากคลัง' })));
-    if (!it.reason && x.reason) it.reason = x.reason;
-    svSave(it); renderSurvey(); renderPR1(); renderSummary(); toast(`ดึง ${x.quotes.length} เจ้าจากคลังแล้ว — ตรวจวันที่สืบ`);
+  const all = await Survey.libAll(), own = Survey.libKey(it.name, it.unit), f = Survey.libFind(all, it);
+  const mine = x => x.key === own && (it.quotes || []).length;
+  const ent = [];
+  if (f.hit && !mine(f.hit)) ent.push({ x: f.hit, tag: f.how, sure: true });
+  f.maybe.forEach(o => { if (!mine(o.x)) ent.push({ x: o.x, tag: 'อาจตรงกับ', sure: false }); });
+  const line = (e, i) => { const a = Survey.ageDays(e.x.updated); return `${e.sure ? '' : '<span class="pill warn">อาจตรงกับ</span> '}<a class="pk-link" data-libuse="${i}" title="${esc(e.tag)}">${esc(e.x.name)} [${esc(e.x.unit)}] · ${(e.x.quotes || []).length} เจ้า · ${a} วันก่อน${e.x.project ? ' (' + esc(e.x.project) + ')' : ''}</a>${a > 90 ? ' <span class="pill warn">เกิน 90 วัน</span>' : ''}`; };
+  el.innerHTML = (ent.length ? 'คลังราคาสืบ: ' + ent.map(line).join(' · ') + ' · ' : '') + '<a class="pk-link" data-libsearch="1">ค้นในคลัง…</a><div data-libres="1"></div>';
+  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = () => { const e = ent[+a.dataset.libuse]; if (!e.sure && !confirm(`ใช้ราคาสืบของ "${e.x.name}" กับ "${it.name}"?\nระบบจะจำว่าเป็นวัสดุเดียวกันสำหรับโครงการต่อไป`)) return; libUse(it, e.x, !e.sure); });
+  el.querySelector('[data-libsearch]').onclick = () => {
+    const q = prompt('ค้นในคลังราคาสืบ (พิมพ์บางส่วนของชื่อ)', it.name); if (!q) return;
+    const res = Survey.libSearch(all, q, it.unit), box = el.querySelector('[data-libres]');
+    box.innerHTML = res.length ? res.map((x, i) => `<div><a class="pk-link" data-libpick="${i}">${esc(x.name)} [${esc(x.unit)}] · ${(x.quotes || []).length} เจ้า · ${Survey.ageDays(x.updated)} วันก่อน</a></div>`).join('') : '<span class="hint">ไม่พบในคลัง</span>';
+    box.querySelectorAll('[data-libpick]').forEach(a => a.onclick = () => libUse(it, res[+a.dataset.libpick], true));
+  };
+}
+/** ดึงราคาสืบจากคลังมาใช้ · remember = จำชื่อนี้เป็นชื่ออื่นของรายการในคลัง (โครงการต่อไปจับคู่ให้เอง) */
+async function libUse(it, x, remember) {
+  toast('กำลังดึงจากคลัง…');
+  for (const [id, v] of Object.entries(x.imgs || {})) { const d = await Survey.libImg(v).catch(() => null); if (d) { S.img[id] = d; Survey.imgPut(id, d); } }
+  it.quotes = (it.quotes || []).concat((x.quotes || []).map(q => Object.assign({}, q, { id: Survey.uid('q'), note: (q.note ? q.note + ' · ' : '') + 'จากคลัง' })));
+  if (!it.reason && x.reason) it.reason = x.reason;
+  const sameUnit = Survey.normUnit(x.unit) === Survey.normUnit(it.unit);
+  if (remember && sameUnit && x.key !== Survey.libKey(it.name, it.unit)) Survey.libAlias(x.key, it.name, it.unit).catch(er => libStatus('จำชื่ออื่นไม่สำเร็จ: ' + er.message, true));
+  svSave(it); renderSurvey(); renderPR1(); renderSummary();
+  toast(sameUnit ? `ดึง ${(x.quotes || []).length} เจ้าจากคลังแล้ว — ตรวจวันที่สืบ` : `ดึงแล้ว แต่หน่วยต่างกัน (${x.unit} → ${it.unit}) — แก้ตัวแปลงหน่วยของแต่ละเจ้า`);
+}
+/** ป้ายในรายการ: มีในคลัง / อาจมีในคลัง (เฉพาะรายการที่ยังไม่ได้สืบ) */
+async function libBadges(box, tmap) {
+  const lib = await Survey.libAll().catch(() => []); if (!lib.length) return;
+  box.querySelectorAll('[data-svi]').forEach(c => {
+    const t = tmap[c.dataset.svi], it = S.boq.surveys[c.dataset.svi]; if (!t || (it && (it.quotes || []).length)) return;
+    const f = Survey.libFind(lib, { name: t.name, unit: t.unit, ref: t.ref || (it && it.ref) }), sum = c.querySelector('.sv-sum'); if (!sum || sum.querySelector('.libb')) return;
+    let h = '';
+    if (f.hit) { const a = Survey.ageDays(f.hit.updated); h = `<span class="pill ${a > 90 ? 'warn' : 'ok'} libb" title="${esc(f.how)}">มีในคลัง · ${(f.hit.quotes || []).length} เจ้า · ${a} วัน</span>`; }
+    else if (f.maybe.length) h = `<span class="pill warn libb" title="${esc(f.maybe[0].x.name)}">อาจมีในคลัง</span>`;
+    if (h) sum.insertAdjacentHTML('afterbegin', h + ' ');
   });
 }
 /** ดูภาพหลักฐานแบบหน้าต่างซ้อน (ไม่เปิดแท็บใหม่) — แตะพื้นหลัง/× /Esc เพื่อปิด */
@@ -387,10 +420,10 @@ function svPrintout() {   // บัญชีสืบราคา + ภาคผ
   items.forEach((it, k) => {
     const s = Survey.summary(it);
     h += `<h4>${k + 1}. ${esc(it.name)} (หน่วย ${esc(it.unit)})</h4><div class="table-wrap"><table class="boq"><tr><th>เจ้า</th><th>ร้าน / ช่องทาง</th><th>ติดต่อ</th><th>วันที่</th><th>ราคาที่ได้</th><th>VAT</th><th>แปลงหน่วย</th><th>บาท/${esc(it.unit)}</th><th>หลักฐาน</th></tr>
-      ${s.list.map((x, i) => { const q = x.q, refs = (q.imgs || []).map(id => { fig.push({ id, cap: `${it.name} — ${q.shop || Survey.CHANNEL[q.channel]}` }); return 'ภาพ ' + fig.length; });
+      ${s.list.map((x, i) => { const q = x.q, refs = (q.imgs || []).map(id => { fig.push({ id, cap: `${it.name} — ${q.shop || Survey.CHANNEL[q.channel]}` }); const d = Survey.safeImg(S.img[id]); return d ? `<figure class="sv-ev"><img src="${esc(d)}"><figcaption>ภาพ ${fig.length}</figcaption></figure>` : 'ภาพ ' + fig.length; });
         return `<tr ${q === s.best ? 'class="total"' : ''}><td class="r">${i + 1}</td><td>${esc(q.shop || '')}<br><small>${Survey.CHANNEL[q.channel] || ''}</small></td><td style="word-break:break-all">${esc(q.contact || '')}</td><td>${esc(q.date || '')}</td>
           <td class="r">${fmt(+q.price)}${q.qunit ? '/' + esc(q.qunit) : ''}</td><td>${q.vat ? 'รวม (หักออก)' : 'ไม่รวม'}</td><td class="r">${+(q.factor || 1) !== 1 ? `1 ${esc(q.qunit || '')} = ${esc(q.factor)} ${esc(it.unit)}` : '-'}</td>
-          <td class="r"><b>${fmt(x.up)}</b></td><td>${refs.join(', ') || '-'}</td></tr>`; }).join('')}
+          <td class="r"><b>${fmt(x.up)}</b></td><td class="sv-evs">${refs.join('') || '-'}</td></tr>`; }).join('')}
       </table></div><p>ใช้ราคา <b>${fmt(s.price)}</b> บาท/${esc(it.unit)} (${esc(s.best.shop || '')})${s.n < Survey.MIN_Q ? ` · สืบได้ ${s.n} เจ้า: ${esc(it.reason || 'ไม่ได้ระบุเหตุผล')}` : ''}</p>`;
     n++;
   });
@@ -556,7 +589,7 @@ function _renderSummary() {
   const T = totals(), pr = T.pr, p = S.boq.project, fc = S.boq.factor;
   const { secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand } = T;
   const head = `<div class="head"><span>ชื่อโครงการ ${esc(p.name)}</span><span>สถานที่ก่อสร้าง ${esc(p.location)}</span>
-    <span>แบบเลขที่ ${esc(p.drawing_no || '-')}</span><span>หน่วยงาน ${esc(p.agency)}</span><span>คำนวณราคากลางเมื่อวันที่ ${esc(p.calc_date)}</span><span>หน่วย : บาท</span></div>`;
+    <span>แบบเลขที่ ${esc(p.drawing_no || '-')}</span><span>หน่วยงาน ${esc(p.agency)}</span><span>คำนวณ${RG()}เมื่อวันที่ ${esc(p.calc_date)}</span><span>หน่วย : บาท</span></div>`;
   return renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box });
 }
 function totals() {
@@ -590,14 +623,14 @@ function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV
   ${S.boq.pr2.length ? `<div class="sum-doc"><h3>แบบ ปร.2 (ก) แบบสรุปค่าครุภัณฑ์จัดซื้อ</h3>${head}
     <div class="table-wrap"><table class="boq"><tr><th>รายการ</th><th>ค่าครุภัณฑ์</th><th>VAT</th><th>จำนวนเงิน</th><th>ค่าติดตั้ง</th><th>VAT</th><th>จำนวนเงิน</th><th>รวมค่าครุภัณฑ์จัดซื้อ</th></tr>
     <tr><td>ครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eq)}</td><td class="r">${fmt(eqV)}</td><td class="r">${fmt(r2(eq + eqV))}</td><td class="r">${fmt(ins)}</td><td class="r">${fmt(insV)}</td><td class="r">${fmt(r2(ins + insV))}</td><td class="r">${fmt(eqTotal)}</td></tr></table></div>${sig}</div>` : ''}
-  <div class="sum-doc"><h3>แบบ ปร.4 แบบสรุปราคากลางงานก่อสร้างอาคาร</h3>${head}
+  <div class="sum-doc"><h3>แบบ ปร.4 แบบสรุป${RG()}งานก่อสร้างอาคาร</h3>${head}
     <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
     <tr><td class="r">1</td><td>ค่างานต้นทุน</td><td class="r">${fmt(build)}</td><td></td></tr>
     ${secs.map(s => `<tr><td></td><td>&nbsp;&nbsp;- ${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
     <tr><td class="r">2</td><td>ค่าครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eqTotal)}</td><td></td></tr>
     <tr><td class="r">3</td><td>ค่าใช้จ่ายพิเศษตามข้อกำหนด (ถ้ามี)</td><td class="r">${fmt(sp)}</td><td></td></tr>
     <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr></table></div>
-    <p class="bigtotal" style="margin-top:12px">ราคากลาง ${fmt(grand)} บาท</p>
+    <p class="bigtotal" style="margin-top:12px">${RG()} ${fmt(grand)} บาท</p>
     <p style="text-align:right">(${esc(BoqCalc.bahtText(grand))})</p>${sig}</div>`;
 }
 
@@ -765,7 +798,7 @@ function renderDiff() {
   const ch = R.filter(r => r.status !== 'same');
   const el = [...E.added.map(e => ['เพิ่ม', e]), ...E.removed.map(e => ['ลบ', e]), ...E.changed.map(e => ['แก้', e])];
   const stale = [S.old.model, S.model].filter(m => m.quantities && m.quantities.stale).length;
-  out.innerHTML = `<div class="kpis">${k('ค่างานต้นทุน', A.cost, B.cost, 'บ.')}${k('ราคากลาง', A.grand, B.grand, 'บ.')}${k('Factor F', A.F, B.F, '', 4)}${k('ระยะเวลา', A.plan.calDays, B.plan.calDays, 'วัน', 0)}</div>
+  out.innerHTML = `<div class="kpis">${k('ค่างานต้นทุน', A.cost, B.cost, 'บ.')}${k(RG(), A.grand, B.grand, 'บ.')}${k('Factor F', A.F, B.F, '', 4)}${k('ระยะเวลา', A.plan.calDays, B.plan.calDays, 'วัน', 0)}</div>
   ${stale ? '<p class="alert">มีโมเดลที่ปริมาณเก่า (แก้โมเดลหลังถอดปริมาณ) — ถอดปริมาณใหม่ก่อนเทียบ</p>' : ''}
   <div class="card"><h2>ชิ้นส่วนที่เปลี่ยน (${el.length})</h2>${el.length ? `<div class="table-wrap"><table class="boq"><tr><th>สถานะ</th><th>ประเภท</th><th>id</th><th>สิ่งที่เปลี่ยน</th></tr>${el.map(([t, e]) =>
     `<tr class="row" data-id="${esc(e.id)}"><td><span class="pill ${t === 'เพิ่ม' ? 'ok' : t === 'ลบ' ? 'err' : 'warn'}">${t}</span></td><td>${esc(BmDiff.SETS[e.set])}</td><td class="mono">${esc(e.id)}</td><td>${e.fields ? e.fields.map(f => `<b>${esc(f)}</b> ${e.before && f in e.before ? `<span class="mono">${esc(JSON.stringify(e.before[f]))} → ${esc(JSON.stringify(e.after[f]))}</span>` : ''}`).join('<br>') : ''}</td></tr>`).join('')}</table></div>` : '<p class="hint">ไม่มีชิ้นส่วนที่เปลี่ยน</p>'}</div>
@@ -814,14 +847,14 @@ function kpiHtml(T, plan) {
   const area = +S.boq.project.area || 0;
   const k = (l, v, u, hot) => `<div class="kpi ${hot ? 'hot' : ''}"><span>${l}</span><b>${v}${u ? `<small>${u}</small>` : ''}</b></div>`;
   return k('ค่าวัสดุ', fmt(mat, 0), 'บ.') + k('ค่าแรง', fmt(lab, 0), 'บ.') + k('ค่างานต้นทุน', fmt(T.cost, 0), 'บ.') +
-    k(`ราคากลาง (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
+    k(`${RG()} (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
     (plan ? k('ระยะเวลา', plan.calDays, 'วัน') : '');
 }
 function renderSideSum(T, plan) {
   const pr = T.pr, area = +S.boq.project.area || 0, q = S.model.quantities || {};
   const sum = (test, unit) => r2(pr.filter(r => test(r.key) && (!unit || r.unit === unit)).reduce((a, r) => a + (+r.qty || 0), 0));
   const it = [
-    ['ราคากลาง', fmt(T.grand, 0), 'บาท', true],
+    [RG(), fmt(T.grand, 0), 'บาท', true],
     area ? ['เฉลี่ยต่อพื้นที่', fmt(r2(T.grand / area), 0), `บาท/ตร.ม. (${fmt(area)} ตร.ม.)`] : null,
     plan ? ['ระยะเวลา', plan.calDays, `วัน (${thDate(plan.start)} – ${thDate(plan.finish)})`] : null,
     ['คอนกรีตโครงสร้าง', fmt(sum(k => k.startsWith('conc_'), 'ลบ.ม.')), 'ลบ.ม.'],
@@ -845,7 +878,7 @@ function renderHud(T, plan) {
   const m = S.model; if (!m) return;
   const cnt = t => (m.members || []).filter(x => x.type === t).length;
   $('#hud .t').innerHTML = `${esc(S.boq.project.name || m.meta.name || '')}<span class="tag">3D·BOQ·แผนงาน</span>`;
-  $('#hud .s').textContent = `ราคากลาง ${fmt(T.grand)} บาท · ${plan.calDays} วัน (${thDate(plan.start)} – ${thDate(plan.finish)}) · เสา ${cnt('column')} · คาน ${cnt('beam') + cnt('tie_beam')}`;
+  $('#hud .s').textContent = `${RG()} ${fmt(T.grand)} บาท · ${plan.calDays} วัน (${thDate(plan.start)} – ${thDate(plan.finish)}) · เสา ${cnt('column')} · คาน ${cnt('beam') + cnt('tie_beam')}`;
 }
 function renderDockBoq(T, plan) {
   $('#dk-kpis').innerHTML = kpiHtml(T, plan);
@@ -1243,7 +1276,7 @@ function bind() {
   $$('#proj-form [data-k]').forEach(el => el.onchange = () => {
     S.boq.project[el.dataset.k] = el.type === 'number' ? (+el.value || '') : el.value;
     if (el.dataset.k === 'name') $('#meta-proj').textContent = el.value;
-    if (el.dataset.k === 'mode') renderPeople();
+    if (el.dataset.k === 'mode') { renderPeople(); $('#lbl-calc').textContent = `คำนวณ${RG()}เมื่อวันที่`; renderAll(); }
     autosave(); renderSummary(); renderPR1();
   });
   [['#ff-adv', 'advance'], ['#ff-ret', 'retention'], ['#ff-loan', 'loanPct']].forEach(([s, k]) => $(s).onchange = () => {

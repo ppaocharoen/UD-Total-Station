@@ -19,7 +19,7 @@
  */
 const SHEET = 'library', TRASH = 'deleted', FOLDER = 'UD Survey Images';
 const SHEET_ID = '';   // ว่างไว้ได้: ใช้ชีตที่ setup() สร้าง (เก็บ id ใน Script properties)
-const HEAD = ['key', 'name', 'unit', 'quotes', 'reason', 'updated', 'project', 'by', 'imgs'];
+const HEAD = ['key', 'name', 'unit', 'quotes', 'reason', 'updated', 'project', 'by', 'imgs', 'ref', 'aliases'];   // ref = รหัสพาณิชย์/รหัสแถวมาตรฐาน · aliases = ชื่ออื่นที่ผูกไว้
 const IMG_MAX = 2.8e6, IMG_PER_PUT = 10, IMG_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const FAIL_MAX = 20, FAIL_WIN = 600;   // เดาผิดได้ 20 ครั้ง / 10 นาที
 
@@ -30,7 +30,8 @@ function ss_() {
 }
 function tab_(name) {
   const ss = ss_(); let sh = ss.getSheetByName(name);
-  if (!sh) { sh = ss.insertSheet(name); sh.appendRow(name === TRASH ? HEAD.concat(['deleted_at']) : HEAD); sh.setFrozenRows(1); sh.getRange('A:J').setNumberFormat('@'); }
+  if (!sh) { sh = ss.insertSheet(name); sh.appendRow(name === TRASH ? HEAD.concat(['deleted_at']) : HEAD); sh.setFrozenRows(1); sh.getRange('A:L').setNumberFormat('@'); }
+  else if (name === SHEET && sh.getLastColumn() < HEAD.length) { sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]); sh.getRange('A:K').setNumberFormat('@'); }   // เพิ่มคอลัมน์ใหม่ให้ชีตเดิม
   return sh;
 }
 function folder_() {
@@ -56,7 +57,7 @@ function txt_(v) { const s = String(v == null ? '' : v); return /^[=+\-@\t\r]/.t
 function rows_(sh) {
   const v = (sh || tab_(SHEET)).getDataRange().getValues(); v.shift();
   const un = s => String(s).replace(/^'/, '');
-  return v.map((r, i) => ({ row: i + 2, r })).filter(x => x.r[0]).map(({ row, r }) => ({ row, key: un(r[0]), name: un(r[1]), unit: un(r[2]), quotes: JSON.parse(r[3] || '[]'), reason: un(r[4]), updated: un(r[5]), project: un(r[6]), by: un(r[7]), imgs: JSON.parse(r[8] || '{}') }));
+  return v.map((r, i) => ({ row: i + 2, r })).filter(x => x.r[0]).map(({ row, r }) => ({ row, key: un(r[0]), name: un(r[1]), unit: un(r[2]), quotes: JSON.parse(r[3] || '[]'), reason: un(r[4]), updated: un(r[5]), project: un(r[6]), by: un(r[7]), imgs: JSON.parse(r[8] || '{}'), ref: un(r[9] || ''), aliases: JSON.parse(r[10] || '[]') }));
 }
 function same_(a, b) {   // เทียบแบบเวลาคงที่
   a = String(a); b = String(b); let d = a.length ^ b.length;
@@ -87,13 +88,19 @@ function doPost(e) {
       if (!inLib) return out_({ ok: false, error: 'ไม่ใช่ภาพในคลัง' });
       return out_({ ok: true, data: 'data:' + f.getMimeType() + ';base64,' + Utilities.base64Encode(f.getBlob().getBytes()) });
     }
-    if (b.action !== 'put' && b.action !== 'del') return out_({ ok: false, error: 'unknown action' });
+    if (['put', 'del', 'alias'].indexOf(b.action) < 0) return out_({ ok: false, error: 'unknown action' });
     const lock = LockService.getScriptLock(); lock.waitLock(20000);
     try {
       const sh = tab_(SHEET), cur = rows_(sh).find(x => x.key === b.key);
       if (b.action === 'del') {   // ย้ายไปชีต deleted (กู้คืนได้)
         if (cur) { const r = sh.getRange(cur.row, 1, 1, HEAD.length).getValues()[0]; tab_(TRASH).appendRow(r.concat([new Date().toISOString()])); sh.deleteRow(cur.row); }
         return out_({ ok: true });
+      }
+      if (b.action === 'alias') {   // จำชื่ออื่นของรายการ (ไม่เปลี่ยนวันที่สืบ)
+        if (!cur) return out_({ ok: false, error: 'ไม่พบรายการในคลัง' });
+        const al = String(b.alias || '').slice(0, 300); if (!al) return out_({ ok: false, error: 'alias ว่าง' });
+        const list = cur.aliases.indexOf(al) < 0 ? cur.aliases.concat([al]).slice(-50) : cur.aliases;
+        sh.getRange(cur.row, 11).setValue(JSON.stringify(list)); return out_({ ok: true, aliases: list });
       }
       const it = b.item || {};
       if (!b.key || String(b.key).length > 300) return out_({ ok: false, error: 'key ไม่ถูกต้อง' });
@@ -108,7 +115,7 @@ function doPost(e) {
         if (!/^[A-Za-z0-9_-]{1,60}$/.test(id)) return out_({ ok: false, error: 'id ภาพไม่ถูกต้อง' });
         imgs[id] = fd.createFile(Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], id + '.jpg')).getId();   // ไม่แชร์ลิงก์ (ส่วนตัว)
       }
-      const row = [txt_(b.key), txt_(it.name), txt_(it.unit), JSON.stringify(it.quotes || []), txt_(it.reason), txt_(it.updated || new Date().toISOString()), txt_(it.project), txt_(it.by), JSON.stringify(imgs)];
+      const row = [txt_(b.key), txt_(it.name), txt_(it.unit), JSON.stringify(it.quotes || []), txt_(it.reason), txt_(it.updated || new Date().toISOString()), txt_(it.project), txt_(it.by), JSON.stringify(imgs), txt_(String(it.ref || '').slice(0, 120)), JSON.stringify(Array.from(new Set((cur ? cur.aliases : []).concat(Array.isArray(it.aliases) ? it.aliases.map(a => String(a).slice(0, 300)) : []))).slice(-50))];
       if (cur) sh.getRange(cur.row, 1, 1, row.length).setValues([row]); else sh.appendRow(row);
       return out_({ ok: true, imgs });
     } finally { lock.releaseLock(); }

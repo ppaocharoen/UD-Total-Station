@@ -320,9 +320,16 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
   #sv-printout h4{margin:10px 0 4px;color:#000}
   #sv-printout table.boq td,#sv-printout table.boq th{font-size:11px}
   .sv-appx{page-break-before:always}.sv-appx figure{page-break-inside:avoid;margin:0 0 10px;text-align:center}
-  .sv-appx img{max-width:100%;max-height:120mm;border:1px solid #999}.sv-appx figcaption{font-size:11px}
+  .sv-appx img{max-width:100%;max-height:150mm;border:1px solid #999}.sv-appx figcaption{font-size:11px}
+  #sv-printout td.sv-evs{white-space:normal;min-width:44mm}
+  #sv-printout .sv-ev{display:inline-block;margin:0 3px 3px 0;text-align:center;vertical-align:top;page-break-inside:avoid}
+  #sv-printout .sv-ev img{height:26mm;max-width:40mm;object-fit:contain;border:1px solid #999;background:#fff}
+  #sv-printout .sv-ev figcaption{font-size:9px}
+  #sv-printout table.boq tr{page-break-inside:avoid}
 }
 @page{size:A4;margin:12mm}
+@page survey{size:A4 landscape;margin:10mm}
+#sv-printout{page:survey}
 .credit{text-align:center;font-family:var(--f-mono);font-size:11px;color:var(--text3);padding:14px 0 18px}.credit b{color:var(--green2);font-weight:400}
 @media(max-width:800px){.credit{padding-bottom:calc(70px + env(safe-area-inset-bottom))}body.on-model .credit{display:none}}
 .ppl-row{display:grid;grid-template-columns:120px 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:5px}.ppl-row input{min-width:0;width:100%}.ppl-role{font-size:12px;color:var(--amber)}
