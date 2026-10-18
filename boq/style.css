@@ -325,7 +325,7 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
 @page{size:A4;margin:12mm}
 .credit{text-align:center;font-family:var(--f-mono);font-size:11px;color:var(--text3);padding:14px 0 18px}.credit b{color:var(--green2);font-weight:400}
 @media(max-width:800px){.credit{padding-bottom:calc(70px + env(safe-area-inset-bottom))}body.on-model .credit{display:none}}
-.ppl-row{display:grid;grid-template-columns:120px 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:5px}.ppl-role{font-size:12px;color:var(--amber)}
+.ppl-row{display:grid;grid-template-columns:120px 1fr 1fr auto;gap:6px;align-items:center;margin-bottom:5px}.ppl-row input{min-width:0;width:100%}.ppl-role{font-size:12px;color:var(--amber)}
 @media(max-width:800px){.ppl-row{grid-template-columns:1fr 1fr}.ppl-role{grid-column:1/-1}}
 .sig{display:flex;flex-wrap:wrap;justify-content:center;gap:18px 40px;margin-top:22px;font-size:13px;text-align:center}.sig-b{min-width:220px;line-height:1.8}
 .sv-group{margin:16px 0 6px;color:var(--green);font-family:var(--f-th)}.sv-more summary{cursor:pointer;margin:6px 0}
