@@ -329,3 +329,12 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
 @media(max-width:800px){.ppl-row{grid-template-columns:1fr 1fr}.ppl-role{grid-column:1/-1}}
 .sig{display:flex;flex-wrap:wrap;justify-content:center;gap:18px 40px;margin-top:22px;font-size:13px;text-align:center}.sig-b{min-width:220px;line-height:1.8}
 .sv-group{margin:16px 0 6px;color:var(--green);font-family:var(--f-th)}.sv-more summary{cursor:pointer;margin:6px 0}
+
+/* ภาพหลักฐานแบบหน้าต่างซ้อน */
+.img-modal{padding:12px;z-index:400}
+.img-modal img{max-width:100%;max-height:calc(100vh - 24px);object-fit:contain;border:1px solid var(--line,#1d3);box-shadow:0 0 24px rgba(0,0,0,.6);background:#fff}
+.img-modal .img-x{position:absolute;top:10px;right:10px;font-size:18px;line-height:1;padding:6px 12px}
+.sv-th img{cursor:zoom-in}
+/* ปุ่มสลับ Perspective / Parallel */
+.seg{display:flex;gap:0}.seg .btn{flex:1;border-radius:0}.seg .btn:first-child{border-radius:6px 0 0 6px}.seg .btn:last-child{border-radius:0 6px 6px 0}
+.seg .btn.on{background:var(--green,#00ff66);color:#000;border-color:var(--green,#00ff66)}

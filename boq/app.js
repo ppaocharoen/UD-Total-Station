@@ -21,7 +21,7 @@ const S = {
   boq: newBoq(),
 };
 function newBoq() {
-  return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 15, retention: 10, loanPct: 0 },
+  return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 0, retention: 0, loanPct: 0 },
     overrides: {}, survey: {}, surveys: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
 function newPlan() { return { start: '', workdays: [1, 2, 3, 4, 5, 6], holidays: [], durations: {}, inst: { n: 4, mode: 'auto', assign: {} } }; }
@@ -92,6 +92,7 @@ function loadModel(json, name) {
   try { saved = JSON.parse(localStorage.getItem('udboq:' + name) || 'null'); } catch (e) { /* */ }
   S.boq = saved && saved.format === 'ud-boq' ? Object.assign(newBoq(), saved) : newBoq();
   S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
+  if (name === 'sample-building.bm.json' && S.boq.factor && +S.boq.factor.advance === 15 && +S.boq.factor.retention === 10) S.boq.factor = { advance: 0, retention: 0, loanPct: 0 };   // ค่าเริ่มต้นเดิมของตัวอย่าง → 0
   S.boq.model_file = name;
   const p = S.boq.project;
   p.name = p.name || m.meta.name || '';
@@ -121,7 +122,7 @@ function renderAll() {
 
 // ผู้ลงนาม: ประมาณราคา = ผู้ประมาณราคา 1 คน · กำหนดราคากลาง = คณะกรรมการ ≥ 3 คน มีประธาน 1 คนเสมอ (ตกลงกับ Earth 18 ต.ค. 2569)
 function people() {
-  const p = S.boq.project; p.mode = p.mode || 'reference';
+  const p = S.boq.project; p.mode = p.mode || 'estimate';
   let L = p.people || [];
   if (p.mode === 'estimate') { const e = L.find(x => x.role === 'ผู้ประมาณราคา') || L[0] || {}; L = [{ role: 'ผู้ประมาณราคา', name: e.name || '', pos: e.pos || '' }]; }
   else {
@@ -146,7 +147,7 @@ function sigHtml() {   // ส่วนลงนามท้ายแบบฟอ
   return `<div class="sig">${L.map(x => `<div class="sig-b"><div>ลงชื่อ ......................................... ${est ? 'ผู้ประมาณราคา' : x.role}</div><div>(${esc(x.name || '.........................................')})</div><div>${esc(x.pos || 'ตำแหน่ง .........................................')}</div></div>`).join('')}</div>`;
 }
 function renderProject() {
-  $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? (el.dataset.k === 'mode' ? 'reference' : ''); });
+  $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? (el.dataset.k === 'mode' ? 'estimate' : ''); });
   renderPeople();
   $('#ff-adv').value = S.boq.factor.advance; $('#ff-ret').value = S.boq.factor.retention; $('#ff-loan').value = S.boq.factor.loanPct;
   $('#ff-src').textContent = FactorF.SOURCE;
@@ -298,6 +299,14 @@ async function svLibHint(card, it) {
     svSave(it); renderSurvey(); renderPR1(); renderSummary(); toast(`ดึง ${x.quotes.length} เจ้าจากคลังแล้ว — ตรวจวันที่สืบ`);
   });
 }
+/** ดูภาพหลักฐานแบบหน้าต่างซ้อน (ไม่เปิดแท็บใหม่) — แตะพื้นหลัง/× /Esc เพื่อปิด */
+function showImg(d) {
+  let m = $('#img-modal');
+  if (!m) { m = document.createElement('div'); m.id = 'img-modal'; m.className = 'modal img-modal'; m.innerHTML = '<button class="btn small img-x" aria-label="ปิด">×</button><img alt="ภาพหลักฐาน">'; document.body.appendChild(m);
+    m.onclick = e => { if (e.target.tagName !== 'IMG') m.classList.remove('on'); };
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') m.classList.remove('on'); }); }
+  m.querySelector('img').src = d; m.classList.add('on');
+}
 function libStatus(msg, err) {
   const c = Survey.cfg();
   $('#sv-libst').innerHTML = (c.url ? `คลังราคาสืบ: <b style="color:var(--green)">คลังกลาง (Google Sheet)</b>${c.team ? '' : ' · <span style="color:var(--amber)">ยังไม่ใส่รหัสทีม — กด ตั้งค่าคลังกลาง เพื่อเปิดดู/บันทึก (ตอนนี้ใช้คลังในเครื่อง)</span>'}` : 'คลังราคาสืบ: เก็บในเครื่องนี้ (ยังไม่ได้ตั้งคลังกลาง)')
@@ -341,7 +350,7 @@ function bindSurvey() {
     const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q);
     if (q && e.target.dataset.qdel) { if (confirm('ลบเจ้านี้?')) { it.quotes = it.quotes.filter(x => x !== q); svSave(it); renderSurvey(); renderPR1(); } return; }
     if (q && e.target.dataset.imgdel) { q.imgs = q.imgs.filter(x => x !== e.target.dataset.imgdel); svSave(it); renderSurvey(); return; }
-    if (e.target.dataset.view) { const d = Survey.safeImg(S.img[e.target.dataset.view]), w = d && window.open(''); if (w) { w.opener = null; const im = w.document.createElement('img'); im.src = d; im.style.maxWidth = '100%'; w.document.body.appendChild(im); } }
+    if (e.target.dataset.view) { const d = Survey.safeImg(S.img[e.target.dataset.view]); if (d) showImg(d); }
   });
   $('#sv-list').addEventListener('change', async e => {
     const card = e.target.closest('[data-svi]'); if (!card) return;
@@ -1053,6 +1062,7 @@ function tlPlay() {
 function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
   S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => showPick(d) });
+  try { if (localStorage.getItem('udboq:proj') === 'para') $('#proj-seg [data-proj=para]').click(); } catch (e) { /* */ }
   if (S.model) buildLayers(S.viewer.load(S.model));
   const sel = S.selKey && (S.priced || []).find(r => r.key === S.selKey);
   if (sel) S.viewer.highlight(sel.from || []);
@@ -1179,13 +1189,13 @@ function showLog() {
   let m = $('#log-modal');
   if (!m) { m = document.createElement('div'); m.id = 'log-modal'; m.className = 'modal'; document.body.appendChild(m); m.onclick = e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); }; }
   m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">${esc(UD_VERSION.name)} v${UD_VERSION.v}</h2><button class="btn small" data-close="1">×</button></div>
-    <p class="hint">พัฒนาโดย <b style="color:var(--green)">patcharapol_bot</b> · เลขใหญ่.เลขย่อย — แก้เล็กเปลี่ยนเลขย่อย แก้ใหญ่เปลี่ยนเลขใหญ่</p>
+    <p class="hint">developed by <b style="color:var(--green)">patcharapol_bot</b> · เลขใหญ่.เลขย่อย — แก้เล็กเปลี่ยนเลขย่อย แก้ใหญ่เปลี่ยนเลขใหญ่</p>
     <table class="mini-boq">${UD_VERSION.log.map(([v, d, t]) => `<tr><td class="mono" style="color:var(--green);white-space:nowrap">v${v}</td><td class="mono" style="color:var(--text3);white-space:nowrap">${d}</td><td>${esc(t)}</td></tr>`).join('')}</table></div>`;
   m.classList.add('on');
 }
 function bind() {
   bindSurvey();
-  $('#credit').innerHTML = `UD Total Station v${UD_VERSION.v} · พัฒนาโดย <b>patcharapol_bot</b>`;
+  $('#credit').innerHTML = `UD Total Station v${UD_VERSION.v} · developed by <b>patcharapol_bot</b>`;
   $('#logo-ver').textContent = 'v' + UD_VERSION.v; $('#logo-ver').onclick = showLog;
   $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; dev: patcharapol_bot\n&gt; connecting UD-Cost Hub ...<span class="cur">_</span>`;
   $$('#tabs .nav-tab').forEach(t => t.onclick = () => {
@@ -1252,7 +1262,8 @@ function bind() {
   $('#pl-hol').onchange = e => { S.boq.plan.holidays = e.target.value.split(/\s+/).filter(x => /^\d{4}-\d{2}-\d{2}$/.test(x)); autosave(); renderPlan(); };
   $('#pl-reauto').onclick = () => { const ins = S.boq.plan.inst; ins.assign = {}; if (ins.mode === 'manual' && S.plan) ins.assign = Schedule.autoAssign(S.plan, +ins.n || 1); autosave(); renderPlan(); toast('แบ่งงวดอัตโนมัติใหม่แล้ว'); };
   $('#pl-resetdur').onclick = () => { S.boq.plan.durations = {}; autosave(); renderPlan(); };
-  $$('[data-view]').forEach(b => b.onclick = () => { if (S.viewer) S.viewer.setView(b.dataset.view); autoFold(); });
+  $$('#side [data-view], .side [data-view], .btn-grid [data-view]').forEach(b => b.onclick = () => { if (S.viewer) S.viewer.setView(b.dataset.view); autoFold(); });
+  $$('#proj-seg [data-proj]').forEach(b => b.onclick = () => { const on = b.dataset.proj === 'para'; if (S.viewer) S.viewer.setParallel(on); $$('#proj-seg [data-proj]').forEach(x => x.classList.toggle('on', x === b)); try { localStorage.setItem('udboq:proj', on ? 'para' : 'persp'); } catch (e) { /* */ } });
   $$('[data-preset]').forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
   $('#clip-level').onchange = e => setClip(e.target.value === '' ? null : +e.target.value + 0.02);
   $('#clip-z').oninput = e => setClip(+e.target.value);
