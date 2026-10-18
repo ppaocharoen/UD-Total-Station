@@ -46,8 +46,10 @@ async function loadPrices() {
     S.baseCompItems = S.db.compItems.slice();
     applySurvey();
     $('#meta-price').textContent = `ราคาพาณิชย์ ${S.db.period || ''} · ค่าแรง ว480 ${S.db.wages.length} รายการ`;
+    bootDone(`UD-Cost Hub OK · ${S.db.wages.length} wage items`);
   } catch (e) {
     $('#meta-price').textContent = 'โหลดราคาไม่สำเร็จ: ' + e.message;
+    bootDone('ERROR: ' + e.message);
   }
   renderAll();
 }
@@ -300,7 +302,7 @@ function totals() {
 }
 function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box }) {
   const sig = `<p class="hint" style="margin-top:18px;text-align:center">ประธานกรรมการกำหนดราคากลาง ............................ &nbsp; กรรมการ ............................ &nbsp; กรรมการ ............................</p>`;
-  box.innerHTML = `
+  box.innerHTML = `<div class="kpis no-print">${kpiHtml({ pr, cost, ff, grand }, S.plan)}</div>
   <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุปค่าก่อสร้าง ค่างานต้นทุน</h3>${head}
     <table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>Factor F</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
     ${secs.map((s, i) => `<tr><td class="r">${i + 1}</td><td>${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.cost)}</td><td class="r">${ff.F.toFixed(4)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
@@ -382,17 +384,19 @@ function _renderPlan() {
   });
   $$('#pl-table [data-asg]').forEach(el => el.onchange = () => { pl.inst.assign[el.dataset.asg] = +el.value; autosave(); renderPlan(); });
   $$('#pl-table tr.row').forEach(tr => tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION'].includes(e.target.tagName)) return; selectTask(tr.dataset.task); }));
-  renderGantt(plan, inst); renderSCurve(plan, inst); renderInst(inst, contract);
+  renderGantt(plan, inst, '#pl-gantt'); renderSCurve(plan, inst, '#pl-scurve', true); renderInst(inst, contract, '#pl-inst', true);
+  renderGantt(plan, inst, '#dk-gantt-svg'); renderSCurve(plan, inst, '#dk-scurve-svg', false); renderInst(inst, contract, '#dk-inst-table', false);
+  renderHud(T, plan); renderDockBoq(T, plan);
 }
 function selectTask(id) {
   const t = S.plan && S.plan.tasks.find(x => x.id === id); if (!t) return;
   S.selTask = id;
   $$('#pl-table tr.row').forEach(x => x.classList.toggle('sel', x.dataset.task === id));
-  $$('#pl-gantt .bar').forEach(b => b.classList.toggle('sel', b.dataset.task === id));
+  $$('.gantt .bar').forEach(b => b.classList.toggle('sel', b.dataset.task === id));
   if (S.viewer) S.viewer.highlight(t.from);
-  toast(`${t.label}: ${t.from.length} ชิ้นส่วน — ดูในแท็บโมเดล 3D`);
+  toast(`${t.label}: ${t.from.length} ชิ้นส่วน${$('#page-model').classList.contains('active') ? '' : ' — ดูในแท็บโมเดล 3D'}`);
 }
-function renderGantt(plan, inst) {
+function renderGantt(plan, inst, sel) {
   const days = plan.calDays, rowH = 24, left = 250, top = 34, W = Math.max(720, left + days * 12 + 20);
   const sx = (W - left - 20) / days, H = top + plan.tasks.length * rowH + 10;
   const x = d => left + Schedule.parse(d).getTime() / 864e5 * sx - Schedule.parse(plan.start).getTime() / 864e5 * sx;
@@ -409,14 +413,19 @@ function renderGantt(plan, inst) {
       <rect class="bar ${S.selTask === t.id ? 'sel' : ''}" data-task="${esc(t.id)}" x="${x0}" y="${y + 4}" width="${Math.max(3, x1 - x0)}" height="${rowH - 9}" rx="3" fill="${t.color}"><title>${esc(t.label)}\n${thDate(t.start)} – ${thDate(t.finish)} (${t.days} วันทำงาน)\n${fmt(t.cost)} บาท (${t.pct}%)</title></rect>`;
   });
   inst.list.forEach(c => { if (!c.due) return; const xx = x(c.due) + sx; g += `<line class="cut" x1="${xx}" y1="${top - 4}" x2="${xx}" y2="${H}"/><text class="cutlbl" x="${xx + 2}" y="${H - 2}">งวด ${c.no}</text>`; });
-  $('#pl-gantt').innerHTML = g + '</svg>';
-  $$('#pl-gantt .bar').forEach(b => b.onclick = () => selectTask(b.dataset.task));
+  $(sel).innerHTML = g + '</svg>';
+  $$(sel + ' .bar').forEach(b => b.onclick = () => selectTask(b.dataset.task));
 }
-function renderSCurve(plan, inst) {
-  const W = 760, H = 300, l = 44, r = 16, t = 14, b = 34, c = plan.curve;
+function renderSCurve(plan, inst, sel, jump) {
+  const W = 760, H = jump ? 300 : 230, l = 44, r = 60, t = 14, b = 34, c = plan.curve;
   const sx = (W - l - r) / Math.max(1, c.length), sy = (H - t - b) / 100;
   const X = i => l + i * sx, Y = p => H - b - p * sy;
-  let g = `<svg class="scurve" width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${W}px">`;
+  let g = `<svg class="scurve" width="100%" viewBox="0 0 ${W} ${H}" style="max-width:${jump ? W + 'px' : '100%'}">`;
+  // แท่งค่างานรายสัปดาห์ (แกนขวา)
+  const wk = []; for (let i = 0; i < c.length; i += 7) { const a = i ? c[i - 1].pct : 0, z = c[Math.min(c.length, i + 7) - 1].pct; wk.push({ i, v: (z - a) / 100 * plan.total }); }
+  const wmax = Math.max(1, ...wk.map(w => w.v));
+  wk.forEach(w => { const h = w.v / wmax * (H - t - b) * 0.45; g += `<rect class="wk" x="${X(w.i) + 1}" y="${Y(0) - h}" width="${Math.max(1, sx * 7 - 2)}" height="${h}"><title>สัปดาห์เริ่ม ${thDate(c[w.i].date)} · ${fmt(w.v)} บาท</title></rect>`; });
+  g += `<text x="${W - r + 6}" y="${Y(45) + 4}">${fmt(wmax, 0)}</text><text x="${W - r + 6}" y="${Y(0) + 4}">บาท/สัปดาห์</text>`;
   for (let p = 0; p <= 100; p += 20) g += `<line class="grid" x1="${l}" y1="${Y(p)}" x2="${W - r}" y2="${Y(p)}"/><text x="${l - 6}" y="${Y(p) + 4}" text-anchor="end">${p}%</text>`;
   const step = Math.max(1, Math.round(c.length / 8));
   for (let i = 0; i < c.length; i += step) g += `<text x="${X(i)}" y="${H - b + 16}" text-anchor="middle">${thDate(c[i].date)}</text>`;
@@ -425,19 +434,29 @@ function renderSCurve(plan, inst) {
     const i = c.findIndex(p => p.date === k.due); if (i < 0) return;
     g += `<line class="cut" x1="${X(i + 1)}" y1="${Y(0)}" x2="${X(i + 1)}" y2="${Y(c[i].pct)}"/><circle cx="${X(i + 1)}" cy="${Y(c[i].pct)}" r="3.5" fill="var(--green)"><title>งวด ${k.no} · ${thDate(k.due)} · ผลงานตามแผน ${c[i].pct.toFixed(2)}%</title></circle><text x="${X(i + 1) - 4}" y="${Y(c[i].pct) - 6}" text-anchor="end" style="fill:var(--green)">${c[i].pct.toFixed(1)}%</text>`;
   });
-  $('#pl-scurve').innerHTML = g + `<text x="${W - r}" y="${t + 8}" text-anchor="end">คลิกกราฟเพื่อดูอาคาร ณ วันนั้นในแท็บโมเดล 3D</text></svg>`;
-  const svg = $('#pl-scurve svg'); svg.style.cursor = 'pointer';
+  $(sel).innerHTML = g + (jump ? `<text x="${W - r}" y="${t + 8}" text-anchor="end">คลิกกราฟเพื่อดูอาคาร ณ วันนั้นในแท็บโมเดล 3D</text>` : '') + '</svg>';
+  const svg = $(sel + ' svg'); svg.style.cursor = 'pointer';
   svg.onclick = e => {
     const rc = svg.getBoundingClientRect(), xv = (e.clientX - rc.left) / rc.width * W;
     const day = Math.max(1, Math.min(c.length, Math.round((xv - l) / sx)));
-    $$('#tabs .nav-tab').find(x => x.dataset.tab === 'model').click();
+    if (jump) { $$('#tabs .nav-tab').find(x => x.dataset.tab === 'model').click(); setDock('time'); }
     setTimeout(() => tlSet(day), 50);
   };
 }
-function renderInst(inst, contract) {
+function renderInst(inst, contract, sel, full) {
   const fc = S.boq.factor, L = inst.list;
   const sum = k => r2(L.reduce((a, g) => a + g[k], 0));
-  $('#pl-inst').innerHTML = `<tr><th>งวดที่</th><th>เนื้องานที่ต้องแล้วเสร็จ</th><th>กำหนดแล้วเสร็จ</th><th>% งวด</th><th>% สะสม</th><th>จำนวนเงิน</th><th>หักเงินล่วงหน้า ${fc.advance}%</th><th>หักประกันผลงาน ${fc.retention}%</th><th>จ่ายสุทธิ</th></tr>` +
+  if (!full) {
+    $(sel).innerHTML = `<tr><th>งวด</th><th>เนื้องาน</th><th>ครบกำหนด</th><th>%</th><th>สะสม</th><th>จำนวนเงิน</th><th>จ่ายสุทธิ</th></tr>` +
+      L.map(g => `<tr class="row" data-inst="${g.no}"><td class="r">${g.no}</td><td>${g.labels.map(x => esc(x.replace(/ — .*/, ''))).join(', ')}</td><td>${thDate(g.due)}</td><td class="r">${g.pct.toFixed(2)}</td><td class="r">${g.cumPct.toFixed(2)}</td><td class="r">${fmt(g.amount)}</td><td class="r">${fmt(g.net)}</td></tr>`).join('');
+    $$(sel + ' tr[data-inst]').forEach(tr => tr.onclick = () => {
+      const g = L[+tr.dataset.inst - 1]; const ids = S.plan.tasks.filter(t => g.tasks.includes(t.id)).flatMap(t => t.from);
+      $$(sel + ' tr').forEach(x => x.classList.toggle('sel', x === tr));
+      if (S.viewer) S.viewer.highlight(ids); toast(`งวด ${g.no}: ${ids.length} ชิ้นส่วน`);
+    });
+    return;
+  }
+  $(sel).innerHTML = `<tr><th>งวดที่</th><th>เนื้องานที่ต้องแล้วเสร็จ</th><th>กำหนดแล้วเสร็จ</th><th>% งวด</th><th>% สะสม</th><th>จำนวนเงิน</th><th>หักเงินล่วงหน้า ${fc.advance}%</th><th>หักประกันผลงาน ${fc.retention}%</th><th>จ่ายสุทธิ</th></tr>` +
     L.map(g => `<tr><td class="r">${g.no}</td><td>${g.labels.map(esc).join('<br>') || '<span class="alert">ไม่มีงาน</span>'}</td>
       <td>${thDate(g.due)}${g.due ? `<span class="src">วันที่ ${Schedule.parse(g.due) - Schedule.parse(S.plan.start) >= 0 ? Math.round((Schedule.parse(g.due) - Schedule.parse(S.plan.start)) / 864e5) + 1 : ''} นับจากเริ่มงาน</span>` : ''}</td>
       <td class="r">${g.pct.toFixed(2)}</td><td class="r">${g.cumPct.toFixed(2)}</td><td class="r">${fmt(g.amount)}</td><td class="r">${fmt(g.advance)}</td><td class="r">${fmt(g.retention)}</td><td class="r">${fmt(g.net)}</td></tr>`).join('') +
@@ -446,16 +465,75 @@ function renderInst(inst, contract) {
     เงินล่วงหน้าและประกันผลงานใช้ % เดียวกับเงื่อนไข Factor F ในหน้าโครงการ · เงินประกันผลงานคืนตามเงื่อนไขสัญญา (ไม่รวมในตาราง)`;
 }
 
+// ------------------------------------------------------------------ HUD / dock
+function kpiHtml(T, plan) {
+  const mat = r2(T.pr.reduce((a, r) => a + (r.mat_amt || 0), 0)), lab = r2(T.pr.reduce((a, r) => a + (r.lab_amt || 0), 0));
+  const area = +S.boq.project.area || 0;
+  const k = (l, v, u, hot) => `<div class="kpi ${hot ? 'hot' : ''}"><span>${l}</span><b>${v}${u ? `<small>${u}</small>` : ''}</b></div>`;
+  return k('ค่าวัสดุ', fmt(mat, 0), 'บ.') + k('ค่าแรง', fmt(lab, 0), 'บ.') + k('ค่างานต้นทุน', fmt(T.cost, 0), 'บ.') +
+    k(`ราคากลาง (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
+    (plan ? k('ระยะเวลา', plan.calDays, 'วัน') : '');
+}
+function renderHud(T, plan) {
+  const m = S.model; if (!m) return;
+  const cnt = t => (m.members || []).filter(x => x.type === t).length;
+  $('#hud .t').innerHTML = `${esc(S.boq.project.name || m.meta.name || '')}<span class="tag">3D·BOQ·แผนงาน</span>`;
+  $('#hud .s').textContent = `ราคากลาง ${fmt(T.grand)} บาท · ${plan.calDays} วัน (${thDate(plan.start)} – ${thDate(plan.finish)}) · เสา ${cnt('column')} · คาน ${cnt('beam') + cnt('tie_beam')}`;
+}
+function renderDockBoq(T, plan) {
+  $('#dk-kpis').innerHTML = kpiHtml(T, plan);
+  const q = ($('#dk-q').value || '').trim().toLowerCase();
+  const rows = T.pr.filter(r => !q || (r.name + ' ' + r.group_code).toLowerCase().includes(q));
+  $('#dk-boq-table').innerHTML = rows.map(r => `<tr data-key="${esc(r.key)}" class="${S.selKey === r.key ? 'sel' : ''}"><td class="mono" style="color:var(--text3)">${esc(r.group_code)}</td><td>${esc(r.name)}${r.warns.length ? ' <span class="pill warn">ไม่มีราคา</span>' : ''}</td><td class="r">${fmt(r.qty)}</td><td>${esc(r.unit)}</td><td class="r">${fmt(r.total)}</td></tr>`).join('');
+  $$('#dk-boq-table tr').forEach(tr => tr.onclick = () => {
+    const r = T.pr.find(x => x.key === tr.dataset.key); S.selKey = r.key;
+    $$('#dk-boq-table tr').forEach(x => x.classList.toggle('sel', x === tr));
+    if (S.viewer) S.viewer.highlight(r.from || []); toast(`${r.name}: ${(r.from || []).length} ชิ้นส่วน`);
+  });
+}
+function setDock(name) {
+  $$('.dock-tab[data-dock]').forEach(t => t.classList.toggle('active', t.dataset.dock === name));
+  $$('.dock-pane').forEach(p => p.classList.toggle('active', p.id === 'dk-' + name));
+  $('#dock').classList.remove('min'); $('#dock-min').textContent = '▾ ย่อ';
+}
+// ------------------------------------------------------------------ บูต / CRT
+function bootRain() {
+  const cv = $('#boot-rain'), ctx = cv.getContext('2d');
+  const W = cv.width = innerWidth, H = cv.height = innerHeight, fs = 16, cols = Math.ceil(W / fs), y = Array(cols).fill(0).map(() => Math.random() * -50);
+  const ch = 'アイウエオカキクケコサシスセソ0123456789กขคงจฉชซญฎฐณดตถทนบปผพฟภมยรลวศสหฬอฮ'.split('');
+  const t = setInterval(() => {
+    ctx.fillStyle = 'rgba(0,0,0,.08)'; ctx.fillRect(0, 0, W, H); ctx.font = fs + 'px monospace';
+    y.forEach((v, i) => { ctx.fillStyle = Math.random() > .975 ? '#d8ffe0' : '#00ff41'; ctx.fillText(ch[Math.random() * ch.length | 0], i * fs, v * fs); y[i] = v * fs > H && Math.random() > .975 ? 0 : v + 1; });
+  }, 45);
+  return () => clearInterval(t);
+}
+function bootDone(msg) {
+  const el = $('#boot'); if (!el || el.classList.contains('off')) return;
+  $('#boot-txt').innerHTML = `&gt; UD_BOQ v2.69\n&gt; ${esc(msg)}\n&gt; ready<span class="cur">_</span>`;
+  setTimeout(() => { el.classList.add('off'); setTimeout(() => { S.stopRain && S.stopRain(); el.remove(); }, 700); }, Math.max(300, 1400 - (Date.now() - S.bootAt)));
+}
+function setCrt(on) {
+  document.body.classList.toggle('nocrt', !on); $('#b-crt').textContent = 'CRT:' + (on ? 'ON' : 'OFF');
+  try { localStorage.setItem('udboq:crt', on ? '1' : '0'); } catch (e) { /* */ }
+}
+
 // ------------------------------------------------------------------ 3D
 function buildLayers(groups) {
-  $('#layer-list').innerHTML = groups.map(g => `<label><input type="checkbox" ${S.viewer.groups[g].visible ? 'checked' : ''} data-layer="${esc(g)}"> ${esc(g)}</label>`).join('');
-  $$('#layer-list input').forEach(cb => cb.onchange = () => {
-    if (cb.dataset.layer === 'เหล็กเสริม') { S.viewer.setXray(cb.checked); syncLayers(); return; }
-    S.viewer.setVisible(cb.dataset.layer, cb.checked);
+  const v = S.viewer;
+  $('#layer-list').innerHTML = groups.map(g => {
+    const kids = v.groups[g].children, n = new Set(kids.map(m => m.userData.id || m.uuid)).size;
+    const col = '#' + ((kids[0] && kids[0].userData.baseColor) || 0x888888).toString(16).padStart(6, '0');
+    return `<span class="chip" data-layer="${esc(g)}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${esc(g)}</span><em>${n}</em></span>`;
+  }).join('');
+  $$('#layer-list .chip').forEach(ch => ch.onclick = () => {
+    const g = ch.dataset.layer, on = !v.groups[g].visible;
+    if (g === 'เหล็กเสริม') v.setXray(on); else v.setVisible(g, on);
+    $$('.preset').forEach(b => b.classList.remove('on'));
+    syncLayers();
   });
-  buildClip(); tlReset();
+  syncLayers(); buildClip(); tlReset();
 }
-function syncLayers() { $$('#layer-list input').forEach(cb => { const g = S.viewer.groups[cb.dataset.layer]; if (g) cb.checked = g.visible; }); }
+function syncLayers() { $$('#layer-list .chip').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
 function buildClip() {
   const m = S.model, v = S.viewer; if (!m || !v || !v.bbox) return;
   const lv = (m.levels || []).slice().sort((a, b) => a.z - b.z);
@@ -471,6 +549,7 @@ function setClip(z) {
 }
 function applyPreset(name) {
   const v = S.viewer; if (!v) return;
+  v.highlight([]); $('#pick-info').innerHTML = '';
   v.setXray(false);
   const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'เหล็กรูปพรรณ'].includes(g),
     roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g) }[name];
@@ -538,29 +617,31 @@ function tlSet(day) {
     return st;
   });
   const cv = p.curve[Math.max(0, day - 1)], now = p.tasks.filter(t => prog[t.id] > 0 && prog[t.id] < 1);
+  $('#tl-fill').style.width = (day ? cv.pct : 0) + '%';
   $('#tl-label').innerHTML = `<b>วันที่ ${day}/${p.calDays}</b> · ${thDate(date)} · ผลงานตามแผน <b style="color:var(--green)">${day ? cv.pct.toFixed(1) : '0.0'}%</b>` +
     (now.length ? ` · กำลังทำ: ${now.map(t => `<span class="pill" style="border-color:${t.color}">${esc(t.label.replace(/ — .*/, ''))} ${Math.round(prog[t.id] * 100)}%</span>`).join('')}` : '');
 }
 function tlDone() {
   tlStop(); TL.day = null;
   if (S.viewer) { S.viewer.setState(null); if (S.viewer.groups['เหล็กเสริม']) S.viewer.groups['เหล็กเสริม'].visible = S.viewer.xray; }
+  $('#tl-fill').style.width = '100%';
   if (S.plan) { $('#tl-day').value = S.plan.calDays; $('#tl-label').textContent = `อาคารเสร็จ · ${S.plan.calDays} วัน (${thDate(S.plan.start)} – ${thDate(S.plan.finish)})`; }
 }
-function tlStop() { clearInterval(TL.timer); TL.timer = null; $('#tl-play').textContent = '▶ เล่นลำดับก่อสร้าง'; }
+function tlStop() { clearInterval(TL.timer); TL.timer = null; $('#tl-play').textContent = '▶ เล่น'; }
 function tlPlay() {
   if (TL.timer) return tlStop();
   if (!S.plan) return toast('แผนงานยังไม่พร้อม');
   let d = (TL.day === null || TL.day >= S.plan.calDays) ? 0 : TL.day;
-  $('#tl-play').textContent = '⏸ หยุด';
+  $('#tl-play').textContent = '⏸ หยุด'; setDock('time');
   const ms = Math.max(60, Math.min(250, 12000 / S.plan.calDays));
   TL.timer = setInterval(() => { d++; if (d >= S.plan.calDays) { tlDone(); return; } tlSet(d); }, ms);
 }
 function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
   S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => {
-    if (!d || !d.id) { $('#pick-info').textContent = 'คลิกชิ้นส่วนในโมเดล'; return; }
+    if (!d || !d.id) { $('#pick-info').innerHTML = ''; S.viewer.highlight([]); return; }
     const items = (S.priced || []).filter(r => (r.from || []).includes(d.id));
-    $('#pick-info').innerHTML = `<div class="kv"><b>id</b><span class="mono">${esc(d.id)}</span><b>กลุ่ม</b><span>${esc(d.group)}</span><b>รายละเอียด</b><span>${esc(d.info || '')}</span></div>
+    $('#pick-info').innerHTML = `<div class="side-top"><h2 style="font-size:18px;margin:0">ชิ้นส่วน</h2><button class="btn small" onclick="this.closest('.pick').innerHTML='';S.viewer.highlight([])">✕</button></div><div class="kv"><b>id</b><span class="mono">${esc(d.id)}</span><b>กลุ่ม</b><span>${esc(d.group)}</span><b>รายละเอียด</b><span>${esc(d.info || '')}</span></div>
       <p class="hint" style="margin-top:8px">อยู่ในรายการ BOQ ${items.length} รายการ:</p><ul class="hint" style="margin-left:18px">${items.map(r => `<li>${esc(r.group_code)} ${esc(r.name)}</li>`).join('')}</ul>`;
     S.viewer.highlight([d.id]);
   } });
@@ -622,16 +703,28 @@ function bind() {
   $$('[data-preset]').forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
   $('#clip-level').onchange = e => setClip(e.target.value === '' ? null : +e.target.value + 0.02);
   $('#clip-z').oninput = e => setClip(+e.target.value);
-  $('#b-side-close').onclick = () => { $('#model-wrap').classList.add('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '1'); } catch (er) { /* */ } };
-  $('#b-side-open').onclick = () => { $('#model-wrap').classList.remove('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '0'); } catch (er) { /* */ } };
-  try { if (localStorage.getItem('udboq:side') === '1') $('#model-wrap').classList.add('collapsed'); } catch (er) { /* */ }
+  $('#b-side-close').onclick = () => { $('#stage').classList.add('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '1'); } catch (er) { /* */ } };
+  $('#b-side-open').onclick = () => { $('#stage').classList.remove('collapsed'); setTimeout(() => S.viewer && S.viewer.resize(), 50); try { localStorage.setItem('udboq:side', '0'); } catch (er) { /* */ } };
+  try {
+    const sv = localStorage.getItem('udboq:side');
+    if (sv === '1' || (sv === null && innerWidth < 800)) $('#stage').classList.add('collapsed');   // มือถือเริ่มแบบพับเมนู
+  } catch (er) { /* */ }
+  const fitStage = () => { $('#stage').style.height = Math.max(420, innerHeight - $('.topbar').offsetHeight) + 'px'; };
+  addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
+  $$('.dock-tab[data-dock]').forEach(t => t.onclick = () => setDock(t.dataset.dock));
+  $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '▴ ขยาย' : '▾ ย่อ'; };
+  $('#dk-q').oninput = () => renderPlan();
+  $('#b-crt').onclick = () => setCrt(document.body.classList.contains('nocrt'));
+  try { if (localStorage.getItem('udboq:crt') === '0') setCrt(false); } catch (er) { /* */ }
   $('#tl-day').oninput = e => { tlStop(); tlSet(+e.target.value); };
   $('#tl-done').onclick = tlDone;
   $('#b-fit').onclick = () => S.viewer && S.viewer.fit();
   $('#b-clear').onclick = () => S.viewer && S.viewer.highlight([]);
 }
 
+S.bootAt = Date.now(); S.stopRain = bootRain();
+setTimeout(() => bootDone('timeout — ทำงานต่อโดยไม่มีราคา'), 15000);
 bind();
 renderAll();
 loadPrices();
