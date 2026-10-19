@@ -258,6 +258,7 @@ class Takeoff:
         self._beams()
         self._slabs()
         self._stairs()
+        self._retaining_walls()
         self._plates()
         self._steel_and_roofs()
         self._walls()
@@ -846,6 +847,31 @@ class Takeoff:
                     dia, sp = d["dist_bar"]; n = math.floor(Li / sp) + 1
                     self.rebar(st["id"], dia, n * (W - 2 * c), f"{fid} เหล็กกันร้าว @{sp:g} {n} เส้น × {W - 2 * c:.2f} ม.")
 
+    # ------------------------------------------------------------ กำแพงกันดิน (เพิ่มจากแท็บออกแบบ)
+    def _retaining_walls(self):
+        c = self.s["cover"]
+        for w in self.m.get("retaining_walls", []):
+            L, H, tb, tw, B = w["length"], w["H"], w["tb"], w["tw"], w["B1"] + w["B2"]
+            hw = H - tb
+            name, key = self.conc_name(w.get("material"))
+            vol = L * (hw * tw + B * tb)
+            self.add("1.1.12", key + "_retain", name + " (กำแพงกันดิน)", "ลบ.ม.", vol, w["id"], task="footing",
+                     calc=f"ยาว {L:g} × (ผนัง {hw:.2f}×{tw:g} + ฐาน {B:g}×{tb:g}) = {vol:.3f} ลบ.ม.")
+            fw = L * (2 * hw + 2 * tb) + 2 * (hw * tw + B * tb)
+            self.add("1.1.7", "formwork_retain", "ไม้แบบหล่อคอนกรีต (กำแพงกันดิน)", "ตร.ม.", fw, w["id"], task="footing",
+                     calc=f"ผนัง 2 ด้าน {2 * hw:.2f} + ขอบฐาน {2 * tb:g} × ยาว {L:g} + หัวท้าย = {fw:.2f} ตร.ม.")
+            rb = w.get("rebar") or {}
+            if rb.get("wall"):
+                dia, sp = rb["wall"]; n = math.floor(L / sp) + 1
+                self.rebar(w["id"], dia, n * (H - 2 * c), f"เหล็กยืนผนัง @{sp:g} {n} เส้น × {H - 2 * c:.2f} ม.")
+            if rb.get("base"):
+                dia, sp = rb["base"]; n = math.floor(L / sp) + 1
+                self.rebar(w["id"], dia, n * (B - 2 * c), f"เหล็กฐาน @{sp:g} {n} เส้น × {B - 2 * c:.2f} ม.")
+            if rb.get("temp"):
+                dia, sp = rb["temp"]; n = (math.floor(hw / sp) + 1) + (math.floor(B / sp) + 1)
+                self.rebar(w["id"], dia, n * (L - 2 * c), f"เหล็กกันร้าวตามยาว @{sp:g} ผนัง {math.floor(hw / sp) + 1} + ฐาน {math.floor(B / sp) + 1} เส้น × {L - 2 * c:.2f} ม.")
+            self.src_task.setdefault(w["id"], "footing")
+
     # ------------------------------------------------------------ เพลทหัวเสาและสลักยึด (ผลออกแบบ)
     def _plates(self):
         for pid, e in (self.design.get("plates") or {}).items():
@@ -925,7 +951,7 @@ class Takeoff:
                 row["by_task"] = {t: {"share": round(v["q"] / tot, 4), "from": v["from"]}
                                   for t, v in sorted(parts.items(), key=lambda kv: -kv[1]["q"])}
                 row["task"] = next(iter(row["by_task"]))
-            pr = (price_map or {}).get(it["key"])
+            pr = (price_map or {}).get(it["key"]) or ((price_map or {}).get(it["key"][:-7]) if it["key"].endswith("_retain") else None)
             if pr is None and price_map:
                 pr = next((v for k, v in price_map.items() if k.endswith("*") and it["key"].startswith(k[:-1])), None)
             if it.get("wage_code"):

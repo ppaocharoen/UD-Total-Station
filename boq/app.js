@@ -916,7 +916,7 @@ function renderSideSum(T, plan) {
     ['คอนกรีตโครงสร้าง', fmt(sum(k => k.startsWith('conc_'), 'ลบ.ม.')), 'ลบ.ม.'],
     ['เหล็กเสริม', fmt(sum(k => k.startsWith('rebar_'), 'กก.'), 0), 'กก.'],
     ['เหล็กรูปพรรณ', fmt(sum(k => k.startsWith('steel_'), 'กก.'), 0), 'กก.'],
-    ['ไม้แบบ', fmt(sum(k => k === 'formwork')), 'ตร.ม.'],
+    ['ไม้แบบ', fmt(sum(k => k.startsWith('formwork'))), 'ตร.ม.'],
     ['ผนัง', fmt(sum(k => k.startsWith('wall_'))), 'ตร.ม.'],
     ['หลังคา', fmt(sum(k => k.startsWith('cover_'))), 'ตร.ม.'],
     ['จุดไฟฟ้า', sum(k => k.startsWith('pt_')), 'จุด'],

@@ -100,6 +100,23 @@
         "$ref": "#/$defs/stair"
       }
     },
+    "retaining_walls": {
+      "type": "array",
+      "description": "กำแพงกันดินแบบยื่น (เพิ่มจากแท็บออกแบบ) — ใช้ถอดปริมาณ",
+      "items": {
+        "type": "object",
+        "required": ["id", "length", "H", "tb", "tw", "B1", "B2"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"}, "mark": {"type": "string"},
+          "length": {"$ref": "#/$defs/pos"}, "H": {"$ref": "#/$defs/pos", "description": "ความสูงรวมฐาน"},
+          "tb": {"$ref": "#/$defs/pos"}, "tw": {"$ref": "#/$defs/pos"},
+          "B1": {"type": "number", "minimum": 0, "description": "ปลายเท้า"}, "B2": {"$ref": "#/$defs/pos", "description": "ส้น (รวมความหนาผนัง)"},
+          "material": {"$ref": "#/$defs/id"},
+          "rebar": {"type": "object", "description": "{wall:[ขนาด, ระยะ], base:[…], temp:[…]}"},
+          "src": {"type": "string"}
+        }
+      }
+    },
     "finishes": {
       "type": "array",
       "items": {

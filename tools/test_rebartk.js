@@ -15,7 +15,7 @@ function viaPython(m) {
   execFileSync('python3', [path.join(__dirname, 'takeoff.py'), f, '--write'], { stdio: 'pipe' });
   const out = JSON.parse(fs.readFileSync(f, 'utf8'));
   const h = execFileSync('python3', ['-c', `import json,sys;sys.path.insert(0,${JSON.stringify(__dirname)});from validate import canonical_hash;m=json.load(open(${JSON.stringify(f)}));print(canonical_hash(m,["design"]))`]).toString().trim();
-  return { rows: out.quantities.items.filter(r => r.group_code === '1.1.9'), piles: out.quantities.items.filter(r => r.group_code === '1.1.5' || r.group_code === '1.1.10'), all: out.quantities.items, q: out.quantities, hash: h };
+  return { rows: out.quantities.items.filter(r => r.group_code === '1.1.9'), piles: out.quantities.items.filter(r => r.group_code === '1.1.5' || r.group_code === '1.1.10' || /_retain$/.test(r.key)), all: out.quantities.items, q: out.quantities, hash: h };
 }
 async function cmp(label, m) {
   const py = viaPython(m), js = T.compute(m);
@@ -25,12 +25,13 @@ async function cmp(label, m) {
     check(`${label}: ${r.key}`, a === b, '\n py ' + a.slice(0, 600) + '\n js ' + b.slice(0, 600));
   });
   const jp = T.computePiles(m).concat(T.computePlates(m));
+  const order = ['1.1.5', '1.1.7', '1.1.10', '1.1.12']; py.piles.sort((a, b) => order.indexOf(a.group_code) - order.indexOf(b.group_code)); jp.push(...T.computeRetain(m)); jp.sort((a, b) => order.indexOf(a.group_code) - order.indexOf(b.group_code));
   check(`${label}: จำนวนแถวเข็ม`, py.piles.length === jp.length, `py ${py.piles.length} js ${jp.length}`);
   py.piles.forEach((r, i) => { const a = canon(strip(r)), b = canon(strip(jp[i] || {})); check(`${label}: ${r.key}`, a === b, '\n py ' + a + '\n js ' + b); });
   // apply บนผล Python ต้องได้ items เท่าเดิม (ยกเว้น src/price_ref คงเดิม)
-  const mm = clone(m); mm.quantities = clone(py.q); mm.quantities.items = mm.quantities.items.filter(r => r.group_code !== '1.1.9' && r.group_code !== '1.1.5' && r.group_code !== '1.1.10');
+  const mm = clone(m); mm.quantities = clone(py.q); mm.quantities.items = mm.quantities.items.filter(r => r.group_code !== '1.1.9' && r.group_code !== '1.1.5' && r.group_code !== '1.1.10' && !/_retain$/.test(r.key));
   T.apply(mm);
-  check(`${label}: apply ลำดับแถว`, mm.quantities.items.map(r => r.key).join() === py.all.map(r => r.key).join());
+  check(`${label}: apply ลำดับแถว`, mm.quantities.items.map(r => r.key).join() === py.all.map(r => r.key).join(), '\n' + mm.quantities.items.map(r => r.key).join() + '\n' + py.all.map(r => r.key).join());
   check(`${label}: hash design ตรง Python`, (await T.designHash(m)) === py.hash, `${await T.designHash(m)} vs ${py.hash}`);
 }
 (async () => {
@@ -61,6 +62,9 @@ async function cmp(label, m) {
   m7.design.stairs = { 'ST1#1': { main_bar: [12, 0.15], dist_bar: [9, 0.2] }, 'ST1#2': { main_bar: [12, 0.125], dist_bar: [9, 0.25] }, ST2: { main_bar: [16, 0.2] } };
   m7.design.plates = { 'N-1': { node: 'N-1', plate: [250, 300, 12], bolts: [4, 16, 33] }, 'N-2': { plate: [250, 300, 12], bolts: [4, 16, 33] }, 'N-3': { plate: [200, 200, 9], bolts: [4, 12, 25] } };
   await cmp('บันได + เพลท/สลัก', m7);
+  const m8 = clone(m7); m8.retaining_walls = [{ id: 'RW-1', mark: 'RW-1', length: 12.5, H: 3, tb: 0.4, tw: 0.25, B1: 0.8, B2: 1.8, material: m8.materials.find(x => x.kind === 'concrete').id, rebar: { wall: [16, 0.15], base: [16, 0.2], temp: [12, 0.25] } },
+    { id: 'RW-2', material: m8.materials.find(x => x.kind === 'concrete').id, length: 6, H: 2, tb: 0.3, tw: 0.2, B1: 0.5, B2: 1.2, rebar: { wall: [12, 0.2] } }];
+  await cmp('กำแพงกันดิน', m8);
   check('pyJson เลขยกกำลัง', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]) === '[1e-05,1.5e-07,0.0001,2.5]', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]));
   console.log((ok ? 'PASS' : 'FAIL') + ` rebartk ${n} ข้อ`);
   process.exit(ok ? 0 : 1);
