@@ -712,6 +712,7 @@ function dsgPileRun(x) {
   const dl = d.p.dL, ds = n === 1 ? dl : d.p.dS;
   const bandL = n === 3 ? Math.round((r.Dnx + 2 * 1.3 * r.pileInfo.w) * 100) / 100 : 0;   // แถบ 3 ต้น: ระยะเข็ม + 2×1.3D
   const rebar = n === 3 ? { bands: [3, r.nL, dl, bandL] } : { bars_x: [r.nL, dl], bars_y: [n === 1 ? r.nL : r.nS, ds] };
+  if (n === 1 && r.nRing) rebar.rings = [r.nRing, d.p.dS || 12];   // ปลอกรอบ (ชีต 1 Pile)
   const pl = r.pileInfo, spec = { kind: pl.kind, length: inp.len, capacity: inp.cap };
   if (pl.kind === 'bored') {
     spec.size = pl.w; spec.type = 'เข็มเจาะ ' + pl.code;
@@ -848,7 +849,7 @@ function plateCard(plates) {
   const D = dsg(), opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
   const dn = plates.filter(x => S.dsgPlate[x.id] && S.dsgPlate[x.id].r), pass = dn.filter(x => S.dsgPlate[x.id].ok).length;
   return `<div class="card"><h2>เพลทหัวเสา <span class="hint">${dn.length}/${plates.length} จุด · ผ่าน ${pass}</span></h2>
-    <p class="hint">จุดที่ชิ้นส่วนเหล็กวางบนหัวเสา คสล. · เพลทต้องไม่ใหญ่กว่าหัวเสา · ใส่แรงอัด P และโมเมนต์ M ที่ฐาน (แรงปฏิกิริยาจาก SAP) · ขนาดหน้าตัดอ่านจากชื่อหน้าตัด แก้ได้ · ยังไม่เข้า BOQ (เหล็กแผ่น/สลักยึด) — รอผูกรายการราคา</p>
+    <p class="hint">จุดที่ชิ้นส่วนเหล็กวางบนหัวเสา คสล. · เพลทต้องไม่ใหญ่กว่าหัวเสา · ใส่แรงอัด P และโมเมนต์ M ที่ฐาน (แรงปฏิกิริยาจาก SAP) · ขนาดหน้าตัดอ่านจากชื่อหน้าตัด แก้ได้ · เขียนลงโมเดลแล้ว ปร.1 มีรายการเหล็กแผ่น (กก.) และสลักยึด (ตัว) ในหมวดโครงสร้างเหล็ก — ราคาสืบเอง</p>
     ${plates.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>จุด</th><th>เหล็กที่วาง</th><th>หน้าตัด</th><th>กว้าง×ลึก (มม.)</th><th>P กก.</th><th>M กก.-ม.</th><th>เพลท + สลัก</th><th></th></tr>
     ${plates.map(x => {
       const o = S.dsgPlate[x.id], u = D.plates[x.id] || {};
@@ -921,7 +922,7 @@ function stairCard(stairs) {
   const D = dsg(), c = D.crit;
   const dn = stairs.filter(x => S.dsgStair[x.id] && S.dsgStair[x.id].r), pass = dn.filter(x => S.dsgStair[x.id].ok).length;
   return `<div class="card"><h2>บันได คสล. (ท้องเรียบ ช่วงเดียว) <span class="hint">${dn.length}/${stairs.length} ช่วงออกแบบได้ · ผ่าน ${pass}</span></h2>
-    <p class="hint">L = ช่วงราบระหว่างที่รองรับ (ช่วงที่รวมชานพักให้แก้ L เอง) · t = ความหนาท้องบันได · น้ำหนักบันได = γ·t·√(h²+b²)/b + ½·h·γ · ใช้เหล็กพื้น (${RcWsd.barName((c.slabDias || [9])[0], +c.slabFy).split(' ')[0]}) · บันไดจากโมเดลยังไม่เข้า BOQ</p>
+    <p class="hint">L = ช่วงราบระหว่างที่รองรับ (ช่วงที่รวมชานพักให้แก้ L เอง) · t = ความหนาท้องบันได · น้ำหนักบันได = γ·t·√(h²+b²)/b + ½·h·γ · ใช้เหล็กพื้น (${RcWsd.barName((c.slabDias || [9])[0], +c.slabFy).split(' ')[0]}) · บันไดจากโมเดลเขียนแล้วเหล็กเข้า ปร.1 (ยาวตามแนวเอียงของช่วง ไม่รวมชานพัก) · บันไดที่เพิ่มเองไม่เข้าปริมาณ</p>
     <div class="btn-row"><button class="btn small" id="dsg-st-add">+ เพิ่มบันไดคำนวณเอง</button></div>
     ${stairs.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>บันได</th><th>L (ม.)</th><th>t (ม.)</th><th>ลูกนอน (ม.)</th><th>ลูกตั้ง (ม.)</th><th>SDL</th><th>LL กก./ตร.ม.</th><th>เหล็กเสริม</th><th></th></tr>
     ${stairs.map(x => {

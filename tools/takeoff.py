@@ -257,6 +257,8 @@ class Takeoff:
         self._columns()
         self._beams()
         self._slabs()
+        self._stairs()
+        self._plates()
         self._steel_and_roofs()
         self._walls()
         self._finishes()
@@ -312,6 +314,9 @@ class Takeoff:
                 n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c), f"แนว x {n} เส้น × {b - 2*c:.2f} ม.")
             if rb.get("bars_y"):
                 n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c), f"แนว y {n} เส้น × {d - 2*c:.2f} ม.")
+            if rb.get("rings"):   # ฐานเข็ม 1 ต้น: ปลอกรอบ
+                k, dia = rb["rings"]; per = 2 * (b + d) - 8 * c
+                self.rebar(f["id"], dia, int(k) * per, f"ปลอกรอบ {int(k)} วง × {per:.2f} ม.")
             if rb.get("bands"):   # ฐานเข็ม 3 ต้น: แถบเหล็กเหนือหัวเข็มแต่ละคู่
                 k, n, dia, ln = rb["bands"]; k, n = int(k), int(n)
                 self.rebar(f["id"], dia, k * n * ln, f"{k} แถบ × {n} เส้น × {ln:.2f} ม.")
@@ -818,6 +823,40 @@ class Takeoff:
                 it = self.add("1.3", f"{part}_{grp}", f"{label} ท่อ{pc['name']} (วัสดุ {pc[part]*100:g}% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
                               "งาน", 1, None, count=True, task="mep_rough", note=f"ว480 {grp}-{code}")
                 it["pct"] = {"of": keys, "mat": pc[part], "lab_of_mat": 0.30}
+
+    # ------------------------------------------------------------ บันได (เหล็กเสริมตามผลออกแบบ)
+    def _stairs(self):
+        c = self.s["cover"]
+        for st in self.m.get("stairs", []):
+            fl = st.get("flights") or []
+            for k, f in enumerate(fl):
+                fid = st["id"] if len(fl) == 1 else f"{st['id']}#{k + 1}"
+                dz = self.design.get("stairs") or {}
+                d = dz.get(fid) or {}
+                if not (d.get("main_bar") or d.get("dist_bar")):
+                    continue
+                W, H, Lh = f["width"], f["top"] - f["bottom"], f["risers"] * f["going"]
+                Li = math.hypot(Lh, H)
+                lv = min(self.levels, key=lambda kk: abs(self.levels[kk] - f["top"]), default="?")
+                self.src_task.setdefault(st["id"], "lift:" + lv)
+                if d.get("main_bar"):
+                    dia, sp = d["main_bar"]; n = math.floor(W / sp) + 1
+                    self.rebar(st["id"], dia, n * Li, f"{fid} เหล็กหลัก @{sp:g} {n} เส้น × {Li:.2f} ม.")
+                if d.get("dist_bar"):
+                    dia, sp = d["dist_bar"]; n = math.floor(Li / sp) + 1
+                    self.rebar(st["id"], dia, n * (W - 2 * c), f"{fid} เหล็กกันร้าว @{sp:g} {n} เส้น × {W - 2 * c:.2f} ม.")
+
+    # ------------------------------------------------------------ เพลทหัวเสาและสลักยึด (ผลออกแบบ)
+    def _plates(self):
+        for pid, e in (self.design.get("plates") or {}).items():
+            if e.get("plate"):
+                B, L, t = e["plate"]; kg = B * L * t * 7.85e-6
+                self.add("1.1.10", f"plate_{t:g}", f"เหล็กแผ่น หนา {t:g} มม.", "กก.", kg, pid, task="roof_frame",
+                         calc=f"{B:g}×{L:g}×{t:g} มม. × 7,850 กก./ลบ.ม. = {kg:.2f} กก.")
+            if e.get("bolts"):
+                n, dia, La = e["bolts"]
+                self.add("1.1.10", f"abolt_{dia:g}_{La:g}", f"สลักเกลียวยึด (Anchor bolt) Ø {dia:g} มม. ฝังลึก {La:g} ซม.", "ตัว",
+                         int(n), pid, count=True, task="roof_frame")
 
     # ------------------------------------------------------------ เหล็กเสริมรวม
     def _rebar_items(self):

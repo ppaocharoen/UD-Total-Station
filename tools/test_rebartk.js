@@ -15,7 +15,7 @@ function viaPython(m) {
   execFileSync('python3', [path.join(__dirname, 'takeoff.py'), f, '--write'], { stdio: 'pipe' });
   const out = JSON.parse(fs.readFileSync(f, 'utf8'));
   const h = execFileSync('python3', ['-c', `import json,sys;sys.path.insert(0,${JSON.stringify(__dirname)});from validate import canonical_hash;m=json.load(open(${JSON.stringify(f)}));print(canonical_hash(m,["design"]))`]).toString().trim();
-  return { rows: out.quantities.items.filter(r => r.group_code === '1.1.9'), piles: out.quantities.items.filter(r => r.group_code === '1.1.5'), all: out.quantities.items, q: out.quantities, hash: h };
+  return { rows: out.quantities.items.filter(r => r.group_code === '1.1.9'), piles: out.quantities.items.filter(r => r.group_code === '1.1.5' || r.group_code === '1.1.10'), all: out.quantities.items, q: out.quantities, hash: h };
 }
 async function cmp(label, m) {
   const py = viaPython(m), js = T.compute(m);
@@ -24,11 +24,11 @@ async function cmp(label, m) {
     const a = canon(strip(r)), b = canon(strip(js[i] || {}));
     check(`${label}: ${r.key}`, a === b, '\n py ' + a.slice(0, 600) + '\n js ' + b.slice(0, 600));
   });
-  const jp = T.computePiles(m);
+  const jp = T.computePiles(m).concat(T.computePlates(m));
   check(`${label}: จำนวนแถวเข็ม`, py.piles.length === jp.length, `py ${py.piles.length} js ${jp.length}`);
   py.piles.forEach((r, i) => { const a = canon(strip(r)), b = canon(strip(jp[i] || {})); check(`${label}: ${r.key}`, a === b, '\n py ' + a + '\n js ' + b); });
   // apply บนผล Python ต้องได้ items เท่าเดิม (ยกเว้น src/price_ref คงเดิม)
-  const mm = clone(m); mm.quantities = clone(py.q); mm.quantities.items = mm.quantities.items.filter(r => r.group_code !== '1.1.9' && r.group_code !== '1.1.5');
+  const mm = clone(m); mm.quantities = clone(py.q); mm.quantities.items = mm.quantities.items.filter(r => r.group_code !== '1.1.9' && r.group_code !== '1.1.5' && r.group_code !== '1.1.10');
   T.apply(mm);
   check(`${label}: apply ลำดับแถว`, mm.quantities.items.map(r => r.key).join() === py.all.map(r => r.key).join());
   check(`${label}: hash design ตรง Python`, (await T.designHash(m)) === py.hash, `${await T.designHash(m)} vs ${py.hash}`);
@@ -53,7 +53,14 @@ async function cmp(label, m) {
   sp[2].kind = 'pile_cap'; sp[2].piles = { n: 2, type: 'เข็มเจาะ', kind: 'bored', size: 0.5, length: 21.5 };
   if (sp[3]) { sp[3].kind = 'pile_cap'; sp[3].piles = { n: 3, type: 'เข็มเจาะ', kind: 'bored', size: 0.35, length: 18, bars: [6, 16], tie: [6, 0.2], dowel: [4, 16, 1.0] }; }
   m6.design.supports = m6.design.supports || {}; m6.design.supports[sp[1].id] = { rebar: { bands: [3, 13, 12, 1.96] }, status: 'computed' };
-  await cmp('ฐานเข็มตอก/เจาะ + แถบ 3 ต้น', m6);
+  m6.design.supports[sp[0].id] = { rebar: { bars_x: [5, 12], bars_y: [5, 12], rings: [4, 12] }, status: 'computed' };
+  await cmp('ฐานเข็มตอก/เจาะ + แถบ 3 ต้น + ปลอกรอบ', m6);
+  const m7 = clone(m6);
+  m7.stairs = [{ id: 'ST1', mark: 'ST-1', flights: [{ start: [0, 0], dir: '+X', width: 1.2, bottom: 0, top: 1.6, risers: 9, going: 0.25, waist: 0.15 }, { start: [2.25, 1.3], dir: '-X', width: 1.2, bottom: 1.6, top: 3.2, risers: 9, going: 0.25 }] },
+    { id: 'ST2', flights: [{ start: [5, 0], dir: '+Y', width: 1.0, bottom: 0, top: 1.5, risers: 8, going: 0.27 }] }];
+  m7.design.stairs = { 'ST1#1': { main_bar: [12, 0.15], dist_bar: [9, 0.2] }, 'ST1#2': { main_bar: [12, 0.125], dist_bar: [9, 0.25] }, ST2: { main_bar: [16, 0.2] } };
+  m7.design.plates = { 'N-1': { node: 'N-1', plate: [250, 300, 12], bolts: [4, 16, 33] }, 'N-2': { plate: [250, 300, 12], bolts: [4, 16, 33] }, 'N-3': { plate: [200, 200, 9], bolts: [4, 12, 25] } };
+  await cmp('บันได + เพลท/สลัก', m7);
   check('pyJson เลขยกกำลัง', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]) === '[1e-05,1.5e-07,0.0001,2.5]', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]));
   console.log((ok ? 'PASS' : 'FAIL') + ` rebartk ${n} ข้อ`);
   process.exit(ok ? 0 : 1);
