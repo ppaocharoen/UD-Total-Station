@@ -2200,6 +2200,13 @@
           "additionalProperties": {
             "$ref": "#/$defs/designEntry"
           }
+        },
+        "plates": {
+          "type": "object",
+          "description": "เพลทหัวเสา: {node: {plate:[B,L,t มม.], bolts:[จำนวน, Ø มม., ระยะฝัง ซม.]}}",
+          "additionalProperties": {
+            "type": "object"
+          }
         }
       }
     },
