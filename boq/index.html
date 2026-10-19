@@ -17,6 +17,7 @@
   <nav class="nav-tabs" id="tabs">
     <div class="nav-tab active" data-tab="project">โครงการ</div>
     <div class="nav-tab" data-tab="model">โมเดล 3D</div>
+    <div class="nav-tab" data-tab="design">ออกแบบ</div>
     <div class="nav-tab" data-tab="pr1">ปร.1</div>
     <div class="nav-tab" data-tab="pr23">ปร.2 / ปร.3</div>
     <div class="nav-tab" data-tab="survey">ราคาสืบ <span id="sv-badge"></span></div>
@@ -36,6 +37,7 @@
   <button data-go="more"><i>··</i>อื่นๆ</button>
 </nav>
 <div class="bmore glass" id="bmore">
+  <button data-go="design">ออกแบบโครงสร้าง (WSD)</button>
   <button data-go="survey">ราคาสืบ (แคป ลิงก์ ใบเสนอราคา)</button>
   <button data-go="pr23">ปร.2 / ปร.3 ครุภัณฑ์ ค่าใช้จ่ายพิเศษ</button>
   <button data-go="diff">เทียบรุ่น</button>
@@ -244,6 +246,10 @@
   <div class="card"><h2>งวดงานและการจ่ายเงิน</h2><div class="table-wrap"><table class="boq" id="pl-inst"></table></div><div id="pl-instnote" class="hint" style="margin-top:6px"></div></div>
 </section>
 <!-- ================================================================ เทียบรุ่น -->
+<section class="page" id="page-design">
+  <div id="dsg-body"><div class="card hint">เปิดโมเดลก่อน</div></div>
+  <div id="dsg-printout"></div>
+</section>
 <section class="page" id="page-diff">
   <div class="card">
     <h2>เทียบโมเดลก่อน/หลังแก้</h2>
@@ -279,6 +285,8 @@
     document.write('<script src="' + u.replace(/["<>]/g, encodeURIComponent) + '"><\/script>');   // โหลดแบบรอ (app.js ใช้ UDPrice ทันที)
   })();
 </script>
+<script src="../lib/rcwsd.js"></script>
 <script src="app.js"></script>
+<script src="design.js"></script>
 </body>
 </html>

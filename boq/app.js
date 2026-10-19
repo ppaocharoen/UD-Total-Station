@@ -122,6 +122,7 @@ function rows() {   // ผูกราคาตอนเปิด (lib/pricemap.
 // ------------------------------------------------------------------ render
 function renderAll() {
   renderProject(); renderSurvey(); renderPR1(); renderPR23(); renderSummary(); renderPlan(); if (S.old) setTimeout(renderDiff, 0);
+  if (typeof renderDesign === 'function') renderDesign();
 }
 
 // ผู้ลงนาม: ประมาณราคา = ผู้ประมาณราคา 1 คน · กำหนดราคากลาง = คณะกรรมการ ≥ 3 คน มีประธาน 1 คนเสมอ (ตกลงกับ Earth 18 ต.ค. 2569)
@@ -1312,7 +1313,8 @@ function bind() {
     $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + t.dataset.tab));
     if (t.dataset.tab === 'model') { initViewer(); S.viewer && S.viewer.resize(); }
     if (t.dataset.tab === 'survey') renderSurvey();
-    $$('#bnav [data-go]').forEach(b => b.classList.toggle('active', b.dataset.go === t.dataset.tab || (b.dataset.go === 'more' && ['pr23', 'diff', 'survey'].includes(t.dataset.tab))));
+    if (t.dataset.tab === 'design' && typeof renderDesign === 'function') renderDesign();
+    $$('#bnav [data-go]').forEach(b => b.classList.toggle('active', b.dataset.go === t.dataset.tab || (b.dataset.go === 'more' && ['pr23', 'diff', 'survey', 'design'].includes(t.dataset.tab))));
     document.body.classList.toggle('on-model', t.dataset.tab === 'model');
     $('#bmore').classList.remove('on'); scrollTo(0, 0);
   });

@@ -470,3 +470,58 @@ html.dos .side-sum em{color:var(--dos-blue)}
 .legal{margin:4px 0 8px;border:1px solid var(--border);padding:4px 8px}.legal summary{cursor:pointer;color:var(--green);font-size:13px}
 .site-form{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}.site-form label.ck{flex-direction:row;align-items:center;gap:6px}
 .site-road{display:flex;gap:6px;margin:4px 0}.site-road select{flex:1;min-width:0}.site-road input{width:90px}
+
+/* ---------------- ออกแบบ (WSD) */
+.dsg-crit{margin-bottom:8px}.dsg-dias{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:12px;color:var(--text2);grid-column:1/-1}
+.dsg-dias label.ck{flex-direction:row;align-items:center;gap:4px;display:flex}
+table.dsg-kv{min-width:0}table.dsg-kv td,table.dsg-kv th{white-space:nowrap}
+table.dsg-tab input.price{width:78px}table.dsg-tab select{max-width:150px;font-size:12px}
+table.dsg-tab td.dsg-rb{min-width:220px;font-size:12px;white-space:normal}
+table.dsg-tab tr.row{cursor:pointer}table.dsg-tab tr.sel td{background:rgba(0,255,65,.10)}
+html.dos table.dsg-tab tr.sel td{background:#ffff55}
+.d-ok{color:var(--green)}.d-ng{color:var(--red)}html.dos .d-ok{color:#006000}html.dos .d-ng{color:#a80000}
+.d-note{color:var(--amber);font-size:13px;margin:6px 0}
+.dsg-rep h4{margin:12px 0 4px;color:var(--green2)}html.dos .dsg-rep h4{color:#0000a8}
+.dsg-head{font-size:13px;line-height:1.6;border-bottom:1px solid var(--border);padding-bottom:6px}
+table.dsg-calc{width:100%;border-collapse:collapse;font-size:13px}
+table.dsg-calc td{padding:3px 6px;border-bottom:1px dotted var(--border);vertical-align:top}
+table.dsg-calc td:first-child{white-space:nowrap;font-family:var(--f-mono);width:92px}
+table.dsg-calc td.eq{color:var(--text2);font-family:var(--f-mono);font-size:12px}
+table.dsg-calc td.r{font-family:var(--f-mono);overflow-wrap:anywhere}
+.dsg-sum{font-size:14px;margin:2px 0 8px}
+.dsg-secs{display:flex;flex-wrap:wrap;gap:16px}
+.dsg-sec{margin:0;text-align:center}.dsg-sec figcaption{font-size:12px;color:var(--text2)}
+.dsg-sec .con{fill:rgba(0,255,65,.05);stroke:var(--green2);stroke-width:1.5}.dsg-sec .stp{fill:none;stroke:var(--amber);stroke-width:1.2}
+.dsg-sec circle{fill:var(--green)}.dsg-sec circle.sp{fill:var(--amber)}
+html.dos .dsg-sec .con{fill:#fff;stroke:#000}html.dos .dsg-sec .stp{stroke:#0000a8}html.dos .dsg-sec circle{fill:#000}html.dos .dsg-sec circle.sp{fill:#a80000}
+#dsg-printout{display:none}
+table.dsg-calc{table-layout:fixed}
+table.dsg-calc td:nth-child(1){width:15%}table.dsg-calc td:nth-child(3){width:19%}table.dsg-calc td:nth-child(4){width:9%}table.dsg-calc td:nth-child(5){width:19%}
+@media (max-width:640px){
+  table.dsg-calc,table.dsg-calc tbody{display:block}
+  table.dsg-calc tr{display:grid;grid-template-columns:minmax(70px,auto) 1fr auto;border-bottom:1px dotted var(--border);padding:3px 0}
+  table.dsg-calc td{border:none;width:auto!important;padding:1px 4px}
+  table.dsg-calc td:first-child{white-space:normal}
+  table.dsg-calc td:nth-child(5){grid-column:1/-1}table.dsg-calc td:nth-child(5):empty{display:none}
+  table.dsg-calc td.eq{grid-column:1/-1;order:6}
+  table.dsg-tab,table.dsg-tab tbody{display:block;min-width:0}
+  table.dsg-tab tr:first-child{display:none}
+  table.dsg-tab tr.row{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;padding:8px 4px;border-bottom:1px solid var(--border)}
+  table.dsg-tab td{display:block;border:none;padding:0}
+  table.dsg-tab td[data-l]::before{content:attr(data-l);display:block;font-size:11px;color:var(--text3)}
+  table.dsg-tab td.c-name,table.dsg-tab td.dsg-rb{grid-column:1/-1;min-width:0}
+  table.dsg-tab input.price,table.dsg-tab select{width:100%;max-width:none}
+}
+@media print{
+  body.print-dsg main>section{display:none!important}
+  body.print-dsg #page-design{display:block!important}
+  body.print-dsg #dsg-body{display:none!important}
+  body.print-dsg #dsg-printout{display:block!important;font-family:'Sarabun',sans-serif;color:#000}
+  #dsg-printout .dsg-rep{page-break-after:always;border:none;padding:0}
+  #dsg-printout h4{color:#000!important}
+  #dsg-printout table.dsg-calc td{border-bottom:1px solid #bbb;color:#000;font-size:11px;padding:2px 4px}
+  #dsg-printout table.dsg-calc td:first-child{width:auto}
+  #dsg-printout table.dsg-calc td.eq{color:#333}
+  #dsg-printout .d-ok{color:#000}#dsg-printout .d-ng{color:#a00}
+  #dsg-printout .dsg-sec .con{fill:#fff;stroke:#000}#dsg-printout .dsg-sec .stp{stroke:#000}#dsg-printout .dsg-sec circle{fill:#000}
+}
