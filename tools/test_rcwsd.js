@@ -124,6 +124,16 @@ console.log(`  เสา: ${cd.nX + cd.nY - 4}-DB${cd.dMain} ปลอก RB${cd
 const fd = W.footingDesign({ cov: 7.5, t: 0.3, Bx: 1.2, By: 1.2, Df: 1.5, P: 30000, Mx: 300, My: 300, qa: 15000, gamma: 1800, pier: 1, bx: 0.2, by: 0.2 }, cc, { resize: true });
 check('ออกแบบฐาน ผ่าน', fd.ok, JSON.stringify({ p: fd.p, e: fd.error }));
 console.log(`  ฐาน: ${fd.p.Bx}×${fd.p.By}×${fd.p.t} DB${fd.p.dLong}@${fd.p.sLong} / DB${fd.p.dShort}@${fd.p.sShort}`);
+
+// บันไดท้องเรียบ (Stair1–3 ฉบับแก้)
+require('./rcwsd_stair_cases.json').cases.forEach((cs, i) => {
+  const p = cs.input, e = cs.expect, cr = W.criteria(p), r = W.slabStair(p, cr);
+  const g = Object.assign({ fc: cr.fc, fs: cr.main.fs, k: cr.main.k, j: cr.main.j, R: cr.main.R }, r);
+  Object.keys(e).forEach(k => {
+    if (k === 'bond') { check(`stair${i} bond`, (e[k] === '[Ok.]') === r.checks.find(x => x.code === 'bond').ok); return; }
+    if (typeof e[k] === 'number') check(`stair${i} ${k}`, near(g[k], e[k], 1e-9), `เว็บ ${g[k]} Excel ${e[k]}`);
+  });
+});
 // ออกแบบพื้น: ผลผ่าน และระยะไม่น้อยกว่า 0.10
 const cs = W.criteria({ fcp: 240, mode: 1, fy: 2400, fyv: 2400 });
 [['two', { S: 3.5, L: 4.2, t: 0.12, cov: 2, SDL: 100, LL: 300, case: 3 }], ['one', { L: 2.5, t: 0.1, cov: 2, SDL: 50, LL: 200, type: 1 }], ['cant', { L: 1.2, t: 0.1, cov: 2, SDL: 50, LL: 200, P: 100, a: 1 }],

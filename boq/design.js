@@ -3,11 +3,11 @@
  * ใช้ตัวแปรร่วมจาก app.js: S, $, $$, esc, fmt, toast, download, autosave, buildLayers
  */
 'use strict';
-const DSG_DEF = () => ({ crit: { F: 0.45, mode: 1, fy: 4000, fyv: 2400, cov: 2.5, dias: [12, 16, 20, 25], slabFy: 2400, slabCov: 2, slabDias: [9, 12], colCov: 3, colDias: [12, 16, 20], ftCov: 7.5, qa: '', gamma: 1800, ftDias: [12, 16], plateFy: 2400 }, beams: {}, slabs: {}, cols: {}, foots: {}, plates: {}, sel: '' });
+const DSG_DEF = () => ({ crit: { F: 0.45, mode: 1, fy: 4000, fyv: 2400, cov: 2.5, dias: [12, 16, 20, 25], slabFy: 2400, slabCov: 2, slabDias: [9, 12], colCov: 3, colDias: [12, 16, 20], ftCov: 7.5, qa: '', gamma: 1800, ftDias: [12, 16], plateFy: 2400 }, beams: {}, slabs: {}, cols: {}, foots: {}, plates: {}, stairs: {}, stairsManual: [], sel: '' });
 const SLAB_DIAS = fy => fy <= 2400 ? [9, 12, 15] : [10, 12, 16];
 function dsg() {
   const b = S.boq; if (!b.dsg) b.dsg = DSG_DEF();
-  const d = b.dsg; d.crit = Object.assign(DSG_DEF().crit, d.crit || {}); d.beams = d.beams || {}; d.slabs = d.slabs || {}; d.cols = d.cols || {}; d.foots = d.foots || {}; d.plates = d.plates || {}; return d;
+  const d = b.dsg; d.crit = Object.assign(DSG_DEF().crit, d.crit || {}); d.beams = d.beams || {}; d.slabs = d.slabs || {}; d.cols = d.cols || {}; d.foots = d.foots || {}; d.plates = d.plates || {}; d.stairs = d.stairs || {}; d.stairsManual = d.stairsManual || []; return d;
 }
 const df2 = (x, n = 2) => (x === null || x === undefined || Number.isNaN(+x)) ? '-' : (+x).toLocaleString('en-US', { minimumFractionDigits: n, maximumFractionDigits: n });
 const okTag = ok => ok ? '<b class="d-ok">[Ok.]</b>' : '<b class="d-ng">[Fail]</b>';
@@ -80,6 +80,7 @@ function renderDesign() {
   const cols = dsgColList(); S.dsgCol = {}; cols.forEach(x => { S.dsgCol[x.id] = dsgColRun(x); });
   const foots = dsgFootList(); S.dsgFoot = {}; foots.forEach(x => { S.dsgFoot[x.id] = dsgFootRun(x); });
   const plates = dsgPlateList(); S.dsgPlate = {}; plates.forEach(x => { S.dsgPlate[x.id] = dsgPlateRun(x); });
+  const stairs = dsgStairList(); S.dsgStair = {}; stairs.forEach(x => { S.dsgStair[x.id] = dsgStairRun(x); });
   const nRes = Object.keys((S.model.results && S.model.results.members) || {}).length;
   const opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
   const done = beams.filter(b => S.dsgOut[b.id]), pass = done.filter(b => S.dsgOut[b.id].ok).length;
@@ -126,16 +127,18 @@ function renderDesign() {
   </div>
   ${slabCard(slabs)}
   ${colCard(cols)}
+  ${stairCard(stairs)}
   ${footCard(foots)}
   ${plateCard(plates)}
-  <div id="dsg-report">${D.sel && D.sel.startsWith('pl:') && S.dsgPlate[D.sel.slice(3)] && S.dsgPlate[D.sel.slice(3)].r ? plateReport(plates.find(x => x.id === D.sel.slice(3)), S.dsgPlate[D.sel.slice(3)])
+  <div id="dsg-report">${D.sel && D.sel.startsWith('st:') && S.dsgStair[D.sel.slice(3)] && S.dsgStair[D.sel.slice(3)].r ? stairReport(stairs.find(x => x.id === D.sel.slice(3)), S.dsgStair[D.sel.slice(3)])
+    : D.sel && D.sel.startsWith('pl:') && S.dsgPlate[D.sel.slice(3)] && S.dsgPlate[D.sel.slice(3)].r ? plateReport(plates.find(x => x.id === D.sel.slice(3)), S.dsgPlate[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('col:') && S.dsgCol[D.sel.slice(4)] && S.dsgCol[D.sel.slice(4)].r ? colReport(cols.find(x => x.id === D.sel.slice(4)), S.dsgCol[D.sel.slice(4)])
     : D.sel && D.sel.startsWith('ft:') && S.dsgFoot[D.sel.slice(3)] && S.dsgFoot[D.sel.slice(3)].r ? footReport(foots.find(x => x.id === D.sel.slice(3)), S.dsgFoot[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('slab:') && S.dsgSlab[D.sel.slice(5)] && S.dsgSlab[D.sel.slice(5)].r ? slabReport(slabs.find(x => x.id === D.sel.slice(5)), S.dsgSlab[D.sel.slice(5)])
     : D.sel && S.dsgOut[D.sel] ? beamReport(beams.find(b => b.id === D.sel), S.dsgOut[D.sel]) : '<div class="card hint">แตะแถวคาน พื้น เสา หรือฐานรากเพื่อดูรายการคำนวณ</div>'}</div>`;
-  bindDesign(beams, slabs, cols, foots, plates);
+  bindDesign(beams, slabs, cols, foots, plates, stairs);
 }
-function bindDesign(beams, slabs, cols, foots, plates) {
+function bindDesign(beams, slabs, cols, foots, plates, stairs) {
   const D = dsg(), re = () => { autosave(); renderDesign(); };
   $$('#dsg-body [data-dc]').forEach(el => el.onchange = () => {
     const k = el.dataset.dc, v = el.value.trim().replace(/,/g, ''); D.crit[k] = k === 'qa' ? (v === '' ? '' : Math.abs(+v) || '') : ({ cov: 2.5, slabCov: 2, colCov: 3, ftCov: 7.5, gamma: 1800 }[k] !== undefined ? (+v || { cov: 2.5, slabCov: 2, colCov: 3, ftCov: 7.5, gamma: 1800 }[k]) : +v);
@@ -162,7 +165,7 @@ function bindDesign(beams, slabs, cols, foots, plates) {
     });
     tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION'].includes(e.target.tagName)) return; D.sel = id; renderDesign(); const r = $('#dsg-report'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   });
-  [['tr[data-cl]', 'cl', 'cf', 'cols', 'col:'], ['tr[data-ft]', 'ft', 'ff', 'foots', 'ft:'], ['tr[data-pl]', 'pl', 'pf', 'plates', 'pl:']].forEach(([sel, key, fk, store, pre]) => $$('#dsg-body ' + sel).forEach(tr => {
+  [['tr[data-cl]', 'cl', 'cf', 'cols', 'col:'], ['tr[data-ft]', 'ft', 'ff', 'foots', 'ft:'], ['tr[data-pl]', 'pl', 'pf', 'plates', 'pl:'], ['tr[data-st]', 'st', 'tf', 'stairs', 'st:']].forEach(([sel, key, fk, store, pre]) => $$('#dsg-body ' + sel).forEach(tr => {
     const id = tr.dataset[key];
     tr.querySelectorAll(`[data-${fk}]`).forEach(el => el.onchange = () => {
       const u = D[store][id] = D[store][id] || {}, k = el.dataset[fk], v = el.value.trim().replace(/,/g, '');
@@ -171,11 +174,13 @@ function bindDesign(beams, slabs, cols, foots, plates) {
     });
     tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION', 'LABEL'].includes(e.target.tagName)) return; D.sel = pre + id; renderDesign(); const r = $('#dsg-report'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   }));
-  $('#dsg-write').onclick = () => dsgWrite(beams, slabs, cols, foots, plates);
+  const addSt = $('#dsg-st-add'); if (addSt) addSt.onclick = () => { const n = D.stairsManual.length + 1; D.stairsManual.push({ id: 'ST-M' + n, mark: 'ST-' + n }); D.sel = 'st:ST-M' + n; re(); };
+  $$('#dsg-body [data-stdel]').forEach(b => b.onclick = e => { e.stopPropagation(); D.stairsManual = D.stairsManual.filter(x => x.id !== b.dataset.stdel); delete D.stairs[b.dataset.stdel]; re(); });
+  $('#dsg-write').onclick = () => dsgWrite(beams, slabs, cols, foots, plates, stairs);
   $('#dsg-dl').onclick = () => { download(S.modelName.replace(/(\.bm)?\.json$/, '') + '.bm.json', JSON.stringify(S.model, null, 1)); };
-  $('#dsg-print').onclick = () => dsgPrint(beams, slabs, cols, foots, plates);
+  $('#dsg-print').onclick = () => dsgPrint(beams, slabs, cols, foots, plates, stairs);
 }
-function dsgWrite(beams, slabs, cols, foots, plates) {
+function dsgWrite(beams, slabs, cols, foots, plates, stairs) {
   const m = S.model, c = dsg().crit, D = dsg(); m.design = m.design || {}; m.design.members = m.design.members || {};
   let n = 0, skip = 0; D.applied = D.applied || {};
   beams.forEach(bm => {
@@ -212,9 +217,16 @@ function dsgWrite(beams, slabs, cols, foots, plates) {
       src: `UD Total Station v${UD_VERSION.v} เพลทหัวเสา (Neo Column Base Plate)` };
     np++;
   });
-  if (!n && !ns && !nc && !nf && !np) return toast(skip ? `ยังไม่มีชิ้นที่ผ่าน (ไม่ผ่าน ${skip} ชิ้น — แก้ขนาดก่อน)` : 'ยังไม่มีชิ้นที่ออกแบบได้ — กรอกแรง/น้ำหนักบรรทุกก่อน');
+  let nst = 0; D.appliedStairs = D.appliedStairs || {}; m.design.stairs = m.design.stairs || {};
+  (stairs || []).filter(x => !x.manual).forEach(x => {
+    const o = S.dsgStair[x.id]; if (!o || !o.d) return; if (!o.ok) { skip++; return; }
+    m.design.stairs[x.id] = D.appliedStairs[x.id] = { method: 'WSD', main_bar: [o.d.dm, o.d.sA], dist_bar: [o.d.dt, o.d.sB], waist: x.t, pass: true, status: 'computed',
+      src: `UD Total Station v${UD_VERSION.v} บันไดท้องเรียบ WSD (${o.crit.main.grade}, หุ้ม ${c.slabCov} ซม.)` };
+    nst++;
+  });
+  if (!n && !ns && !nc && !nf && !np && !nst) return toast(skip ? `ยังไม่มีชิ้นที่ผ่าน (ไม่ผ่าน ${skip} ชิ้น — แก้ขนาดก่อน)` : 'ยังไม่มีชิ้นที่ออกแบบได้ — กรอกแรง/น้ำหนักบรรทุกก่อน');
   autosave();
-  dsgRequantify().then(msg => toast(`เขียนเหล็กเสริม คาน ${n} · พื้น ${ns} · เสา ${nc} · ฐานราก ${nf} · เพลท ${np} ลงโมเดลแล้ว${skip ? ` · ข้ามชิ้นที่ไม่ผ่าน ${skip} ชิ้น` : ''} · ${msg}`));
+  dsgRequantify().then(msg => toast(`เขียนเหล็กเสริม คาน ${n} · พื้น ${ns} · เสา ${nc} · ฐานราก ${nf} · เพลท ${np} · บันได ${nst} ลงโมเดลแล้ว${skip ? ` · ข้ามชิ้นที่ไม่ผ่าน ${skip} ชิ้น` : ''} · ${msg}`));
 }
 /** ถอดปริมาณเหล็กเสริมใหม่ในเว็บ (lib/rebartk.js วิธีเดียวกับ takeoff.py) แล้วอัปเดต 3D / ปร.1 / แผนงาน */
 async function dsgRequantify() {
@@ -250,21 +262,24 @@ function dsgOnLoad() {
     if (!fids.has(id)) { delete AF[id]; continue; }
     if (JSON.stringify((m.design.supports[id] || {}).rebar) !== JSON.stringify(e.rebar)) { m.design.supports[id] = e; n++; }
   }
+  const ASt = (S.boq.dsg || {}).appliedStairs || {}, stIds = new Set((m.stairs || []).map(x => x.id)); m.design.stairs = m.design.stairs || {};
+  for (const [id, e] of Object.entries(ASt)) { if (!stIds.has(id)) { delete ASt[id]; continue; } if (JSON.stringify(m.design.stairs[id]) !== JSON.stringify(e)) { m.design.stairs[id] = e; n++; } }
   const AP = (S.boq.dsg || {}).appliedPlates || {}; m.design.plates = m.design.plates || {};
   for (const [id, e] of Object.entries(AP)) { if (JSON.stringify(m.design.plates[id]) !== JSON.stringify(e)) { m.design.plates[id] = e; n++; } }
   if (n) dsgRequantify().then(msg => toast(`ใส่ผลออกแบบ ${n} ชิ้นที่เคยเขียนไว้กลับเข้าโมเดล · ${msg}`));
   return n > 0;
 }
-function dsgPrint(beams, slabs, cols, foots, plates) {
+function dsgPrint(beams, slabs, cols, foots, plates, stairs) {
   const D = dsg(), sel = D.sel || '';
   const bl = sel ? beams.filter(b => b.id === sel) : beams.filter(b => S.dsgOut[b.id] && S.dsgOut[b.id].rebar);
   const sl = sel ? slabs.filter(x => 'slab:' + x.id === sel && S.dsgSlab[x.id] && S.dsgSlab[x.id].r) : slabs.filter(x => S.dsgSlab[x.id] && S.dsgSlab[x.id].r);
   const cl = sel ? cols.filter(x => 'col:' + x.id === sel && S.dsgCol[x.id].r) : cols.filter(x => S.dsgCol[x.id] && S.dsgCol[x.id].r);
   const fl = sel ? foots.filter(x => 'ft:' + x.id === sel && S.dsgFoot[x.id].r) : foots.filter(x => S.dsgFoot[x.id] && S.dsgFoot[x.id].r);
   const pl = sel ? plates.filter(x => 'pl:' + x.id === sel && S.dsgPlate[x.id].r) : plates.filter(x => S.dsgPlate[x.id] && S.dsgPlate[x.id].r);
-  if (!bl.length && !sl.length && !cl.length && !fl.length && !pl.length) return toast('ยังไม่มีรายการคำนวณ');
+  const stl = sel ? stairs.filter(x => 'st:' + x.id === sel && S.dsgStair[x.id].r) : stairs.filter(x => S.dsgStair[x.id] && S.dsgStair[x.id].r);
+  if (!bl.length && !sl.length && !cl.length && !fl.length && !pl.length && !stl.length) return toast('ยังไม่มีรายการคำนวณ');
   $('#dsg-printout').innerHTML = bl.map(b => beamReport(b, S.dsgOut[b.id])).join('') + sl.map(x => slabReport(x, S.dsgSlab[x.id])).join('')
-    + cl.map(x => colReport(x, S.dsgCol[x.id])).join('') + fl.map(x => footReport(x, S.dsgFoot[x.id])).join('') + pl.map(x => plateReport(x, S.dsgPlate[x.id])).join('');
+    + cl.map(x => colReport(x, S.dsgCol[x.id])).join('') + fl.map(x => footReport(x, S.dsgFoot[x.id])).join('') + pl.map(x => plateReport(x, S.dsgPlate[x.id])).join('') + stl.map(x => stairReport(x, S.dsgStair[x.id])).join('');
   document.body.classList.add('print-dsg');
   setTimeout(() => { window.print(); document.body.classList.remove('print-dsg'); }, 300);
 }
@@ -542,7 +557,7 @@ function colReport(x, o) {
       ${row('Pa', "0.85·Ag·(0.25f'c + fs·ρg)", df2(r.Pa, 0), 'กก.')}${row('Fa / Fb', "0.34(1+ρg·m)f'c / 0.45f'c", `${df2(r.Fa, 2)} / ${df2(r.Fb, 2)}`, 'ksc')}
       ${row('Ix / Iy', 'b·h³/12 + (2n−1)·Ast·γ²/' + (o.d.nX === o.d.nY ? 6 : 4), `${df2(r.Ix, 0)} / ${df2(r.Iy, 0)}`, 'ซม.⁴')}
       ${row('e = My/P · Mx/P', '', `${df2(r.ex, 2)} · ${df2(r.ey, 2)}`, 'ซม.')}${row('ea / eb (แกนคุม)', '', `${df2(r.ex >= r.ey ? r.eax : r.eay, 2)} / ${df2(r.ex >= r.ey ? r.ebx : r.eby, 2)}`, 'ซม.')}
-      ${r.slender ? row('R (เสายาว)', `klu/r = ${df2(r.klr, 1)} · r = 0.25·Bx`, df2(r.R, 3), '', r.R > 0 ? '' : okTag(false)) : ''}
+      ${r.slender ? row('R (เสายาว)', `klu/r = ${df2(r.klr, 1)} · r = 0.3 × ด้านแคบ`, df2(r.R, 3), '', r.R > 0 ? '' : okTag(false)) : ''}
       ${row(zoneTh, r.zone === 1 ? 'Pa ≥ P/R' : r.zone === 2 ? 'fa/Fa + fbx/Fb + fby/Fb' : 'Mx/Mox + My/Moy', r.zone === 1 ? `${df2(r.Pa, 0)} ≥ ${df2(r.Pd, 0)}` : df2(r.ratio, 3), r.zone === 1 ? 'กก.' : '≤ 1.00', okTag(main.ok))}
     </table>
     <h4>3. เหล็กปลอก</h4><table class="dsg-calc">
@@ -708,4 +723,74 @@ function plateReport(x, o) {
       ${row('ระยะฝังสลัก', 'Ft·D/(4·11)', df2(r.La, 0), 'ซม.')}${row('เชื่อม', 'เชื่อมโดยรอบ', '3', 'มม.')}
     </table>
     <h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">เพลท ${o.d.B}×${o.d.L}×${o.d.t} มม. + สลักยึด ${o.d.nb * 2}-Ø${o.d.dBolt} มม. ฝังลึก ${o.d.La} ซม. · เชื่อมโดยรอบ 3 มม.</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}</div>`;
+}
+
+// ------------------------------------------------------------------ บันไดท้องเรียบ (ชีต Stair1–3)
+/** ช่วงบันไดจากโมเดล (ทีละช่วง) + บันไดที่เพิ่มเอง */
+function dsgStairList() {
+  const m = S.model, D = dsg(); if (!m) return [];
+  const out = [];
+  (m.stairs || []).forEach(st => (st.flights || []).forEach((f, k) => {
+    const id = (st.flights.length > 1 ? `${st.id}#${k + 1}` : st.id), rise = (f.top - f.bottom) / f.risers;
+    out.push({ id, stair: st.id, mark: st.mark || st.id, L: f.risers * f.going, t: f.waist || 0.15, b: f.going, h: rise, width: f.width, manual: false });
+  }));
+  (D.stairsManual || []).forEach(x => out.push(Object.assign({ L: 3, t: 0.15, b: 0.25, h: 0.175, width: 1.2 }, x, { manual: true })));
+  return out;
+}
+function dsgStairInput(x) {
+  const u = dsg().stairs[x.id] || {}, has = k => u[k] !== undefined && u[k] !== '', v = k => has(k) ? +u[k] : x[k];
+  return { L: v('L'), t: v('t'), b: v('b'), h: v('h'), SDL: has('SDL') ? +u.SDL : 0, LL: has('LL') ? +u.LL : null };
+}
+function dsgStairRun(x) {
+  const c = dsg().crit, inp = dsgStairInput(x);
+  if (inp.LL === null) return { need: 'ใส่น้ำหนักบรรทุกจร (LL)', inp };
+  if (!(inp.L > 0 && inp.t > 0 && inp.b > 0 && inp.h > 0)) return { need: 'ใส่ L, t, ลูกนอน, ลูกตั้ง', inp };
+  const m = S.model, mt = (m.materials || []).find(y => y.kind === 'concrete') || {};
+  const crit = RcWsd.criteria({ fcp: +mt.fc || 240, F: +c.F, mode: +c.mode, fy: +c.slabFy, fyv: +c.fyv });
+  const p = { L: inp.L, t: inp.t, b: inp.b, h: inp.h, cov: +c.slabCov, unitW: +mt.unit_weight || 2400, SDL: inp.SDL, LL: inp.LL };
+  const d = RcWsd.slabDesign('stair', p, crit, (c.slabDias || []).map(Number));
+  return { r: d.r, ok: d.ok, error: d.error || '', d, crit, inp, p };
+}
+function stairCard(stairs) {
+  const D = dsg(), c = D.crit;
+  const dn = stairs.filter(x => S.dsgStair[x.id] && S.dsgStair[x.id].r), pass = dn.filter(x => S.dsgStair[x.id].ok).length;
+  return `<div class="card"><h2>บันได คสล. (ท้องเรียบ ช่วงเดียว) <span class="hint">${dn.length}/${stairs.length} ช่วงออกแบบได้ · ผ่าน ${pass}</span></h2>
+    <p class="hint">L = ช่วงราบระหว่างที่รองรับ (ช่วงที่รวมชานพักให้แก้ L เอง) · t = ความหนาท้องบันได · น้ำหนักบันได = γ·t·√(h²+b²)/b + ½·h·γ · ใช้เหล็กพื้น (${RcWsd.barName((c.slabDias || [9])[0], +c.slabFy).split(' ')[0]}) · บันไดจากโมเดลยังไม่เข้า BOQ</p>
+    <div class="btn-row"><button class="btn small" id="dsg-st-add">+ เพิ่มบันไดคำนวณเอง</button></div>
+    ${stairs.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>บันได</th><th>L (ม.)</th><th>t (ม.)</th><th>ลูกนอน (ม.)</th><th>ลูกตั้ง (ม.)</th><th>SDL</th><th>LL กก./ตร.ม.</th><th>เหล็กเสริม</th><th></th></tr>
+    ${stairs.map(x => {
+      const o = S.dsgStair[x.id], u = D.stairs[x.id] || {};
+      const cell = (k, def) => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-tf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (def === undefined || def === null ? '' : esc(def))}" placeholder="-">`;
+      return `<tr class="row ${D.sel === 'st:' + x.id ? 'sel' : ''}" data-st="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">${x.manual ? 'เพิ่มเอง' : esc(x.id)}</span>${x.manual ? ` <button class="btn small" data-stdel="${esc(x.id)}">ลบ</button>` : ''}</td>
+        <td data-l="L (ม.)">${cell('L', +(+x.L).toFixed(3))}</td><td data-l="t (ม.)">${cell('t', x.t)}</td><td data-l="ลูกนอน (ม.)">${cell('b', +(+x.b).toFixed(3))}</td><td data-l="ลูกตั้ง (ม.)">${cell('h', +(+x.h).toFixed(3))}</td>
+        <td data-l="SDL">${cell('SDL', 0)}</td><td data-l="LL กก./ตร.ม.">${cell('LL')}</td>
+        <td class="dsg-rb">${o.r ? `เหล็กหลัก ${RcWsd.barName(o.d.dm, +c.slabFy)} @${o.d.sA} · กันร้าว ${RcWsd.barName(o.d.dt, +c.slabFy)} @${o.d.sB}` + (o.error ? `<span class="warnline">${esc(o.error)}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}</td>
+        <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
+    }).join('')}</table></div>` : '<p class="hint">ไม่มีบันไดในโมเดล — กดเพิ่มบันไดคำนวณเองได้</p>'}
+  </div>`;
+}
+function stairReport(x, o) {
+  if (!x || !o || !o.r) return '';
+  const r = o.r, C = o.crit, p = o.p, fy = C.fy, pj = S.boq.project || {}, bn = d => RcWsd.barName(d, fy);
+  const row = (a, eq, v, u = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${u}</td><td>${tag}</td></tr>`;
+  const ck = k => (r.checks.find(c => c.code === k) || {}).ok;
+  return `<div class="card dsg-rep"><div class="dsg-head"><b>Stairs Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>บันได <b>${esc(x.mark)}</b> (${x.manual ? 'เพิ่มเอง' : esc(x.id)}) · ท้องเรียบ ช่วงเดียว</div>
+    <h4>1. ข้อมูล</h4><table class="dsg-calc">
+      ${row("f'c / fc / fs", C.main.grade, `${df2(C.fcp, 0)} / ${df2(C.fc, 2)} / ${df2(C.main.fs, 0)}`, 'ksc')}${row('k, j, R', '', `${df2(C.main.k, 4)} · ${df2(C.main.j, 4)} · ${df2(C.main.R, 3)}`, '')}
+      ${row('L / t', '', `${df2(p.L)} / ${df2(p.t)}`, 'ม.')}${row('ลูกนอน / ลูกตั้ง', '', `${df2(p.b, 3)} / ${df2(p.h, 3)}`, 'ม.')}
+      ${row('น้ำหนักบันได', 'γ·t·√(h²+b²)/b + ½·h·γ', df2(r.self, 1), 'กก./ตร.ม.')}${row('w', '+ SDL + LL', `${df2(r.self, 1)} + ${df2(p.SDL, 0)} + ${df2(p.LL, 0)} = ${df2(r.w, 1)}`, 'กก./ตร.ม.')}
+    </table>
+    <h4>2. ตรวจ</h4><table class="dsg-calc">
+      ${row('M', 'w·L²/8', df2(r.M, 2), 'กก.-ม./ม.')}${row('V', 'w·L/2 − w·d', df2(r.V, 2), 'กก./ม.')}
+      ${row('t min', `L/20${fy >= 4000 ? '' : '·(0.4 + fy/7000)'}`, df2(r.hmin, 3), 'ม.', `≤ ${df2(p.t)} ${okTag(ck('hmin'))}`)}
+      ${row('d / d ต้องการ', 't − หุ้ม − ½D · √(M/R)', `${df2(r.d, 2)} / ${df2(r.dreq, 2)}`, 'ซม.', okTag(ck('dreq')))}
+      ${row('Vc', "0.29√f'c·b·d", df2(r.Vc, 0), 'กก./ม.', okTag(ck('vc')))}${row('Mc', 'R·b·d²', df2(r.Mc, 2), 'กก.-ม./ม.', okTag(ck('mc')))}
+    </table>
+    <h4>3. เหล็กเสริม</h4><table class="dsg-calc">
+      ${row('As', 'M/(fs·j·d)', df2(r.As, 3), 'ตร.ซม./ม.')}${row('ระยะเหล็กหลัก', 'min(A/As, 3t, 0.45, As min)', df2(r.sMain, 2), 'ม.', `ใช้ ${bn(o.d.dm)} @${o.d.sA}`)}
+      ${row('As min / ระยะกันร้าว', `ρ·b·t (ρ = ${RcWsd.rhoTemp(fy)}) · min(A/As min, 5t, 0.45)`, `${df2(r.Asmin, 2)} / ${df2(r.sTemp, 2)}`, '', `ใช้ ${bn(o.d.dt)} @${o.d.sB}`)}
+      ${row('ยึดหน่วง U', 'V/(Σo·N·j·d)', df2(r.U, 2), 'ksc', `≤ ${df2(Math.min(r.Ua, r.Ucap), 2)} ${okTag(ck('bond'))}`)}
+      ${row('แรงลงที่รองรับ', 'w·L/2', df2(r.Vb, 1), 'กก./ม.')}
+    </table>
+    <h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">เหล็กหลัก ${bn(o.d.dm)} @${o.d.sA} ม. · เหล็กกันร้าว ${bn(o.d.dt)} @${o.d.sB} ม.</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}</div>`;
 }

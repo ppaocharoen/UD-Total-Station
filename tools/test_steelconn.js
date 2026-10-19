@@ -6,6 +6,9 @@ const near = (a, b) => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
 const check = (name, good, extra = '') => { n++; ok = ok && !!good; if (!good) console.log('FAIL ' + name + ' ' + extra); };
 data.cases.forEach((cs, i) => {
   const r = SC.basePlate(cs.input), e = cs.expect;
+  // ตกลงกับ Earth 19 ต.ค. 2569: มีโมเมนต์แต่ไม่มีแรงถอน → สลักรับแรงเฉือน ใช้ Fv (Neo ใช้ Ft)
+  const shearM = typeof e.fpmin === 'number' && e.fpmin >= 0;
+  if (shearM) { e.Areq = e.F / 960; e.nb = Math.max(Math.trunc(e.Areq / (Math.PI * (cs.input.dBolt / 10) ** 2 / 4)) + 1, 2); }
   ['fp', 'fpmin', 'fpe', 'fpmax', 'Me', 'F', 'm', 'n', 'treq', 'Areq', 'nb', 'La', 'x', 'y', 'Fb', 'Fp'].forEach(k => {
     if (typeof e[k] === 'number') check(`bp${i} ${k}`, near(r[k], e[k]), `เว็บ ${r[k]} Neo ${e[k]}`);
   });

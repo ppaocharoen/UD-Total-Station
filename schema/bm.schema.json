@@ -2207,6 +2207,13 @@
           "additionalProperties": {
             "type": "object"
           }
+        },
+        "stairs": {
+          "type": "object",
+          "description": "บันได: {id ช่วงบันได: {main_bar:[ขนาด มม., ระยะ ม.], dist_bar:[…], waist}}",
+          "additionalProperties": {
+            "type": "object"
+          }
         }
       }
     },
