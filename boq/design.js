@@ -374,7 +374,8 @@ function beamReport(bm, d) {
 // ------------------------------------------------------------------ พื้น (ชีต Two-way / One-way / Cantilever slaps)
 const SLAB_TYPES = [['two:1', 'สองทาง · ต่อเนื่อง 4 ด้าน'], ['two:2', 'สองทาง · ไม่ต่อเนื่อง 1 ด้าน'], ['two:3', 'สองทาง · ไม่ต่อเนื่อง 2 ด้าน'], ['two:4', 'สองทาง · ไม่ต่อเนื่อง 3 ด้าน'], ['two:5', 'สองทาง · ไม่ต่อเนื่อง 4 ด้าน'],
   ['one:1', 'ทางเดียว · ช่วงเดียว'], ['one:2', 'ทางเดียว · ต่อเนื่องปลายเดียว'], ['one:3', 'ทางเดียว · ต่อเนื่องสองปลาย'], ['cant', 'พื้นยื่น']];
-const slabTypeTh = t => (SLAB_TYPES.find(x => x[0] === t) || [, t])[1];
+const GS_TYPES = [['gs:ll', 'วางบนดิน · ไม่มีรถ'], ['gs:car', 'วางบนดิน · มีรถ']];
+const slabTypeTh = t => (SLAB_TYPES.concat(GS_TYPES).find(x => x[0] === t) || [, t])[1];
 /** พื้นในโมเดล + ช่วงสั้น/ยาว + ด้านที่ต่อเนื่อง (มีพื้นหล่อในที่ระดับเดียวกันชิดขอบ) + น้ำหนักบรรทุกจาก area_loads */
 function dsgSlabList() {
   const m = S.model; if (!m) return [];
@@ -402,13 +403,15 @@ function dsgSlabList() {
 }
 function dsgSlabInput(sl) {
   const u = dsg().slabs[sl.id] || {}, has = k => u[k] !== undefined && u[k] !== '';
-  const type = u.type || sl.auto;
-  return { type, SDL: has('SDL') ? +u.SDL : sl.sdl, LL: has('LL') ? +u.LL : sl.ll, P: has('P') ? +u.P : 0, a: has('a') ? +u.a : 0, Lc: has('Lc') ? +u.Lc : sl.S,
-    src: (has('SDL') || has('LL')) ? 'กรอกเอง' : (sl.sdl !== null || sl.ll !== null) ? 'จากโมเดล' : '' };
+  const gs = sl.kind === 'ground', type = u.type || (gs ? 'gs:ll' : sl.auto);
+  return { type, SDL: has('SDL') ? +u.SDL : sl.sdl, LL: has('LL') ? +u.LL : (sl.ll !== null && sl.ll !== undefined ? sl.ll : gs ? 200 : null),
+    W: has('W') ? +u.W : 1.35, psi: has('psi') ? +u.psi : 25, soil: has('soil') ? +u.soil : 1, wm: has('wm') ? +u.wm : 0, P: has('P') ? +u.P : 0, a: has('a') ? +u.a : 0, Lc: has('Lc') ? +u.Lc : sl.S,
+    src: (has('SDL') || has('LL')) ? 'กรอกเอง' : (sl.sdl !== null || sl.ll !== null) ? 'จากโมเดล' : gs ? 'ค่าตั้งต้น 200 กก./ตร.ม.' : '' };
 }
 function dsgSlabRun(sl) {
-  if (sl.kind !== 'cast') return { skip: sl.kind === 'ground' ? 'พื้นวางบนดิน — ออกแบบในชุดถัดไป (จากไฟล์ Neo)' : 'พื้นสำเร็จรูป — ใช้ตามผู้ผลิต' };
+  if (sl.kind === 'precast') return { skip: 'พื้นสำเร็จรูป — ใช้ตามผู้ผลิต' };
   const c = dsg().crit, inp = dsgSlabInput(sl);
+  if (sl.kind === 'ground') return dsgMesh(dsgGroundRun(sl, inp), inp);
   if (inp.LL === null || inp.LL === undefined) return { need: 'ใส่น้ำหนักบรรทุกจร (LL)', inp };
   const crit = RcWsd.criteria({ fcp: sl.fcp, F: +c.F, mode: +c.mode, fy: +c.slabFy, fyv: +c.fyv });
   const [kind, cs] = inp.type.split(':');
@@ -417,11 +420,32 @@ function dsgSlabRun(sl) {
   const d = RcWsd.slabDesign(kind, p, crit, (c.slabDias || []).map(Number));
   const main = [d.dm, d.sA], sec = [d.dt, d.sB];   // main = เหล็กวางตามช่วงสั้น (หรือแนวยื่น)
   const rebar = { mesh_xy: sl.shortX ? { x: main, y: sec } : { x: sec, y: main } };
-  return { r: d.r, ok: d.ok, error: d.error || '', d, crit, inp, kind, p, rebar, label: slabTypeTh(inp.type) };
+  return dsgMesh({ r: d.r, ok: d.ok, error: d.error || '', d, crit, inp, kind, p, rebar, label: slabTypeTh(inp.type) }, inp);
+}
+/** พื้นวางบนดิน (Westergaard — ชีต Ground Slab ของ Neo RC) */
+function dsgGroundRun(sl, inp) {
+  const c = dsg().crit, crit = RcWsd.criteria({ fcp: sl.fcp, F: +c.F, mode: +c.mode, fy: +c.slabFy, fyv: +c.fyv }), car = inp.type === 'gs:car';
+  if (!car && !(inp.LL > 0)) return { need: 'ใส่น้ำหนักบรรทุกจร (LL)', inp };
+  const p = { mode: car ? 'vehicle' : 'll', S: sl.S, L: sl.L, t: sl.t * 100, soil: inp.soil, W: inp.W, psi: inp.psi, LL: inp.LL, fcp: sl.fcp, fs: crit.main.fs, fy: +c.slabFy };
+  const d = GroundSlab.design(p, (c.slabDias || []).map(Number));
+  return { r: d.r, ok: d.ok, error: d.error || '', d: Object.assign(d, { dm: d.d, sA: d.s, dt: d.d, sB: d.s }), crit, inp, kind: 'ground', p, label: slabTypeTh(inp.type),
+    rebar: { mesh_xy: { x: [d.d, d.s], y: [d.d, d.s] } } };
+}
+/** เลือกตะแกรงสำเร็จรูปแทนเหล็ก (ชีต Mesh): ใช้ทิศที่ต้องการตะแกรงมากกว่า */
+function dsgMesh(o, inp) {
+  if (!o || !o.d || !inp.wm) return o;
+  const fs = o.crit.main.fs, a = GroundSlab.mesh(o.d.dm, o.d.sA, fs, { wires: [inp.wm] }), b = GroundSlab.mesh(o.d.dt, o.d.sB, fs, { wires: [inp.wm] });
+  const m = !a.ok ? a : !b.ok ? b : (a.s <= b.s ? a : b);
+  o.mesh = m;
+  if (!m.ok) { o.ok = false; o.error = [o.error, `ตะแกรง Ø${inp.wm} มม. ไม่พอ — ใช้ลวดใหญ่ขึ้นหรือเหล็กเสริม`].filter(Boolean).join(' · '); return o; }
+  o.rebar = { wire_mesh: m.name };
+  return o;
 }
 const slabRbText = (o, fy) => {
   if (!o || !o.d) return '';
   const n = d => RcWsd.barName(d, fy);
+  if (o.mesh && o.mesh.ok) return `ตะแกรงสำเร็จรูป ${o.mesh.name} (แทน ${n(o.d.dm)} @${o.d.sA}${o.kind === 'ground' ? '' : ` · ${n(o.d.dt)} @${o.d.sB}`})`;
+  if (o.kind === 'ground') return `${n(o.d.dm)} @${o.d.sA} สองทาง`;
   return o.kind === 'two' ? `ช่วงสั้น ${n(o.d.dm)} @${o.d.sA} · ช่วงยาว ${n(o.d.dt)} @${o.d.sB}` : `เหล็กหลัก ${n(o.d.dm)} @${o.d.sA} · กันร้าว ${n(o.d.dt)} @${o.d.sB}`;
 };
 function slabCard(slabs) {
@@ -431,12 +455,15 @@ function slabCard(slabs) {
     <p class="hint">น้ำหนักบรรทุกคงที่เพิ่ม (SDL) และจร (LL) ดึงจาก area_loads ของโมเดล ถ้าไม่มีให้กรอก · ประเภทเดาจาก S/L และพื้นข้างเคียงที่ชิดขอบ แก้ได้ · น้ำหนักพื้นคิดจากความหนา × หน่วยน้ำหนักวัสดุ</p>
     ${slabs.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>พื้น</th><th>S×L (ม.)</th><th>t (ม.)</th><th>ประเภท</th><th>SDL กก./ตร.ม.</th><th>LL กก./ตร.ม.</th><th>เหล็กเสริม</th><th></th></tr>
     ${slabs.map(sl => {
-      const o = S.dsgSlab[sl.id], u = D.slabs[sl.id] || {}, inp = dsgSlabInput(sl), cast = sl.kind === 'cast';
+      const o = S.dsgSlab[sl.id], u = D.slabs[sl.id] || {}, inp = dsgSlabInput(sl), cast = sl.kind === 'cast', gs = sl.kind === 'ground';
       const cell = (k, v) => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-sf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (v === null || v === undefined ? '' : esc(v))}" placeholder="-">`;
       return `<tr class="row ${D.sel === 'slab:' + sl.id ? 'sel' : ''}" data-sl="${esc(sl.id)}"><td class="c-name"><b>${esc(sl.mark)}</b> <span class="hint">${esc(sl.id)}</span>${sl.use ? `<span class="src">${esc(sl.use)}</span>` : ''}${sl.rect ? '' : '<span class="warnline">ไม่ใช่สี่เหลี่ยมผืนผ้า — ใช้กรอบนอก</span>'}</td>
         <td class="r" data-l="S×L (ม.)">${df2(sl.S)}×${df2(sl.L)}</td><td class="r" data-l="t (ม.)">${df2(sl.t)}</td>
-        <td data-l="ประเภท">${cast ? `<select data-sf="type">${SLAB_TYPES.map(([v, t]) => opt(v, inp.type, t + (v === sl.auto ? ' *' : ''))).join('')}</select>${inp.type === 'cant' ? `<div class="dsg-cant">ยื่น ${cell('Lc', df2(inp.Lc))} ม. · P ${cell('P', 0)} กก./ม. ที่ ${cell('a', 0)} ม.</div>` : ''}` : `<span class="hint">${sl.kind === 'ground' ? 'วางบนดิน' : 'สำเร็จรูป'}</span>`}</td>
-        <td data-l="SDL กก./ตร.ม.">${cast ? cell('SDL', sl.sdl) : ''}</td><td data-l="LL กก./ตร.ม.">${cast ? cell('LL', sl.ll) : ''}</td>
+        <td data-l="ประเภท">${cast ? `<select data-sf="type">${SLAB_TYPES.map(([v, t]) => opt(v, inp.type, t + (v === sl.auto ? ' *' : ''))).join('')}</select>${inp.type === 'cant' ? `<div class="dsg-cant">ยื่น ${cell('Lc', df2(inp.Lc))} ม. · P ${cell('P', 0)} กก./ม. ที่ ${cell('a', 0)} ม.</div>` : ''}`
+          : gs ? `<select data-sf="type">${GS_TYPES.map(([v, t]) => opt(v, inp.type, t)).join('')}</select><div class="dsg-cant">ดิน <select data-sf="soil">${Object.entries(GroundSlab.SOIL).map(([k, v]) => opt(k, inp.soil, v[0])).join('')}</select></div>${inp.type === 'gs:car' ? `<div class="dsg-cant">เพลา ${cell('W', 1.35)} ตัน · ลมยาง ${cell('psi', 25)} psi</div>` : ''}`
+          : '<span class="hint">สำเร็จรูป</span>'}
+          ${cast || gs ? `<div class="dsg-cant">เหล็ก <select data-sf="wm">${opt('', inp.wm || '', 'เหล็กเสริม')}${GroundSlab.WIRE.map(w => opt(w, inp.wm || '', 'ตะแกรงสำเร็จรูป Ø' + w)).join('')}</select></div>` : ''}</td>
+        <td data-l="SDL กก./ตร.ม.">${cast ? cell('SDL', sl.sdl) : ''}</td><td data-l="LL กก./ตร.ม.">${cast ? cell('LL', sl.ll) : gs && inp.type !== 'gs:car' ? cell('LL', inp.LL) : ''}</td>
         <td class="dsg-rb">${o.r ? esc(slabRbText(o, +c.slabFy)) + (o.error ? `<span class="warnline">${esc(o.error)}</span>` : '') : `<span class="hint">${esc(o.skip || o.need || '')}</span>`}</td>
         <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
     }).join('')}</table></div>` : '<p class="hint">ไม่มีพื้นในโมเดล</p>'}
@@ -445,6 +472,7 @@ function slabCard(slabs) {
 }
 function slabReport(sl, o) {
   if (!sl || !o || !o.r) return '';
+  if (o.kind === 'ground') return groundReport(sl, o);
   const r = o.r, C = o.crit, p = o.p, fy = C.fy, pj = S.boq.project || {}, bn = d => RcWsd.barName(d, fy);
   const row = (a, eq, v, u = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${u}</td><td>${tag}</td></tr>`;
   const ck = k => (r.checks.find(x => x.code === k) || {}).ok;
@@ -493,6 +521,34 @@ function slabReport(sl, o) {
     </table>`;
   }
   return `<div class="card dsg-rep">${head}${data}${body}<h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">${esc(slabRbText(o, fy))}</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}${r.warn ? `<p class="d-note">${esc(r.warn)}</p>` : ''}${C.note ? `<p class="d-note">${esc(C.note)}</p>` : ''}</div>`;
+}
+
+/** รายการคำนวณพื้นวางบนดิน */
+function groundReport(sl, o) {
+  const r = o.r, C = o.crit, p = o.p, fy = C.fy, pj = S.boq.project || {}, bn = d => RcWsd.barName(d, fy), car = p.mode === 'vehicle';
+  const row = (a, eq, v, u = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${u}</td><td>${tag}</td></tr>`;
+  const ck = k => (r.checks.find(x => x.code === k) || {}).ok;
+  const m = o.mesh;
+  return `<div class="card dsg-rep"><div class="dsg-head"><b>Slab on Grade: Westergaard's Method (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>พื้น <b>${esc(sl.mark)}</b> (${esc(sl.id)}) · ${esc(o.label)}</div>
+    <h4>1. ข้อมูล</h4><table class="dsg-calc">
+      ${row("f'c / ที่ยอมให้", "0.13 f'c", `${df2(C.fcp, 0)} / ${df2(r.fa, 2)}`, 'ksc')}${row('fs เหล็ก', C.main.grade, df2(C.main.fs, 0), 'ksc')}
+      ${row('S × L (ระยะรอยต่อ)', `≤ ${df2(GroundSlab.JOINT_MAX)} ม.`, `${df2(p.S)} × ${df2(p.L)}`, 'ม.', okTag(ck('joint')))}${row('ความหนา', '', df2(p.t, 1), 'ซม.')}
+      ${row('ดินรองรับ k', esc(r.soilName), df2(r.k, 3), 'กก./ลบ.ซม.')}
+      ${car ? row('แรงล้อ P', `0.4 × เพลา ${df2(p.W, 2)} ตัน`, df2(r.P, 0), 'กก.') + row('รัศมีหน้าสัมผัส a', `√(P/(π·ลมยาง ${df2(p.psi, 0)} psi))`, df2(r.a, 2), 'ซม.') + row('b', 'a < 1.725t → √(1.6a² + t²) − 0.675t', df2(r.b, 2), 'ซม.')
+        : row('P', `LL/0.2 (LL ${df2(p.LL, 0)} กก./ตร.ม.) · a = 12 ซม.`, df2(r.P, 0), 'กก.')}
+      ${row('รัศมีสัมพัทธ์ l', '⁴√(Ec·t³/(12k(1 − µ²))) µ = 0.15', df2(r.l, 2), 'ซม.')}
+    </table>
+    <h4>2. หน่วยแรงดึงในแผ่น</h4><table class="dsg-calc">
+      ${row('t ต้องการ (มุม)', '√(3P/(0.13f\'c)·(1 − (a√2/l)^0.6))', df2(r.treq, 2), 'ซม.', okTag(ck('t')))}
+      ${row('กลางแผ่น', car ? '0.316P/t²·(4 log(l/b) + 1.069)' : '0.316P/t²·(log t³ − 4 log(√(1.6a² + t²) − 0.675t) − log k + 6.48)', df2(r.si, 2), 'ksc', okTag(ck('si')))}
+      ${row('ขอบแผ่น', car ? '0.572P/t²·(4 log(l/b) + 0.359)' : '0.572P/t²·(… + 5.77)', df2(r.se, 2), 'ksc', okTag(ck('se')))}
+      ${car ? row('มุมแผ่น', '3P/t²·(1 − (a√2/l)^0.6)', df2(r.sc, 2), 'ksc', okTag(ck('sc'))) : ''}
+    </table>
+    <h4>3. เหล็กต้านการยืดหด</h4><table class="dsg-calc">
+      ${row('As ด้านสั้น / ยาว', `max(ρ·b·t (ρ = ${r.rhoMin}), 24·t·L·1.5/(2fs))`, `${df2(r.AsS, 2)} / ${df2(r.AsL, 2)}`, 'ตร.ซม./ม.', `ใช้ ${bn(o.d.dm)} @${o.d.sA} สองทาง`)}
+      ${m ? row('ตะแกรงสำเร็จรูป', `As1 = As2·${df2(m.fs2, 0)}/${df2(m.fs1, 0)} = ${df2(m.As1, 2)} · ระยะสูงสุด ${df2(m.smax, 2)}`, m.ok ? esc(m.name) : '-', '', m.ok ? '' : okTag(false)) : ''}
+    </table>
+    <h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">${esc(slabRbText(o, fy))} · ห้ามฝังเหล็กเข้าคานคอดิน</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}</div>`;
 }
 
 // ------------------------------------------------------------------ เสาปลอกเดี่ยว (ชีต Tied Columns)
