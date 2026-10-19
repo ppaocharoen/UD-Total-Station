@@ -207,7 +207,7 @@ function surveyTargets() {   // กลุ่ม: pr1 = วัสดุใน ป
 // ราคาสืบของ ปร.2/ปร.3 → ราคาต่อหน่วยครุภัณฑ์ / ค่าใช้จ่ายรวม (= ราคาต่อหน่วย × จำนวน)
 function applyPr23Survey() {
   (S.boq.pr2 || []).forEach(r => { const it = r.id && S.boq.surveys['pr2:' + r.id], p = it ? Survey.summary(it).price : null; if (p !== null) { r.price = p; r.price_src = Survey.srcText(it); } else delete r.price_src; });
-  (S.boq.pr3 || []).forEach(r => { const it = r.id && S.boq.surveys['pr3:' + r.id], p = it ? Survey.summary(it).price : null; if (p !== null) { r.amount = r2(p * (+r.qty || 1)); r.price_src = Survey.srcText(it) + ` × ${r.qty}`; } else delete r.price_src; });
+  (S.boq.pr3 || []).forEach(r => { const it = r.id && S.boq.surveys['pr3:' + r.id], p = it ? Survey.summary(it).price : null; if (p !== null) { r.amount = r2(p * r2(+r.qty || 1)); r.price_src = Survey.srcText(it) + ` × ${r.qty}`; } else delete r.price_src; });
 }
 function svItem(t) {   // รายการราคาสืบของเป้าหมาย (สร้างใหม่ถ้ายังไม่มี)
   const sv = S.boq.surveys; let it = sv[t.target];
@@ -545,7 +545,7 @@ const PR3_TEMPLATES = ['ค่าใช้จ่ายในการกำห�
   'ค่าใช้จ่ายในการนำวัสดุก่อสร้างไปใช้ในสถานที่ที่มีข้อจำกัดในการลำเลียงวัสดุ', 'ค่าใช้จ่ายในการขนส่งวัสดุ', 'อื่น ๆ'];
 const VAT = 0.07;
 function pr2Row(r) {
-  const eq = r2((+r.qty || 0) * (+r.price || 0)), inst = r2((+r.qty || 0) * (+r.install || 0));
+  const q = r2(+r.qty || 0), eq = r2(q * r2(+r.price || 0)), inst = r2(q * r2(+r.install || 0));   // คูณจากค่าที่พิมพ์
   return { eq, inst, eqVat: r2(eq * VAT), instVat: r2(inst * VAT) };
 }
 function renderPR23() { clearTimeout(renderPR23._t); renderPR23._t = setTimeout(_renderPR23, 0); }
@@ -555,14 +555,14 @@ function _renderPR23() {
   S.boq.pr2.forEach((r, i) => {
     const c = pr2Row(r);
     h += `<tr><td class="r">${i + 1}</td><td><input class="cell" data-i="${i}" data-f="name" value="${esc(r.name)}"></td>
-      <td class="r"><input class="price" data-i="${i}" data-f="qty" value="${esc(r.qty)}"></td><td><input class="cell" style="width:60px" data-i="${i}" data-f="unit" value="${esc(r.unit)}"></td>
-      <td class="r">${r.price_src ? `${fmt(r.price)}<span class="src">${esc(r.price_src)}</span>` : `<input class="price" data-i="${i}" data-f="price" value="${esc(r.price)}">`}<button class="btn small sv-go" data-svpr="pr2:${esc(r.id || '')}">${r.price_src ? 'ดูราคาสืบ' : 'สืบราคา'}</button></td><td class="r">${fmt(c.eq)}</td>
-      <td class="r"><input class="price" data-i="${i}" data-f="install" value="${esc(r.install)}"></td><td class="r">${fmt(c.inst)}</td>
+      <td class="r"><input class="price" data-i="${i}" data-f="qty" value="${esc(r2(+r.qty || 0))}"></td><td><input class="cell" style="width:60px" data-i="${i}" data-f="unit" value="${esc(r.unit)}"></td>
+      <td class="r">${r.price_src ? `${fmt(r.price)}<span class="src">${esc(r.price_src)}</span>` : `<input class="price" data-i="${i}" data-f="price" value="${esc(r2(+r.price || 0))}">`}<button class="btn small sv-go" data-svpr="pr2:${esc(r.id || '')}">${r.price_src ? 'ดูราคาสืบ' : 'สืบราคา'}</button></td><td class="r">${fmt(c.eq)}</td>
+      <td class="r"><input class="price" data-i="${i}" data-f="install" value="${esc(r2(+r.install || 0))}"></td><td class="r">${fmt(c.inst)}</td>
       <td class="r">${fmt(r2(c.eq + c.inst))}</td><td><button class="btn small" data-del2="${i}">ลบ</button></td></tr>`;
   });
   t2.innerHTML = h;
   t2.querySelectorAll('input').forEach(el => el.onchange = () => {
-    const r = S.boq.pr2[+el.dataset.i]; r[el.dataset.f] = ['qty', 'price', 'install'].includes(el.dataset.f) ? +el.value || 0 : el.value; applyPr23Survey();
+    const r = S.boq.pr2[+el.dataset.i]; r[el.dataset.f] = ['qty', 'price', 'install'].includes(el.dataset.f) ? r2(+el.value.replace(/,/g, '') || 0) : el.value; applyPr23Survey();
     autosave(); renderPR23(); renderSummary();
   });
   const goSv = b => b.onclick = () => { if (!b.dataset.svpr.split(':')[1]) { surveyTargets(); renderPR23(); return toast('ใส่ชื่อรายการก่อน'); } S.svOpen = b.dataset.svpr; S.svf = 'all'; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'survey').click(); setTimeout(() => { const c = $(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) c.scrollIntoView({ block: 'start' }); }, 120); };
@@ -573,20 +573,21 @@ function _renderPR23() {
   let k = `<tr><th>ลำดับ</th><th>รายการ</th><th>จำนวน</th><th>หน่วย</th><th>ค่าใช้จ่ายรวม (ค่าก่อสร้าง)</th><th>หมายเหตุ / เหตุผลความจำเป็น</th><th></th></tr>`;
   S.boq.pr3.forEach((r, i) => {
     k += `<tr><td class="r">${i + 1}</td><td><input class="cell" list="pr3-list" data-i="${i}" data-f="name" value="${esc(r.name)}"></td>
-      <td class="r"><input class="price" data-i="${i}" data-f="qty" value="${esc(r.qty)}"></td><td><input class="cell" style="width:60px" data-i="${i}" data-f="unit" value="${esc(r.unit)}"></td>
-      <td class="r">${r.price_src ? `${fmt(r.amount)}<span class="src">${esc(r.price_src)}</span>` : `<input class="price" data-i="${i}" data-f="amount" value="${esc(r.amount)}">`}<button class="btn small sv-go" data-svpr="pr3:${esc(r.id || '')}">${r.price_src ? 'ดูราคาสืบ' : 'สืบราคา'}</button></td>
+      <td class="r"><input class="price" data-i="${i}" data-f="qty" value="${esc(r2(+r.qty || 0))}"></td><td><input class="cell" style="width:60px" data-i="${i}" data-f="unit" value="${esc(r.unit)}"></td>
+      <td class="r">${r.price_src ? `${fmt(r.amount)}<span class="src">${esc(r.price_src)}</span>` : `<input class="price" data-i="${i}" data-f="amount" value="${esc(r2(+r.amount || 0))}">`}<button class="btn small sv-go" data-svpr="pr3:${esc(r.id || '')}">${r.price_src ? 'ดูราคาสืบ' : 'สืบราคา'}</button></td>
       <td><input class="cell" data-i="${i}" data-f="note" value="${esc(r.note)}"></td><td><button class="btn small" data-del3="${i}">ลบ</button></td></tr>`;
   });
   k += `<tr class="total"><td></td><td colspan="3">รวมค่าใช้จ่ายพิเศษตามข้อกำหนดทุกรายการ</td><td class="r">${fmt(pr3Total())}</td><td colspan="2"></td></tr>`;
   setTimeout(() => t3.querySelectorAll('[data-svpr]').forEach(goSv), 0);
   t3.innerHTML = k + `<datalist id="pr3-list">${PR3_TEMPLATES.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`;
   t3.querySelectorAll('input').forEach(el => el.onchange = () => {
-    const r = S.boq.pr3[+el.dataset.i]; r[el.dataset.f] = ['qty', 'amount'].includes(el.dataset.f) ? +el.value || 0 : el.value; applyPr23Survey();
+    const r = S.boq.pr3[+el.dataset.i]; r[el.dataset.f] = ['qty', 'amount'].includes(el.dataset.f) ? r2(+el.value.replace(/,/g, '') || 0) : el.value; applyPr23Survey();
     autosave(); renderPR23(); renderSummary();
   });
   t3.querySelectorAll('[data-del3]').forEach(b => b.onclick = () => { S.boq.pr3.splice(+b.dataset.del3, 1); autosave(); renderPR23(); renderSummary(); });
 }
-const pr3Total = () => r2(S.boq.pr3.reduce((a, r) => a + (+r.amount || 0), 0));
+const roundDown1000 = x => Math.floor(r2(x) / 1000 + 1e-9) * 1000;
+const pr3Total = () => r2(S.boq.pr3.reduce((a, r) => a + r2(+r.amount || 0), 0));
 
 // ------------------------------------------------------------------ สรุป ปร.1(ก) ปร.2(ก) ปร.4
 function renderSummary() { clearTimeout(renderSummary._t); renderSummary._t = setTimeout(() => { _renderSummary(); renderPlan(); }, 0); }
@@ -615,6 +616,7 @@ function totals() {
   return { pr, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand };
 }
 function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box }) {
+  const est = p.mode === 'estimate', show = est ? roundDown1000(grand) : grand;   // คิดเพียง เฉพาะประมาณราคา · ราคากลางไม่ปัด
   const sig = sigHtml();
   box.innerHTML = `<div class="kpis no-print">${kpiHtml({ pr, cost, ff, grand }, S.plan)}</div>
   <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุปค่าก่อสร้าง ค่างานต้นทุน</h3>${head}
@@ -636,9 +638,11 @@ function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV
     ${secs.map(s => `<tr><td></td><td>&nbsp;&nbsp;- ${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
     <tr><td class="r">2</td><td>ค่าครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eqTotal)}</td><td></td></tr>
     <tr><td class="r">3</td><td>ค่าใช้จ่ายพิเศษตามข้อกำหนด (ถ้ามี)</td><td class="r">${fmt(sp)}</td><td></td></tr>
-    <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr></table></div>
-    <p class="bigtotal" style="margin-top:12px">${RG()} ${fmt(grand)} บาท</p>
-    <p style="text-align:right">(${esc(BoqCalc.bahtText(grand))})</p>${sig}</div>`;
+    <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr>
+    ${est ? `<tr class="total"><td></td><td>คิดเพียง</td><td class="r">${fmt(show)}</td><td></td></tr>` : ''}</table></div>
+    ${est ? `<p class="hint" style="text-align:right;margin-top:8px">รวม ${fmt(grand)} บาท · คิดเพียง (ปัดลงหลักพัน)</p>` : ''}
+    <p class="bigtotal" style="margin-top:${est ? 2 : 12}px">${est ? 'คิดเพียง' : RG()} ${fmt(show)} บาท</p>
+    <p style="text-align:right">(${esc(BoqCalc.bahtText(show))})</p>${sig}</div>`;
 }
 
 // ------------------------------------------------------------------ แผนงาน / งวดงาน
