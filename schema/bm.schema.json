@@ -918,6 +918,28 @@
             "capacity": {
               "$ref": "#/$defs/pos",
               "description": "กก./ต้น"
+            },
+            "kind": {
+              "enum": ["driven", "bored"],
+              "description": "เข็มตอก / เข็มเจาะ (ไม่ระบุ = ตอก)"
+            },
+            "bars": {
+              "$ref": "#/$defs/bars",
+              "description": "เข็มเจาะ: เหล็กยืน [จำนวน, ขนาด มม.]"
+            },
+            "tie": {
+              "type": "array",
+              "description": "เข็มเจาะ: ปลอก [ขนาด มม., ระยะ ม.]",
+              "items": {"type": "number"},
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "dowel": {
+              "type": "array",
+              "description": "เข็มเจาะ: เหล็กเดือย [จำนวน, ขนาด มม., ยาว ม.]",
+              "items": {"type": "number"},
+              "minItems": 3,
+              "maxItems": 3
             }
           }
         },
@@ -2091,6 +2113,13 @@
         },
         "bars_y": {
           "$ref": "#/$defs/bars"
+        },
+        "bands": {
+          "type": "array",
+          "description": "ฐานเข็ม 3 ต้น: [จำนวนแถบ, เส้นต่อแถบ, ขนาด มม., ยาวต่อเส้น ม.]",
+          "items": {"type": "number"},
+          "minItems": 4,
+          "maxItems": 4
         },
         "mesh": {
           "$ref": "#/$defs/mesh",

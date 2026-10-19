@@ -158,6 +158,19 @@ SYS_TARGET = {"cw": ("meter", "water_tank", "pump"), "soil": ("septic_tank",),
               "waste": ("grease_trap", "soak_pit", "manhole", "septic_tank")}
 
 
+def bored_pile_item(p):
+    """รายการเข็มเจาะ: เสาเข็มเจาะ ขนาด ศก. x.xx ม. ยาว x.xx ม. n-DBxx ปลอก RBx @ x.xx ม. n-DBxx L=x.xx ม. (ถ้ามีเดือย)"""
+    dia, ln = float(p.get("size") or 0), float(p["length"])
+    name, key = f"เสาเข็มเจาะ ขนาด ศก. {dia:.2f} ม. ยาว {ln:.2f} ม.", f"pile_bored_{dia:g}_{ln:g}"
+    if p.get("bars"):
+        n, d = p["bars"]; name += f" {int(n)}-DB{d:g}"; key += f"_{int(n)}DB{d:g}"
+    if p.get("tie"):
+        d, sp = p["tie"]; name += f" ปลอก RB{d:g} @ {sp:.2f} ม."; key += f"_RB{d:g}@{sp:g}"
+    if p.get("dowel"):
+        n, d, L = p["dowel"]; name += f" {int(n)}-DB{d:g} L={L:.2f} ม."; key += f"_{int(n)}DB{d:g}L{L:g}"
+    return key, name
+
+
 class Takeoff:
     def __init__(self, m, settings=None):
         self.m = m
@@ -299,13 +312,20 @@ class Takeoff:
                 n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c), f"แนว x {n} เส้น × {b - 2*c:.2f} ม.")
             if rb.get("bars_y"):
                 n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c), f"แนว y {n} เส้น × {d - 2*c:.2f} ม.")
+            if rb.get("bands"):   # ฐานเข็ม 3 ต้น: แถบเหล็กเหนือหัวเข็มแต่ละคู่
+                k, n, dia, ln = rb["bands"]; k, n = int(k), int(n)
+                self.rebar(f["id"], dia, k * n * ln, f"{k} แถบ × {n} เส้น × {ln:.2f} ม.")
             if not rb:
                 self.note(f"ฐานราก {f['id']}: ยังไม่มีเหล็กเสริมใน design — ไม่ได้คิดเหล็ก")
             p = f.get("piles")
             if p:
-                pname = f"เสาเข็ม {p['type']} ยาว {p['length']:g} ม."
-                self.add("1.1.5", f"pile_{p['type']}_{p['length']:g}", pname, "ต้น", p["n"], f["id"], count=True, task="footing")
-                self.add("1.1.5", "pile_drive", "งานตอกเสาเข็มคอนกรีตอัดแรง", "ต้น", p["n"], f["id"], count=True, task="footing")
+                if p.get("kind") == "bored":   # เข็มเจาะ: สืบราคาต่อต้น (รวมเจาะ คอนกรีต เหล็ก) — เหล็กเข็มไม่รวมในหมวด 1.1.9
+                    key, pname = bored_pile_item(p)
+                    self.add("1.1.5", key, pname, "ต้น", p["n"], f["id"], count=True, task="footing")
+                else:
+                    pname = f"เสาเข็ม {p['type']} ยาว {p['length']:g} ม."
+                    self.add("1.1.5", f"pile_{p['type']}_{p['length']:g}", pname, "ต้น", p["n"], f["id"], count=True, task="footing")
+                    self.add("1.1.5", "pile_drive", "งานตอกเสาเข็มคอนกรีตอัดแรง", "ต้น", p["n"], f["id"], count=True, task="footing")
                 self.add("1.1.5", "pile_cut", "งานสกัดหัวเสาเข็ม", "ต้น", p["n"], f["id"], count=True, task="footing")
         if not self.m.get("supports"):
             self.note("ไม่มีฐานราก (supports) ในโมเดล")

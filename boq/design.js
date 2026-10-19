@@ -217,6 +217,7 @@ function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles) {
   });
   (piles || []).forEach(x => {
     const o = S.dsgPile[x.id]; if (!o || !o.rebar) return; if (!o.ok) { skip++; return; }
+    D.appliedPiles = D.appliedPiles || {}; D.appliedPiles[x.id] = o.spec; dsgPileSpec(m, x.id, o.spec, o.r.n, o.r.pileInfo.code);
     m.design.supports[x.id] = D.appliedSup[x.id] = { method: 'WSD', rebar: o.rebar, pass: !!o.ok, governing: o.label, status: 'computed',
       src: `UD Total Station v${UD_VERSION.v} ออกแบบฐานรากเสาเข็ม WSD (${o.r.n} ต้น ${o.r.pileInfo.code} รับ ${df2(o.p.cap, 0)} กก./ต้น, ${o.crit.main.grade}, หุ้ม ${c.ftCov} ซม.)` };
     nf++;
@@ -275,6 +276,8 @@ function dsgOnLoad() {
   }
   const ASt = (S.boq.dsg || {}).appliedStairs || {}, stIds = new Set((m.stairs || []).map(x => x.id)); m.design.stairs = m.design.stairs || {};
   for (const [id, e] of Object.entries(ASt)) { if (!stIds.has(id)) { delete ASt[id]; continue; } if (JSON.stringify(m.design.stairs[id]) !== JSON.stringify(e)) { m.design.stairs[id] = e; n++; } }
+  const APi = (S.boq.dsg || {}).appliedPiles || {};
+  for (const [id, e] of Object.entries(APi)) { if (!fids.has(id)) { delete APi[id]; continue; } if (dsgPileSpec(m, id, e)) n++; }
   const AP = (S.boq.dsg || {}).appliedPlates || {}; m.design.plates = m.design.plates || {};
   for (const [id, e] of Object.entries(AP)) { if (JSON.stringify(m.design.plates[id]) !== JSON.stringify(e)) { m.design.plates[id] = e; n++; } }
   if (n) dsgRequantify().then(msg => toast(`ใส่ผลออกแบบ ${n} ชิ้นที่เคยเขียนไว้กลับเข้าโมเดล · ${msg}`));
@@ -671,13 +674,25 @@ function dsgPileGuess(pl) {
   if (!w) return cand[Math.min(cand.length - 1, 4)].id;
   return cand.reduce((a, b) => Math.abs(b.w - w) < Math.abs(a.w - w) ? b : a).id;
 }
+/** ใส่สเปกเข็ม (ชนิด ความยาว กำลัง เหล็กเข็มเจาะ) ลง supports[].piles ของโมเดล — คืน true ถ้ามีการเปลี่ยน */
+function dsgPileSpec(m, id, spec, n, code) {
+  const f = (m.supports || []).find(y => y.id === id); if (!f || !spec) return false;
+  const before = JSON.stringify(f.piles || null);
+  const p = f.piles = Object.assign(f.piles || { n: n || 1, type: spec.type || '', length: spec.length }, spec);
+  if (spec.kind === 'bored') ['bars', 'tie', 'dowel'].forEach(k => { if (!spec[k]) delete p[k]; });
+  if (!p.type) p.type = spec.kind === 'bored' ? 'เข็มเจาะ' : (code || 'เข็มตอก');
+  return JSON.stringify(p) !== before;
+}
 function dsgPileInput(x) {
   const u = (dsg().piles || {})[x.id] || {}, has = k => u[k] !== undefined && u[k] !== '', sp = x.sap || {}, pl = x.piles || {};
   const pick = k => has(k) ? +u[k] : (sp[k] !== undefined ? sp[k] : null);
   return {
     f: { P: pick('P'), Mx: pick('Mx') || 0, My: pick('My') || 0 }, src: ['P', 'Mx', 'My'].some(has) ? 'กรอกเอง' : x.sap ? 'SAP' : '',
     n: has('n') ? +u.n : (+pl.n || 0), pile: has('pile') ? +u.pile : dsgPileGuess(x.piles), cap: has('cap') ? +u.cap : (+pl.capacity || 0),
-    len: has('len') ? +u.len : (+pl.length || 21), Dn: has('Dn') ? +u.Dn : 0
+    len: has('len') ? +u.len : (+pl.length || 21), Dn: has('Dn') ? +u.Dn : 0,
+    bn: has('bn') ? +u.bn : (pl.bars ? +pl.bars[0] : 0), bd: has('bd') ? +u.bd : (pl.bars ? +pl.bars[1] : 0),
+    td: has('td') ? +u.td : (pl.tie ? +pl.tie[0] : 0), ts: has('ts') ? +u.ts : (pl.tie ? +pl.tie[1] : 0),
+    dn: has('dn') ? +u.dn : (pl.dowel ? +pl.dowel[0] : 0), dd: has('dd') ? +u.dd : (pl.dowel ? +pl.dowel[1] : 0), dl: has('dl') ? +u.dl : (pl.dowel ? +pl.dowel[2] : 0)
   };
 }
 function dsgPileRun(x) {
@@ -695,13 +710,21 @@ function dsgPileRun(x) {
   if (x.piles && +x.piles.n && +x.piles.n !== n) notes.push(`จำนวนเข็มที่ออกแบบ ${n} ต้น ต่างจากโมเดล ${x.piles.n} ต้น — แก้ในโมเดล`);
   if (r.warn) notes.push(r.warn);
   const dl = d.p.dL, ds = n === 1 ? dl : d.p.dS;
-  const rebar = n === 3 ? { bars_x: [r.nL, dl], bars_y: [r.nL, dl] } : { bars_x: [r.nL, dl], bars_y: [n === 1 ? r.nL : r.nS, ds] };
-  return { r, ok: d.ok, error: d.error || '', sug: notes.join(' · '), d, crit, inp, p: d.p, label: `ฐานรากเสาเข็ม ${n} ต้น`, rebar };
+  const bandL = n === 3 ? Math.round((r.Dnx + 2 * 1.3 * r.pileInfo.w) * 100) / 100 : 0;   // แถบ 3 ต้น: ระยะเข็ม + 2×1.3D
+  const rebar = n === 3 ? { bands: [3, r.nL, dl, bandL] } : { bars_x: [r.nL, dl], bars_y: [n === 1 ? r.nL : r.nS, ds] };
+  const pl = r.pileInfo, spec = { kind: pl.kind, length: inp.len, capacity: inp.cap };
+  if (pl.kind === 'bored') {
+    spec.size = pl.w; spec.type = 'เข็มเจาะ ' + pl.code;
+    if (inp.bn && inp.bd) spec.bars = [inp.bn, inp.bd];
+    if (inp.td && inp.ts) spec.tie = [inp.td, inp.ts];
+    if (inp.dn && inp.dd && inp.dl) spec.dowel = [inp.dn, inp.dd, inp.dl];
+  }
+  return { r, ok: d.ok, error: d.error || '', sug: notes.join(' · '), d, crit, inp, p: d.p, label: `ฐานรากเสาเข็ม ${n} ต้น`, rebar, bandL, spec };
 }
 function pileRbText(o, fy) {
   const r = o.r, p = o.p, bn = d => RcWsd.barName(d, fy);
   if (r.n === 1) return `ตะแกรง ${r.nL}-${bn(p.dL)} @${p.sL} สองทาง · ปลอกรอบ ${r.nRing}-${bn(p.dS || 12)} @${p.sS}`;
-  if (r.n === 3) return `${r.nL}-${bn(p.dL)} ต่อแถบ (3 แถบ)`;
+  if (r.n === 3) return `3 แถบ แถบละ ${r.nL}-${bn(p.dL)} ยาว ${df2(o.bandL)} ม.`;
   return `แนว x ${r.nL}-${bn(p.dL)} @${p.sL} · แนว y ${r.nS}-${bn(p.dS)} @${p.sS}`;
 }
 function pileCard(piles) {
@@ -714,6 +737,7 @@ function pileCard(piles) {
       const o = S.dsgPile[x.id], u = (D.piles || {})[x.id] || {}, inp = dsgPileInput(x);
       const has = k => u[k] !== undefined && u[k] !== '';
       const cell = (k, def = '') => `<input class="price${has(k) ? ' ov' : ''}" data-qf="${k}" inputmode="decimal" value="${has(k) ? esc(u[k]) : def}" placeholder="-">`;
+      const pcell = (k, v) => `<input class="price sm${has(k) ? ' ov' : ''}" data-qf="${k}" inputmode="decimal" value="${v ? esc(v) : ''}" placeholder="-">`;
       const sapv = k => x.sap ? df2(x.sap[k], 0).replace(/,/g, '') : '';
       return `<tr class="row ${D.sel === 'pc:' + x.id ? 'sel' : ''}" data-pc="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">${esc(x.id)}</span>${inp.src ? `<span class="src">${inp.src}</span>` : ''}</td>
         <td data-l="จำนวนเข็ม"><select data-qf="n">${opt('', has('n') ? u.n : (x.piles && x.piles.n) || '', 'อัตโนมัติ')}${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => opt(k, has('n') ? u.n : (x.piles && x.piles.n) || '', k + ' ต้น')).join('')}</select></td>
@@ -722,7 +746,12 @@ function pileCard(piles) {
         <td data-l="รับ กก./ต้น">${cell('cap', x.piles && x.piles.capacity ? x.piles.capacity : '')}</td>
         <td data-l="P กก.">${cell('P', sapv('P'))}</td><td data-l="Mx กก.-ม.">${cell('Mx', sapv('Mx'))}</td><td data-l="My กก.-ม.">${cell('My', sapv('My'))}</td>
         <td class="dsg-rb">${o.r ? `<b>${o.r.n} ต้น</b> · ฐาน ${o.r.n === 3 ? 'สามเหลี่ยม' : df2(o.r.Bx) + '×' + df2(o.r.By)}×${df2(o.p.t)} ม.<br>${esc(pileRbText(o, +c.fy))}` + (o.error || o.sug ? `<span class="warnline">${esc([o.error, o.sug].filter(Boolean).join(' · '))}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}</td>
-        <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
+        <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`
+        + (PileCap.pileOf(inp.pile).kind === 'bored' ? `<tr class="row pc-sub ${D.sel === 'pc:' + x.id ? 'sel' : ''}" data-pc="${esc(x.id)}"><td class="c-name hint">เหล็กเข็มเจาะ</td><td colspan="9" data-l="สเปกเข็ม"><div class="dsg-bored">
+          <span class="g">เหล็กยืน ${pcell('bn', inp.bn)}-DB ${pcell('bd', inp.bd)}</span>
+          <span class="g">ปลอก RB ${pcell('td', inp.td)} @ ${pcell('ts', inp.ts)} ม.</span>
+          <span class="g">เดือย ${pcell('dn', inp.dn)}-DB ${pcell('dd', inp.dd)} L= ${pcell('dl', inp.dl)} ม.</span>
+          <span class="hint">ใช้เป็นชื่อรายการเข็มเจาะใน ปร.1 (สืบราคาต่อต้น)</span></div></td></tr>` : '');
     }).join('')}</table></div>` : '<p class="hint">ไม่มีฐานรากเสาเข็มในโมเดล</p>'}
   </div>`;
 }

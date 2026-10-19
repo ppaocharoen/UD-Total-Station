@@ -15,7 +15,7 @@ function viaPython(m) {
   execFileSync('python3', [path.join(__dirname, 'takeoff.py'), f, '--write'], { stdio: 'pipe' });
   const out = JSON.parse(fs.readFileSync(f, 'utf8'));
   const h = execFileSync('python3', ['-c', `import json,sys;sys.path.insert(0,${JSON.stringify(__dirname)});from validate import canonical_hash;m=json.load(open(${JSON.stringify(f)}));print(canonical_hash(m,["design"]))`]).toString().trim();
-  return { rows: out.quantities.items.filter(r => r.group_code === '1.1.9'), all: out.quantities.items, q: out.quantities, hash: h };
+  return { rows: out.quantities.items.filter(r => r.group_code === '1.1.9'), piles: out.quantities.items.filter(r => r.group_code === '1.1.5'), all: out.quantities.items, q: out.quantities, hash: h };
 }
 async function cmp(label, m) {
   const py = viaPython(m), js = T.compute(m);
@@ -24,8 +24,11 @@ async function cmp(label, m) {
     const a = canon(strip(r)), b = canon(strip(js[i] || {}));
     check(`${label}: ${r.key}`, a === b, '\n py ' + a.slice(0, 600) + '\n js ' + b.slice(0, 600));
   });
+  const jp = T.computePiles(m);
+  check(`${label}: จำนวนแถวเข็ม`, py.piles.length === jp.length, `py ${py.piles.length} js ${jp.length}`);
+  py.piles.forEach((r, i) => { const a = canon(strip(r)), b = canon(strip(jp[i] || {})); check(`${label}: ${r.key}`, a === b, '\n py ' + a + '\n js ' + b); });
   // apply บนผล Python ต้องได้ items เท่าเดิม (ยกเว้น src/price_ref คงเดิม)
-  const mm = clone(m); mm.quantities = clone(py.q); mm.quantities.items = mm.quantities.items.filter(r => r.group_code !== '1.1.9');
+  const mm = clone(m); mm.quantities = clone(py.q); mm.quantities.items = mm.quantities.items.filter(r => r.group_code !== '1.1.9' && r.group_code !== '1.1.5');
   T.apply(mm);
   check(`${label}: apply ลำดับแถว`, mm.quantities.items.map(r => r.key).join() === py.all.map(r => r.key).join());
   check(`${label}: hash design ตรง Python`, (await T.designHash(m)) === py.hash, `${await T.designHash(m)} vs ${py.hash}`);
@@ -44,6 +47,13 @@ async function cmp(label, m) {
   const m3 = clone(m); m3.design = {}; await cmp('ไม่มี design', m3);
   const m4 = clone(m); m4.design.slabs[m.slabs[0].id].rebar = { mesh_xy: { x: [9, 0.15], y: [12, 0.2] } }; await cmp('พื้นเหล็กสองแนว', m4);
   const m5 = clone(m); m5.design.slabs[m.slabs[0].id].rebar = { mesh_xy: { x: [9, 0.125], y: [9, 0.25], layers: 2 } }; await cmp('พื้นเหล็กสองแนว 2 ชั้น', m5);
+  const m6 = clone(m), sp = m6.supports;
+  sp[0].kind = 'pile_cap'; sp[0].piles = { n: 4, type: 'I-0.22x0.22', length: 21 };
+  sp[1].kind = 'pile_cap'; sp[1].piles = { n: 3, type: 'เข็มเจาะ', kind: 'bored', size: 0.35, length: 18, bars: [6, 16], tie: [6, 0.2], dowel: [4, 16, 1.0] };
+  sp[2].kind = 'pile_cap'; sp[2].piles = { n: 2, type: 'เข็มเจาะ', kind: 'bored', size: 0.5, length: 21.5 };
+  if (sp[3]) { sp[3].kind = 'pile_cap'; sp[3].piles = { n: 3, type: 'เข็มเจาะ', kind: 'bored', size: 0.35, length: 18, bars: [6, 16], tie: [6, 0.2], dowel: [4, 16, 1.0] }; }
+  m6.design.supports = m6.design.supports || {}; m6.design.supports[sp[1].id] = { rebar: { bands: [3, 13, 12, 1.96] }, status: 'computed' };
+  await cmp('ฐานเข็มตอก/เจาะ + แถบ 3 ต้น', m6);
   check('pyJson เลขยกกำลัง', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]) === '[1e-05,1.5e-07,0.0001,2.5]', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]));
   console.log((ok ? 'PASS' : 'FAIL') + ` rebartk ${n} ข้อ`);
   process.exit(ok ? 0 : 1);
