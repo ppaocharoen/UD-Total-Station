@@ -2938,6 +2938,45 @@
     }
    },
    {
+    "key": "pe_sheet",
+    "group_code": "1.1.4",
+    "group": "งานวัสดุรองฐานราก",
+    "name": "แผ่นพลาสติกรองใต้พื้น (Polyethylene)",
+    "unit": "ตร.ม.",
+    "qty": 32.0,
+    "qty_net": 32.0,
+    "waste": 0.0,
+    "waste_included": false,
+    "from": [
+     "S1-1F"
+    ],
+    "task": "lift:1F",
+    "status": "computed",
+    "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
+    "by_src": {
+     "S1-1F": 32.0
+    },
+    "calc": {
+     "S1-1F": [
+      "พื้นที่ 32.00 ตร.ม. (ไม่คิดเผื่อทับซ้อน)"
+     ]
+    },
+    "by_task": {
+     "lift:1F": {
+      "share": 1.0,
+      "from": [
+       "S1-1F"
+      ]
+     }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ว480 ไม่มีค่าแรงปูแผ่นพลาสติก (รวมในงานเทพื้น)",
+     "why": "แผ่นพลาสติกรองพื้นไม่มีในราคาพาณิชย์"
+    }
+   },
+   {
     "key": "formwork",
     "group_code": "1.1.7",
     "group": "งานไม้แบบหล่อคอนกรีต",
@@ -6372,6 +6411,13 @@
   },
   {
    "at": "2026-10-19T12:03:34+07:00",
+   "by": "tools/takeoff.py",
+   "sections": [
+    "quantities"
+   ]
+  },
+  {
+   "at": "2026-10-19T23:44:01+07:00",
    "by": "tools/takeoff.py",
    "sections": [
     "quantities"

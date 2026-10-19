@@ -109,6 +109,7 @@ function loadModel(json, name) {
   }
   $('#meta-proj').textContent = p.name; restoreImgs();
   $('#file-status').innerHTML = `เปิด <b>${esc(name)}</b>${saved ? ' · ดึงงาน BOQ ที่บันทึกไว้ในเบราว์เซอร์นี้' : ''}`;
+  if (window.RebarTk) RebarTk.applyExtras(m);   // พลาสติกรองพื้น บันได กำแพงกันดิน (คิดในเว็บเหมือน takeoff.py)
   if (typeof dsgOnLoad === 'function' && dsgOnLoad()) return;   // ใส่ผลออกแบบที่เคยเขียนแล้ว render ให้เอง
   if (S.viewer) buildLayers(S.viewer.load(m)); else renderClash();
   renderAll();
@@ -859,14 +860,14 @@ function renderDiff() {
 
 // ------------------------------------------------------------------ Clash
 const SEV = { error: ['ร้ายแรง', 'err'], warn: ['เตือน', 'warn'], info: ['ข้อมูล', ''] };
-// กฎกระทรวง 55 ข้อ 33/41/44/50 — ข้อมูลที่ดินเก็บใน S.boq.site · ไม่ครบ = "ข้อมูลไม่ครบ" (ไม่ตัดสิน) · ปิดรายข้อได้
+// กฎกระทรวง 55 ข้อ 33/41/42/44/45/46/50 — ข้อมูลที่ดินเก็บใน S.boq.site · ไม่ครบ = "ข้อมูลไม่ครบ" (ไม่ตัดสิน) · ปิดรายข้อได้
 const USE_LBL = { res: 'อยู่อาศัย / อยู่อาศัยรวม', public: 'อาคารสาธารณะ', commercial: 'พาณิชย์ / โรงงาน / ห้องแถว', other: 'อาคารอื่นที่ไม่ใช่อยู่อาศัย' };
 function siteCfg() {
-  const st = S.boq.site = Object.assign({ useModel: true, landArea: '', use: 'auto', roads: [], coverExtra: '', off: {} }, S.boq.site || {});
+  const st = S.boq.site = Object.assign({ useModel: true, landArea: '', use: 'auto', roads: [], waters: [], coverExtra: '', off: {} }, S.boq.site || {});
   const mb = S.model.site && S.model.site.existing && S.model.site.existing.boundary;
   const occ = String((S.model.meta || {}).occupancy || '');
   const auto = /อยู่อาศัย|บ้าน|หอพัก|อพาร์ต|คอนโด/.test(occ) ? 'res' : /หอประชุม|โรงมหรสพ|สถานศึกษา|โรงเรียน|โรงพยาบาล|ตลาด|สนามกีฬา|ศาสนสถาน|หอสมุด/.test(occ) ? 'public' : /ร้าน|พาณิชย์|โรงงาน|ตึกแถว|คลังสินค้า/.test(occ) ? 'commercial' : 'other';
-  return { st, mb, auto, cfg: { boundary: st.useModel && mb ? mb : null, landArea: +st.landArea || 0, use: st.use === 'auto' ? auto : st.use, roads: st.roads, coverExtra: +st.coverExtra || 0, off: st.off } };
+  return { st, mb, auto, cfg: { boundary: st.useModel && mb ? mb : null, landArea: +st.landArea || 0, use: st.use === 'auto' ? auto : st.use, roads: st.roads, waters: st.waters, coverExtra: +st.coverExtra || 0, off: st.off } };
 }
 function renderSiteLaw(L) {
   const box = $('#site-law'); if (!box) return;
@@ -883,13 +884,20 @@ function renderSiteLaw(L) {
     <div class="hint" style="margin-top:6px">ถนนสาธารณะที่ติดที่ดิน (ข้อ 41/44)</div>
     ${(st.roads || []).map((r, i) => `<div class="site-road"><select data-road="${i}" data-rf="edge" ${B ? '' : 'disabled'}>${edgeOpt(r.edge) || '<option>ไม่มีเขตที่ดิน</option>'}</select><input data-road="${i}" data-rf="width" inputmode="decimal" value="${esc(r.width)}" placeholder="กว้าง (ม.)"><button class="btn small" data-road-del="${i}">ลบ</button></div>`).join('')}
     <button class="btn small" id="road-add" ${B ? '' : 'disabled'}>+ เพิ่มถนน</button>
-    <table class="mini-boq" style="margin-top:6px">${res.map(r => `<tr><td><span class="pill ${ST[r.status][1]}">${ST[r.status][0]}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(r.code)}</td><td>${esc(r.title)}<span class="src">${esc(r.detail)}${r.need ? ' → ' + esc(r.need) : ''}</span></td><td><label class="hint" style="white-space:nowrap"><input type="checkbox" data-off="${r.code === 'ข้อ 33' ? 'c33' : r.code === 'ข้อ 41' ? 'c41' : r.code === 'ข้อ 44' ? 'c44' : 'c50'}" ${r.status === 'off' ? 'checked' : ''}> ไม่คิด</label></td></tr>`).join('')}</table>
-    <div class="hint">แนวอาคาร = ผนัง เสา พื้น (ไม่รวมชายคา) · ข้อ 44 ใช้ความสูงตามกฎหมายที่แนวอาคารใกล้ถนนที่สุด (ปลอดภัยไว้ก่อน) · เขตที่ดินที่ติดถนนถือเป็นเขตถนน</div>`;
+    <div class="hint" style="margin-top:6px">แหล่งน้ำสาธารณะที่ติดที่ดิน — แม่น้ำ คู คลอง ลำราง ลำกระโดง บึง ทะเลสาบ ทะเล (ข้อ 42)</div>
+    ${(st.waters || []).map((r, i) => `<div class="site-road"><select data-water="${i}" data-wf="edge" ${B ? '' : 'disabled'}>${edgeOpt(r.edge) || '<option>ไม่มีเขตที่ดิน</option>'}</select><select data-water="${i}" data-wf="kind"><option value="canal" ${r.kind !== 'large' ? 'selected' : ''}>แม่น้ำ/คลอง/ลำราง</option><option value="large" ${r.kind === 'large' ? 'selected' : ''}>บึง/ทะเลสาบ/ทะเล</option></select><input data-water="${i}" data-wf="width" inputmode="decimal" value="${esc(r.width)}" placeholder="กว้าง (ม.)" ${r.kind === 'large' ? 'disabled' : ''}><button class="btn small" data-water-del="${i}">ลบ</button></div>`).join('')}
+    <button class="btn small" id="water-add" ${B ? '' : 'disabled'}>+ เพิ่มแหล่งน้ำ</button>
+    <table class="mini-boq" style="margin-top:6px">${res.map(r => `<tr><td><span class="pill ${ST[r.status][1]}">${ST[r.status][0]}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(r.code)}</td><td>${esc(r.title)}<span class="src">${esc(r.detail)}${r.need ? ' → ' + esc(r.need) : ''}</span></td><td><label class="hint" style="white-space:nowrap"><input type="checkbox" data-off="${({ 'ข้อ 33': 'c33', 'ข้อ 41': 'c41', 'ข้อ 42': 'c42', 'ข้อ 44': 'c44', 'ข้อ 45': 'c45', 'ข้อ 46': 'c45', 'ข้อ 45/46': 'c45' })[r.code] || 'c50'}" ${r.status === 'off' ? 'checked' : ''}> ไม่คิด</label></td></tr>`).join('')}</table>
+    <div class="hint">แนวอาคาร = ผนัง เสา พื้น (ไม่รวมชายคา) · ข้อ 44 ใช้ความสูงตามกฎหมายที่แนวอาคารใกล้ถนนที่สุด (ปลอดภัยไว้ก่อน) · เขตที่ดินที่ติดถนน/แหล่งน้ำถือเป็นเขตถนน/เขตแหล่งน้ำ · ถนนสองสายกว้างไม่เท่ากัน: ด้านตรงข้าม = ข้อ 45, ด้านติดกัน (หัวมุม) = ข้อ 46</div>`;
   const save = () => { autosave(); renderClash(); };
   box.querySelectorAll('[data-st]').forEach(el => el.onchange = () => { st[el.dataset.st] = el.type === 'checkbox' ? el.checked : el.value; save(); });
   box.querySelectorAll('[data-rf]').forEach(el => el.onchange = () => { st.roads[+el.dataset.road][el.dataset.rf] = el.dataset.rf === 'edge' ? +el.value : el.value; save(); });
   box.querySelectorAll('[data-road-del]').forEach(b => b.onclick = () => { st.roads.splice(+b.dataset.roadDel, 1); save(); });
   const add = box.querySelector('#road-add'); if (add) add.onclick = () => { st.roads.push({ edge: 0, width: '' }); save(); };
+  st.waters = st.waters || [];
+  box.querySelectorAll('[data-wf]').forEach(el => el.onchange = () => { st.waters[+el.dataset.water][el.dataset.wf] = el.dataset.wf === 'edge' ? +el.value : el.value; save(); });
+  box.querySelectorAll('[data-water-del]').forEach(b => b.onclick = () => { st.waters.splice(+b.dataset.waterDel, 1); save(); });
+  const addW = box.querySelector('#water-add'); if (addW) addW.onclick = () => { st.waters.push({ edge: 0, width: '', kind: 'canal' }); save(); };
   box.querySelectorAll('[data-off]').forEach(el => el.onchange = () => { st.off[el.dataset.off] = el.checked; if (!el.checked) delete st.off[el.dataset.off]; save(); });
   const nf = res.filter(r => r.status === 'fail').length, nm = res.filter(r => r.status === 'missing').length;
   $('#legal-sum').textContent += (nf ? ` · ไม่ผ่าน ${nf} ข้อ` : '') + (nm ? ` · ข้อมูลไม่ครบ ${nm} ข้อ` : '');

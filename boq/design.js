@@ -178,7 +178,7 @@ function bindDesign(beams, slabs, cols, foots, plates, stairs, piles, retains) {
     const id = tr.dataset[key];
     tr.querySelectorAll(`[data-${fk}]`).forEach(el => el.onchange = () => {
       const u = D[store] = D[store] || {}, uu = u[id] = u[id] || {}, k = el.dataset[fk], v = el.value.trim().replace(/,/g, '');
-      if (k === 'strap' || k === 'mark') { if (v) uu[k] = el.value.trim(); else delete uu[k]; } else if (v !== '' && (k === 'n' || k === 'pile')) uu[k] = +v; else if (k === 'case' || k === 'resize' || k === 'type') uu[k] = el.type === 'checkbox' ? el.checked : +v; else if (v === '') delete uu[k]; else uu[k] = Math.abs(+v) || 0;
+      if (k === 'strap' || k === 'mark' || k === 'dir' || k === 'soil') { if (v) uu[k] = el.value.trim(); else delete uu[k]; } else if (k === 'px' || k === 'py') { if (v === '' || !isFinite(+v)) delete uu[k]; else uu[k] = +v; } else if (v !== '' && (k === 'n' || k === 'pile')) uu[k] = +v; else if (k === 'case' || k === 'resize' || k === 'type') uu[k] = el.type === 'checkbox' ? el.checked : +v; else if (v === '') delete uu[k]; else uu[k] = Math.abs(+v) || 0;
       D.sel = pre + id; re();
     });
     tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION', 'LABEL'].includes(e.target.tagName)) return; D.sel = pre + id; renderDesign(); const r = $('#dsg-report'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
@@ -238,6 +238,9 @@ function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains = []
     const o = S.dsgRetain[x.id]; if (!o || !o.r) return; if (!o.ok) { skip++; return; }
     const q = o.p; D.appliedRetains[x.id] = { id: x.id, mark: x.mark, length: q.Lw, H: q.H, tb: q.tb, tw: q.tw, B1: q.B1, B2: q.B2, material: x.material,
       rebar: { wall: [q.dW, o.r.sW], base: [q.dB, o.r.sB], temp: [q.dT, o.r.sT] }, src: `UD Total Station v${UD_VERSION.v} กำแพงกันดิน (Neo Retain)` };
+    const u = (D.retains || {})[x.id] || {}, e = D.appliedRetains[x.id], gl = ((m.levels || []).find(l => l.name === 'GL') || { z: 0 }).z;
+    if (u.px !== undefined && u.py !== undefined) Object.assign(e, { start: [u.px, u.py], dir: u.dir || '+X', soil: u.soil || 'left' });
+    if (q.Df !== null && q.Df > 0) e.bottom = +(gl - q.Df).toFixed(3);
     nrw++;
   });
   m.retaining_walls = Object.values(D.appliedRetains);
@@ -252,7 +255,8 @@ function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains = []
   let nst = 0; D.appliedStairs = D.appliedStairs || {}; m.design.stairs = m.design.stairs || {};
   (stairs || []).filter(x => !x.manual).forEach(x => {
     const o = S.dsgStair[x.id]; if (!o || !o.d) return; if (!o.ok) { skip++; return; }
-    m.design.stairs[x.id] = D.appliedStairs[x.id] = { method: 'WSD', main_bar: [o.d.dm, o.d.sA], dist_bar: [o.d.dt, o.d.sB], waist: x.t, pass: true, status: 'computed',
+    const u = D.stairs[x.id] || {}, land = +u.lA > 0 && +u.lW > 0 && +u.lt > 0 && !x.hasLandings ? { landing: [+u.lA, +u.lW, +u.lt] } : {};
+    m.design.stairs[x.id] = D.appliedStairs[x.id] = { method: 'WSD', main_bar: [o.d.dm, o.d.sA], dist_bar: [o.d.dt, o.d.sB], waist: o.inp.t, ...land, pass: true, status: 'computed',
       src: `UD Total Station v${UD_VERSION.v} บันไดท้องเรียบ WSD (${o.crit.main.grade}, หุ้ม ${c.slabCov} ซม.)` };
     nst++;
   });
@@ -804,7 +808,7 @@ function dsgRetainList() {
 }
 function dsgRetainInput(x) {
   const u = (dsg().retains || {})[x.id] || {}, c = dsg().crit, v = (k, d) => u[k] !== undefined && u[k] !== '' ? +u[k] : d;
-  return { Lw: v('Lw', 10), H: v('H', 3), Hs: v('Hs', 3), tw: v('tw', 0.25), tb: v('tb', 0.4), B1: v('B1', 0.8), B2: v('B2', 1.8), gam: v('gam', +c.gamma || 1800), q: v('q', 0), hw: v('hw', 0), phi: v('phi', 30), beta: v('beta', 0), mu: v('mu', 0.4) };
+  return { Lw: v('Lw', 10), H: v('H', 3), Hs: v('Hs', 3), tw: v('tw', 0.25), tb: v('tb', 0.4), B1: v('B1', 0.8), B2: v('B2', 1.8), gam: v('gam', +c.gamma || 1800), q: v('q', 0), hw: v('hw', 0), phi: v('phi', 30), beta: v('beta', 0), mu: v('mu', 0.4), Df: v('Df', null) };
 }
 function dsgRetainRun(x) {
   const c = dsg().crit, inp = dsgRetainInput(x);
@@ -822,7 +826,8 @@ function retainCard(retains) {
     ${retains.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>กำแพง</th><th>ยาว (ม.)</th><th>H / Hs (ม.)</th><th>ผนัง / ฐาน หนา (ม.)</th><th>B1 / B2 (ม.)</th><th>เหล็กเสริม</th><th></th></tr>
     ${retains.map(x => {
       const o = S.dsgRetain[x.id], u = (D.retains || {})[x.id] || {}, inp = dsgRetainInput(x);
-      const cell = (k, cls = '') => `<input class="price ${cls}${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-wf="${k}" inputmode="decimal" value="${esc(inp[k])}" placeholder="-">`;
+      const cell = (k, cls = '') => `<input class="price ${cls}${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-wf="${k}" inputmode="decimal" value="${esc(inp[k] === null ? '' : inp[k])}" placeholder="-">`;
+      const pos = k => `<input class="price sm${u[k] !== undefined ? ' ov' : ''}" data-wf="${k}" inputmode="decimal" value="${u[k] !== undefined ? esc(u[k]) : ''}" placeholder="-">`;
       return `<tr class="row ${D.sel === 'rw:' + x.id ? 'sel' : ''}" data-rw="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">เพิ่มเอง</span> <button class="btn small" data-rwdel="${esc(x.id)}">ลบ</button></td>
         <td data-l="ยาว (ม.)">${cell('Lw')}</td><td data-l="H / Hs (ม.)"><div class="dsg-cant">${cell('H', 'sm')} / ${cell('Hs', 'sm')}</div></td>
         <td data-l="ผนัง / ฐาน หนา (ม.)"><div class="dsg-cant">${cell('tw', 'sm')} / ${cell('tb', 'sm')}</div></td><td data-l="B1 / B2 (ม.)"><div class="dsg-cant">${cell('B1', 'sm')} / ${cell('B2', 'sm')}</div></td>
@@ -830,7 +835,13 @@ function retainCard(retains) {
         <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>
         <tr class="row pc-sub ${D.sel === 'rw:' + x.id ? 'sel' : ''}" data-rw="${esc(x.id)}"><td class="c-name hint">ดิน/น้ำ</td><td colspan="6" data-l="ดิน/น้ำ"><div class="dsg-bored">
           <span class="g">γ ${cell('gam', 'sm')} กก./ลบ.ม.</span><span class="g">น้ำหนักบนดิน ${cell('q', 'sm')} กก./ตร.ม.</span><span class="g">น้ำสูง ${cell('hw', 'sm')} ม.</span>
-          <span class="g">φ ${cell('phi', 'sm')}°</span><span class="g">ดินถมเอียง β ${cell('beta', 'sm')}°</span><span class="g">μ ${cell('mu', 'sm')}</span></div></td></tr>`;
+          <span class="g">φ ${cell('phi', 'sm')}°</span><span class="g">ดินถมเอียง β ${cell('beta', 'sm')}°</span><span class="g">μ ${cell('mu', 'sm')}</span></div></td></tr>
+        <tr class="row pc-sub ${D.sel === 'rw:' + x.id ? 'sel' : ''}" data-rw="${esc(x.id)}"><td class="c-name hint">ตำแหน่ง</td><td colspan="6" data-l="ตำแหน่ง"><div class="dsg-bored">
+          <span class="g">จุดเริ่ม x ${pos('px')} y ${pos('py')} ม.</span>
+          <span class="g">ทิศ <select data-wf="dir">${['+X', '-X', '+Y', '-Y'].map(d => `<option${(u.dir || '+X') === d ? ' selected' : ''}>${d}</option>`).join('')}</select></span>
+          <span class="g">ดินอยู่ <select data-wf="soil"><option value="left"${u.soil !== 'right' ? ' selected' : ''}>ซ้าย</option><option value="right"${u.soil === 'right' ? ' selected' : ''}>ขวา</option></select></span>
+          <span class="g">ท้องฐานลึกจาก GL ${cell('Df', 'sm')} ม.</span>
+          <span class="hint">จุดเริ่ม = ปลายแนวหน้าผนัง (ฝั่งไม่มีดิน) · ซ้าย/ขวา มองตามทิศ · ไม่ใส่ตำแหน่ง = ไม่แสดง 3D · ไม่ใส่ความลึก = ไม่คิดงานขุด</span></div></td></tr>`;
     }).join('')}</table></div>` : '<p class="hint">ยังไม่มีกำแพงกันดิน — กดเพิ่ม</p>'}
   </div>`;
 }
@@ -856,7 +867,7 @@ function retainReport(x, o) {
       ${row('M ผนัง', 'ที่โคนผนัง', df2(r.Mw, 0), 'กก.-ม./ม.')}${row('ผนังหนา', 'd ต้องการ + 5 ซม.', df2(r.dW + 0.05, 2), 'ม.', okTag(ck('tw')))}
       ${row('M ปลายเท้า / ส้น', '', `${df2(r.Mtoe, 0)} / ${df2(r.Mheel, 0)}`, 'กก.-ม./ม.')}${row('ฐานหนา', 'max(H/12, d + 7.5 ซม.)', df2(Math.max(q.H / 12, r.dB + 0.075), 2), 'ม.', okTag(ck('tb')))}
       ${row('เฉือนส้นฐาน', "≤ 0.29√f'c", df2(Math.abs(r.v), 2), 'ksc', okTag(ck('v')))}
-      ${row('As ผนัง', 'max(M/(fs·j·d), 0.006·b·t)', df2(r.AsW, 2), 'ตร.ซม./ม.', `${bn(q.dW)} @${r.sW}`)}${row('As ฐาน', '', df2(r.AsB, 2), 'ตร.ซม./ม.', `${bn(q.dB)} @${r.sB}`)}
+      ${row('As ผนัง', 'max(M/(fs·j·d), 0.0025·b·t)', df2(r.AsW, 2), 'ตร.ซม./ม.', `${bn(q.dW)} @${r.sW}`)}${row('As ฐาน', '', df2(r.AsB, 2), 'ตร.ซม./ม.', `${bn(q.dB)} @${r.sB}`)}
       ${row('กันร้าว', '0.0025·b·t', df2(r.AsT, 2), 'ตร.ซม./ม.', `${bn(q.dT)} @${r.sT}`)}
     </table>
     <h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">ผนัง ${bn(q.dW)} @${r.sW} · ฐาน ${bn(q.dB)} @${r.sB} · กันร้าว ${bn(q.dT)} @${r.sT} ม.</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}</div>`;
@@ -1098,7 +1109,7 @@ function dsgStairList() {
   const out = [];
   (m.stairs || []).forEach(st => (st.flights || []).forEach((f, k) => {
     const id = (st.flights.length > 1 ? `${st.id}#${k + 1}` : st.id), rise = (f.top - f.bottom) / f.risers;
-    out.push({ id, stair: st.id, mark: st.mark || st.id, L: f.risers * f.going, t: f.waist || 0.15, b: f.going, h: rise, width: f.width, manual: false });
+    out.push({ id, stair: st.id, mark: st.mark || st.id, L: f.risers * f.going, t: f.waist || 0.15, b: f.going, h: rise, width: f.width, manual: false, hasLandings: !!(st.landings && st.landings.length) });
   }));
   (D.stairsManual || []).forEach(x => out.push(Object.assign({ L: 3, t: 0.15, b: 0.25, h: 0.175, width: 1.2 }, x, { manual: true })));
   return out;
@@ -1121,17 +1132,21 @@ function stairCard(stairs) {
   const D = dsg(), c = D.crit;
   const dn = stairs.filter(x => S.dsgStair[x.id] && S.dsgStair[x.id].r), pass = dn.filter(x => S.dsgStair[x.id].ok).length;
   return `<div class="card"><h2>บันได คสล. (ท้องเรียบ ช่วงเดียว) <span class="hint">${dn.length}/${stairs.length} ช่วงออกแบบได้ · ผ่าน ${pass}</span></h2>
-    <p class="hint">L = ช่วงราบระหว่างที่รองรับ (ช่วงที่รวมชานพักให้แก้ L เอง) · t = ความหนาท้องบันได · น้ำหนักบันได = γ·t·√(h²+b²)/b + ½·h·γ · ใช้เหล็กพื้น (${RcWsd.barName((c.slabDias || [9])[0], +c.slabFy).split(' ')[0]}) · บันไดจากโมเดลเขียนแล้วเหล็กเข้า ปร.1 (ยาวตามแนวเอียงของช่วง ไม่รวมชานพัก) · บันไดที่เพิ่มเองไม่เข้าปริมาณ</p>
+    <p class="hint">L = ช่วงราบระหว่างที่รองรับ (ช่วงที่รวมชานพักให้แก้ L เอง) · t = ความหนาท้องบันได · น้ำหนักบันได = γ·t·√(h²+b²)/b + ½·h·γ · ใช้เหล็กพื้น (${RcWsd.barName((c.slabDias || [9])[0], +c.slabFy).split(' ')[0]}) · บันไดจากโมเดล: คอนกรีตและไม้แบบเข้า ปร.1 เสมอ · เขียนผลแล้วเหล็กช่วงพื้นเอียงและชานพักเข้า ปร.1 · บันไดที่เพิ่มเองไม่เข้าปริมาณ</p>
     <div class="btn-row"><button class="btn small" id="dsg-st-add">+ เพิ่มบันไดคำนวณเอง</button></div>
     ${stairs.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>บันได</th><th>L (ม.)</th><th>t (ม.)</th><th>ลูกนอน (ม.)</th><th>ลูกตั้ง (ม.)</th><th>SDL</th><th>LL กก./ตร.ม.</th><th>เหล็กเสริม</th><th></th></tr>
     ${stairs.map(x => {
       const o = S.dsgStair[x.id], u = D.stairs[x.id] || {};
       const cell = (k, def) => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-tf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (def === undefined || def === null ? '' : esc(def))}" placeholder="-">`;
+      const lcell = k => `<input class="price sm${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-tf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : ''}" placeholder="-">`;
       return `<tr class="row ${D.sel === 'st:' + x.id ? 'sel' : ''}" data-st="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">${x.manual ? 'เพิ่มเอง' : esc(x.id)}</span>${x.manual ? ` <button class="btn small" data-stdel="${esc(x.id)}">ลบ</button>` : ''}</td>
         <td data-l="L (ม.)">${cell('L', +(+x.L).toFixed(3))}</td><td data-l="t (ม.)">${cell('t', x.t)}</td><td data-l="ลูกนอน (ม.)">${cell('b', +(+x.b).toFixed(3))}</td><td data-l="ลูกตั้ง (ม.)">${cell('h', +(+x.h).toFixed(3))}</td>
         <td data-l="SDL">${cell('SDL', 0)}</td><td data-l="LL กก./ตร.ม.">${cell('LL')}</td>
         <td class="dsg-rb">${o.r ? `เหล็กหลัก ${RcWsd.barName(o.d.dm, +c.slabFy)} @${o.d.sA} · กันร้าว ${RcWsd.barName(o.d.dt, +c.slabFy)} @${o.d.sB}` + (o.error ? `<span class="warnline">${esc(o.error)}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}</td>
-        <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
+        <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`
+        + (x.manual ? '' : `<tr class="row pc-sub ${D.sel === 'st:' + x.id ? 'sel' : ''}" data-st="${esc(x.id)}"><td class="c-name hint">ชานพัก</td><td colspan="8" data-l="ชานพัก"><div class="dsg-bored">${x.hasLandings
+          ? '<span class="hint">ใช้ชานพักจากโมเดล — คอนกรีต ไม้แบบ และเหล็ก (ต่อเนื่องจากช่วงที่ชานพักอยู่บน) เข้า ปร.1</span>'
+          : `<span class="g">ชานพักบนช่วงนี้ ยาวตามแนวบันได ${lcell('lA')} ม.</span><span class="g">กว้าง ${lcell('lW')} ม.</span><span class="g">หนา ${lcell('lt')} ม.</span><span class="hint">ไม่มีชานพัก = เว้นว่าง · เหล็กหลัก/กันร้าวต่อเนื่องจากช่วงนี้</span>`}</div></td></tr>`);
     }).join('')}</table></div>` : '<p class="hint">ไม่มีบันไดในโมเดล — กดเพิ่มบันไดคำนวณเองได้</p>'}
   </div>`;
 }

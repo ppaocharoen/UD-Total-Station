@@ -105,15 +105,78 @@
       "description": "กำแพงกันดินแบบยื่น (เพิ่มจากแท็บออกแบบ) — ใช้ถอดปริมาณ",
       "items": {
         "type": "object",
-        "required": ["id", "length", "H", "tb", "tw", "B1", "B2"],
+        "required": [
+          "id",
+          "length",
+          "H",
+          "tb",
+          "tw",
+          "B1",
+          "B2"
+        ],
         "properties": {
-          "id": {"$ref": "#/$defs/id"}, "mark": {"type": "string"},
-          "length": {"$ref": "#/$defs/pos"}, "H": {"$ref": "#/$defs/pos", "description": "ความสูงรวมฐาน"},
-          "tb": {"$ref": "#/$defs/pos"}, "tw": {"$ref": "#/$defs/pos"},
-          "B1": {"type": "number", "minimum": 0, "description": "ปลายเท้า"}, "B2": {"$ref": "#/$defs/pos", "description": "ส้น (รวมความหนาผนัง)"},
-          "material": {"$ref": "#/$defs/id"},
-          "rebar": {"type": "object", "description": "{wall:[ขนาด, ระยะ], base:[…], temp:[…]}"},
-          "src": {"type": "string"}
+          "id": {
+            "$ref": "#/$defs/id"
+          },
+          "mark": {
+            "type": "string"
+          },
+          "length": {
+            "$ref": "#/$defs/pos"
+          },
+          "H": {
+            "$ref": "#/$defs/pos",
+            "description": "ความสูงรวมฐาน"
+          },
+          "tb": {
+            "$ref": "#/$defs/pos"
+          },
+          "tw": {
+            "$ref": "#/$defs/pos"
+          },
+          "B1": {
+            "type": "number",
+            "minimum": 0,
+            "description": "ปลายเท้า"
+          },
+          "B2": {
+            "$ref": "#/$defs/pos",
+            "description": "ส้น (รวมความหนาผนัง)"
+          },
+          "material": {
+            "$ref": "#/$defs/id"
+          },
+          "rebar": {
+            "type": "object",
+            "description": "{wall:[ขนาด, ระยะ], base:[…], temp:[…]}"
+          },
+          "src": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/$defs/xy",
+            "description": "จุดเริ่มแนวหน้าผนัง (ด้านไม่มีดิน)"
+          },
+          "dir": {
+            "enum": [
+              "+X",
+              "-X",
+              "+Y",
+              "-Y"
+            ],
+            "description": "ทิศตามแนวยาวกำแพงจากจุดเริ่ม"
+          },
+          "soil": {
+            "enum": [
+              "left",
+              "right"
+            ],
+            "description": "ดินอยู่ด้านซ้าย/ขวาเมื่อมองตามทิศ dir (ส้นฐานอยู่ฝั่งดิน)"
+          },
+          "bottom": {
+            "type": "number",
+            "description": "ระดับท้องฐาน (ม.) — ใช้คิดงานขุดและวาด 3D"
+          }
         }
       }
     },
@@ -937,7 +1000,10 @@
               "description": "กก./ต้น"
             },
             "kind": {
-              "enum": ["driven", "bored"],
+              "enum": [
+                "driven",
+                "bored"
+              ],
               "description": "เข็มตอก / เข็มเจาะ (ไม่ระบุ = ตอก)"
             },
             "bars": {
@@ -947,14 +1013,18 @@
             "tie": {
               "type": "array",
               "description": "เข็มเจาะ: ปลอก [ขนาด มม., ระยะ ม.]",
-              "items": {"type": "number"},
+              "items": {
+                "type": "number"
+              },
               "minItems": 2,
               "maxItems": 2
             },
             "dowel": {
               "type": "array",
               "description": "เข็มเจาะ: เหล็กเดือย [จำนวน, ขนาด มม., ยาว ม.]",
-              "items": {"type": "number"},
+              "items": {
+                "type": "number"
+              },
               "minItems": 3,
               "maxItems": 3
             }
@@ -1023,6 +1093,10 @@
         "use": {
           "type": "string",
           "description": "การใช้งาน สำหรับเลือกน้ำหนักบรรทุกจรตามกฎหมาย"
+        },
+        "pe_sheet": {
+          "type": "boolean",
+          "description": "พื้นวางบนดิน: คิดแผ่นพลาสติกรองใต้พื้น (ค่าตั้งต้น true)"
         }
       }
     },
@@ -1384,6 +1458,10 @@
               }
             }
           }
+        },
+        "material": {
+          "$ref": "#/$defs/id",
+          "description": "คอนกรีตบันได (ไม่ระบุ = คอนกรีตชนิดแรกใน materials)"
         }
       }
     },
@@ -2138,7 +2216,9 @@
         "bands": {
           "type": "array",
           "description": "ฐานเข็ม 3 ต้น: [จำนวนแถบ, เส้นต่อแถบ, ขนาด มม., ยาวต่อเส้น ม.]",
-          "items": {"type": "number"},
+          "items": {
+            "type": "number"
+          },
           "minItems": 4,
           "maxItems": 4
         },

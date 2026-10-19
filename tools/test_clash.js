@@ -70,8 +70,8 @@ L = C.classify(m); check('หลังคาแบน ดาดฟ้า +24.00 
 // กฎกระทรวง 55 ข้อ 33/41/44/50
 const SB = clone().site.existing.boundary, st = (r, c) => (r.find(x => x.code === c) || {}).status;
 let R = C.siteCheck(clone(), {});
-check('ไม่มีข้อมูลที่ดิน → ข้อมูลไม่ครบทุกข้อ (ไม่ตัดสิน)', R.every(x => x.status === 'missing'));
-R = C.siteCheck(clone(), { boundary: SB, off: { c33: 1, c41: 1, c44: 1, c50: 1 } });
+check('ไม่มีข้อมูลที่ดิน → ข้อมูลไม่ครบทุกข้อ (ไม่ตัดสิน) · ข้อ 42/45–46 ไม่บังคับเมื่อไม่ระบุ', R.every(x => x.status === (/ข้อ 4[2-6]\b|ข้อ 45\/46/.test(x.code) && x.code !== 'ข้อ 44' ? 'na' : 'missing')), JSON.stringify(R.map(x => x.code + ':' + x.status)));
+R = C.siteCheck(clone(), { boundary: SB, off: { c33: 1, c41: 1, c42: 1, c44: 1, c45: 1, c50: 1 } });
 check('ปิดทุกข้อ → ไม่คิด', R.every(x => x.status === 'off'));
 R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }] });
 check('ตัวอย่าง ถนน 8 ม. ด้านใต้ → ผ่านทุกข้อ', ['ข้อ 33', 'ข้อ 41', 'ข้อ 44', 'ข้อ 50'].every(c => st(R, c) === 'pass'));
@@ -84,5 +84,20 @@ check('ถนน 4 ม. อาคารสาธารณะ ห่างกึ�
 R = C.siteCheck(clone(), { landArea: 40, use: 'res' });
 check('ที่ดิน 40 ตร.ม. อยู่อาศัย (ปกคลุม 53.76) → ข้อ 33 ไม่ผ่าน', st(R, 'ข้อ 33') === 'fail');
 
+// ข้อ 42 แหล่งน้ำ · ข้อ 45 ถนนขนาบ · ข้อ 46 หัวมุม (อาคารห่างเขตทุกด้าน 5 ม.)
+const all = (r, c) => r.filter(x => x.code === c);
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }, { edge: 2, width: 12 }], waters: [{ edge: 1, width: 8 }] });
+check('คลองกว้าง 8 ม. ห่าง 5 ม. ≥ 3 → ข้อ 42 ผ่าน', st(R, 'ข้อ 42') === 'pass');
+check('ถนน 8/12 ม. ขนาบ ห่าง 14 ม. → ข้อ 45 ผ่าน และข้อ 44 ถนนแคบใช้ข้อ 45 แทน', st(R, 'ข้อ 45') === 'pass' && all(R, 'ข้อ 44').some(x => x.status === 'na' && /ข้อ 45/.test(x.detail)));
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }, { edge: 1, width: 12 }], waters: [{ edge: 3, width: 12 }] });
+check('แหล่งน้ำกว้าง 12 ม. ห่าง 5 ม. < 6 → ข้อ 42 ไม่ผ่าน', st(R, 'ข้อ 42') === 'fail');
+check('ถนน 8/12 ม. หัวมุม → ข้อ 46 ผ่าน (ยาวตามถนนแคบ ≤ 60 ม.)', st(R, 'ข้อ 46') === 'pass');
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }], waters: [{ edge: 3, kind: 'large' }] });
+check('ทะเลสาบ ห่าง 5 ม. < 12 → ข้อ 42 ไม่ผ่าน · ถนนสายเดียว → ข้อ 45/46 ไม่บังคับ', st(R, 'ข้อ 42') === 'fail' && st(R, 'ข้อ 45/46') === 'na');
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }, { edge: 2, width: 8 }] });
+check('ถนนสองสายกว้างเท่ากัน → ข้อ 45/46 ไม่บังคับ', st(R, 'ข้อ 45/46') === 'na');
+const tall = clone(); tall.levels.push({ name: 'X', z: 40 }); tall.slabs.push({ id: 'S-T', kind: 'roof', level: 'X', t: 0.1, top: 40, polygon: [[0, 0], [8, 0], [8, 4], [0, 4]] }); tall.roofs.forEach(r => { r.form = 'flat'; });
+R = C.siteCheck(tall, { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }, { edge: 1, width: 12 }] });
+check('สูง 40 ม. หัวมุม ระยะถึงฝั่งตรงข้ามถนนกว้าง 17 ม. → ข้อ 46 ไม่ผ่าน', st(R, 'ข้อ 46') === 'fail', JSON.stringify(R.filter(x => x.code === 'ข้อ 46')));
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);

@@ -458,6 +458,9 @@ class Takeoff:
             else:   # ground
                 self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * self.s["sand_thk"], s["id"],
                          waste=self.s["sand_waste"], task=lt)
+                if s.get("pe_sheet", True):   # แผ่นพลาสติกรองใต้พื้น ไม่คิดเผื่อทับซ้อน (ตกลงกับ Earth 19 ต.ค. 2569)
+                    self.add("1.1.4", "pe_sheet", "แผ่นพลาสติกรองใต้พื้น (Polyethylene)", "ตร.ม.", A, s["id"], task=lt,
+                             calc=f"พื้นที่ {A:.2f} ตร.ม. (ไม่คิดเผื่อทับซ้อน)")
             rb = self.rebar_of("slabs", s["id"])
             if rb.get("mesh"):
                 mh = rb["mesh"]; dia, sp = mh[0], mh[1]; layers = mh[2] if len(mh) > 2 else 1
@@ -825,27 +828,68 @@ class Takeoff:
                               "งาน", 1, None, count=True, task="mep_rough", note=f"ว480 {grp}-{code}")
                 it["pct"] = {"of": keys, "mat": pc[part], "lab_of_mat": 0.30}
 
-    # ------------------------------------------------------------ บันได (เหล็กเสริมตามผลออกแบบ)
+    # ------------------------------------------------------------ บันได: คอนกรีต ไม้แบบ (ช่วงพื้นเอียง + ชานพัก) และเหล็กตามผลออกแบบ
+    def default_conc(self):
+        return next((x["id"] for x in self.m.get("materials", []) if x.get("kind") == "concrete"), None)
+
+    def level_of(self, z):
+        return min(self.levels, key=lambda kk: abs(self.levels[kk] - z), default="?")
+
     def _stairs(self):
         c = self.s["cover"]
         for st in self.m.get("stairs", []):
             fl = st.get("flights") or []
+            name, key = self.conc_name(st.get("material") or self.default_conc())
+            dz = self.design.get("stairs") or {}
+            fids = [st["id"] if len(fl) == 1 else f"{st['id']}#{k + 1}" for k in range(len(fl))]
             for k, f in enumerate(fl):
-                fid = st["id"] if len(fl) == 1 else f"{st['id']}#{k + 1}"
-                dz = self.design.get("stairs") or {}
+                fid = fids[k]
                 d = dz.get(fid) or {}
-                if not (d.get("main_bar") or d.get("dist_bar")):
-                    continue
                 W, H, Lh = f["width"], f["top"] - f["bottom"], f["risers"] * f["going"]
                 Li = math.hypot(Lh, H)
-                lv = min(self.levels, key=lambda kk: abs(self.levels[kk] - f["top"]), default="?")
-                self.src_task.setdefault(st["id"], "lift:" + lv)
+                t = d.get("waist") or f.get("waist") or 0.15
+                lt = "lift:" + self.level_of(f["top"])
+                self.src_task.setdefault(st["id"], lt)
+                side = Li * t + Lh * H / 2
+                vol, fw = W * side, W * Li + H * W + 2 * side
+                self.add("1.1.12", key + "_stair", name + " (บันได)", "ลบ.ม.", vol, st["id"], task=lt,
+                         calc=f"{fid} กว้าง {W:g} × (ท้อง {Li:.2f}×{t:g} + ขั้น {Lh:.2f}×{H:.2f}/2) = {vol:.3f} ลบ.ม.")
+                self.add("1.1.7", "formwork_stair", "ไม้แบบหล่อคอนกรีต (บันได)", "ตร.ม.", fw, st["id"], task=lt,
+                         calc=f"{fid} ท้อง {W:g}×{Li:.2f} + ลูกตั้ง {H:.2f}×{W:g} + ข้าง 2×{side:.3f} = {fw:.2f} ตร.ม.")
                 if d.get("main_bar"):
                     dia, sp = d["main_bar"]; n = math.floor(W / sp) + 1
                     self.rebar(st["id"], dia, n * Li, f"{fid} เหล็กหลัก @{sp:g} {n} เส้น × {Li:.2f} ม.")
                 if d.get("dist_bar"):
                     dia, sp = d["dist_bar"]; n = math.floor(Li / sp) + 1
                     self.rebar(st["id"], dia, n * (W - 2 * c), f"{fid} เหล็กกันร้าว @{sp:g} {n} เส้น × {W - 2 * c:.2f} ม.")
+            # ชานพัก: จากโมเดล (landings) หรือจากแท็บออกแบบ (design.stairs[ช่วง].landing = [ยาวตามแนวบันได, กว้าง, หนา]) — เหล็กต่อเนื่องจากช่วงที่ชานพักอยู่บน
+            lands = []
+            for j, ld in enumerate(st.get("landings") or []):
+                x1, y1, x2, y2 = ld["rect"]; dx, dy = abs(x2 - x1), abs(y2 - y1)
+                k = next((k for k, f in enumerate(fl) if abs(f["top"] - ld["top"]) <= 0.02), None)
+                if k is None:
+                    k = next((k for k, f in enumerate(fl) if abs(f["bottom"] - ld["top"]) <= 0.02), None)
+                xdir = k is not None and fl[k]["dir"] in ("+X", "-X")
+                lands.append((f"ชานพัก {j + 1}", k, dx if xdir else dy, dy if xdir else dx, ld["t"], ld["top"]))
+            if not st.get("landings"):
+                for k, f in enumerate(fl):
+                    ln = (dz.get(fids[k]) or {}).get("landing")
+                    if ln:
+                        lands.append((f"ชานพัก {fids[k]}", k, ln[0], ln[1], ln[2], f["top"]))
+            for lbl, k, al, wd, t, top in lands:
+                A, P = al * wd, 2 * (al + wd)
+                lt = "lift:" + self.level_of(top)
+                self.add("1.1.12", key + "_stair", name + " (บันได)", "ลบ.ม.", A * t, st["id"], task=lt,
+                         calc=f"{lbl} {al:g}×{wd:g} × หนา {t:g} = {A * t:.3f} ลบ.ม.")
+                self.add("1.1.7", "formwork_stair", "ไม้แบบหล่อคอนกรีต (บันได)", "ตร.ม.", A + P * t, st["id"], task=lt,
+                         calc=f"{lbl} ท้อง {A:.2f} + ขอบ {P:.2f}×{t:g} = {A + P * t:.2f} ตร.ม.")
+                d = (dz.get(fids[k]) or {}) if k is not None else {}
+                if d.get("main_bar"):
+                    dia, sp = d["main_bar"]; n = math.floor(wd / sp) + 1
+                    self.rebar(st["id"], dia, n * al, f"{lbl} เหล็กหลัก @{sp:g} {n} เส้น × {al:.2f} ม.")
+                if d.get("dist_bar"):
+                    dia, sp = d["dist_bar"]; n = math.floor(al / sp) + 1
+                    self.rebar(st["id"], dia, n * (wd - 2 * c), f"{lbl} เหล็กกันร้าว @{sp:g} {n} เส้น × {wd - 2 * c:.2f} ม.")
 
     # ------------------------------------------------------------ กำแพงกันดิน (เพิ่มจากแท็บออกแบบ)
     def _retaining_walls(self):
@@ -853,6 +897,23 @@ class Takeoff:
         for w in self.m.get("retaining_walls", []):
             L, H, tb, tw, B = w["length"], w["H"], w["tb"], w["tw"], w["B1"] + w["B2"]
             hw = H - tb
+            bot = w.get("bottom")   # ระดับท้องฐาน (ม.) — ไม่มี = ยังไม่ระบุตำแหน่ง ไม่คิดงานขุด
+            if bot is not None and self.GL - bot > 0:
+                depth = self.GL - bot
+                if depth <= self.s["excav_deep"]:
+                    exc = B * L * depth
+                    self.add("1.1.2", "excav_retain", "งานขุดดินฐานรากและถมคืน (ลึกไม่เกิน 2.00 ม.) (กำแพงกันดิน)", "ลบ.ม.", exc, w["id"],
+                             waste=self.s["excav_waste"], task="footing",
+                             calc=f"ฐาน {B:g} × ยาว {L:g} × ลึก {depth:.2f} = {exc:.2f} ลบ.ม. (+ เผื่อ {self.s['excav_waste'] * 100:g}%)")
+                else:
+                    mg = self.s["excav_deep_margin"]
+                    exc = (B + 2 * mg) * (L + 2 * mg) * (depth + self.s["sand_thk"] + self.s["lean_thk"])
+                    self.add("1.1.2", "excav_deep_retain", "งานขุดดินฐานรากและถมคืน (ลึกเกิน 2.00 ม.) (กำแพงกันดิน)", "ลบ.ม.", exc, w["id"], task="footing",
+                             calc=f"({B:g}+{2 * mg:g}) × ({L:g}+{2 * mg:g}) × ลึก {depth + self.s['sand_thk'] + self.s['lean_thk']:.2f} = {exc:.2f} ลบ.ม.")
+                    self.note(f"กำแพงกันดิน {w['id']} ขุดลึก {depth:.2f} ม. เกิน 2 ม. — พิจารณาค่าใช้จ่ายพิเศษระบบป้องกันดินพัง (ปร.3)")
+            self.add("1.1.4", "sand_base_retain", "ทรายรองใต้ฐานราก (บดอัดแรงคน) (กำแพงกันดิน)", "ลบ.ม.", B * L * self.s["sand_thk"], w["id"],
+                     waste=self.s["sand_waste"], task="footing")
+            self.add("1.1.12", "lean_conc_retain", "คอนกรีตหยาบรองใต้ฐานราก (1:3:5) (กำแพงกันดิน)", "ลบ.ม.", B * L * self.s["lean_thk"], w["id"], task="footing")
             name, key = self.conc_name(w.get("material"))
             vol = L * (hw * tw + B * tb)
             self.add("1.1.12", key + "_retain", name + " (กำแพงกันดิน)", "ลบ.ม.", vol, w["id"], task="footing",
@@ -951,7 +1012,8 @@ class Takeoff:
                 row["by_task"] = {t: {"share": round(v["q"] / tot, 4), "from": v["from"]}
                                   for t, v in sorted(parts.items(), key=lambda kv: -kv[1]["q"])}
                 row["task"] = next(iter(row["by_task"]))
-            pr = (price_map or {}).get(it["key"]) or ((price_map or {}).get(it["key"][:-7]) if it["key"].endswith("_retain") else None)
+            base = re.sub(r"_(retain|stair)$", "", it["key"])   # กำแพงกันดิน/บันได ใช้ราคาเดียวกับรายการปกติ
+            pr = (price_map or {}).get(it["key"]) or ((price_map or {}).get(base) if base != it["key"] else None)
             if pr is None and price_map:
                 pr = next((v for k, v in price_map.items() if k.endswith("*") and it["key"].startswith(k[:-1])), None)
             if it.get("wage_code"):
