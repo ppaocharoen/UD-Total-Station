@@ -69,6 +69,27 @@ slabs.cases.forEach((cs, i) => {
     check(`slab${i} ${p.kind} ${k}`, near(g[k], e[k], 1e-9), `เว็บ ${g[k]} Excel ${e[k]}`);
   });
 });
+
+// ฉบับแก้ (RC_Design_WSD_UDfix.xlsm) — โหมดออกแบบของเว็บต้องตรงกับไฟล์ที่แก้แล้ว
+const bfix = require('./rcwsd_beam_cases_fix.json');
+bfix.cases.forEach((cs, i) => {
+  const p = cs.input, e = cs.expect, cr = W.criteria(p), r = W.beamCheck(p, cr);
+  ['dp', 'd', 'Mc', 'As', 'Asc', 'Asmin', 'Vc', 'Vp', 'Av_s', 'At_s', 'smax', 'Avmin', 'reqT', 'reqC'].forEach(k => {
+    if (typeof e[k] === 'number') check(`fix beam${i} ${k}`, near(r[k], e[k]), `เว็บ ${r[k]} Excel ${e[k]}`);
+  });
+  check(`fix beam${i} ระยะปลอก`, r.checks.find(x => x.code === 's').ok === !/Check/.test(e.stirTxt));
+});
+const sfix = require('./rcwsd_slab_cases_fix.json');
+sfix.cases.forEach((cs, i) => {
+  const p = Object.assign({}, cs.input), e = cs.expect, cr = W.criteria(p);
+  const r = p.kind === 'two' ? W.slabTwoWay(p, cr) : p.kind === 'one' ? W.slabOneWay(p, cr) : W.slabCant(p, cr);
+  const g = Object.assign({}, r, p.kind === 'two' ? { MSm: r.M.Sm } : {});
+  Object.keys(e).forEach(k => {
+    if (k === 'bond') { check(`fix slab${i} bond`, (e[k] === '[Ok.]') === r.checks.find(x => x.code === 'bond').ok); return; }
+    if (typeof e[k] !== 'number') return;
+    check(`fix slab${i} ${p.kind} ${k}`, near(g[k], e[k], 1e-9), `เว็บ ${g[k]} Excel ${e[k]}`);
+  });
+});
 // ออกแบบพื้น: ผลผ่าน และระยะไม่น้อยกว่า 0.10
 const cs = W.criteria({ fcp: 240, mode: 1, fy: 2400, fyv: 2400 });
 [['two', { S: 3.5, L: 4.2, t: 0.12, cov: 2, SDL: 100, LL: 300, case: 3 }], ['one', { L: 2.5, t: 0.1, cov: 2, SDL: 50, LL: 200, type: 1 }], ['cant', { L: 1.2, t: 0.1, cov: 2, SDL: 50, LL: 200, P: 100, a: 1 }],
