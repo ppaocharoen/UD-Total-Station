@@ -131,20 +131,45 @@ function bindDesign(beams) {
   $('#dsg-print').onclick = () => dsgPrint(beams);
 }
 function dsgWrite(beams) {
-  const m = S.model, c = dsg().crit; m.design = m.design || {}; m.design.members = m.design.members || {};
-  let n = 0;
+  const m = S.model, c = dsg().crit, D = dsg(); m.design = m.design || {}; m.design.members = m.design.members || {};
+  let n = 0; D.applied = D.applied || {};
   beams.forEach(bm => {
     const r = S.dsgOut[bm.id]; if (!r || !r.rebar) return;
-    m.design.members[bm.id] = { method: 'WSD', rebar: r.rebar, pass: !!r.ok, ratio: Math.round(r.ratio * 1000) / 1000,
+    m.design.members[bm.id] = D.applied[bm.id] = { method: 'WSD', rebar: r.rebar, pass: !!r.ok, ratio: Math.round(r.ratio * 1000) / 1000,
       governing: [r.inp.src === 'SAP' && bm.sap && bm.sap.combo ? bm.sap.combo : r.inp.src, RcWsd.BEAM_TYPES_TH[r.inp.type]].filter(Boolean).join(' · '),
       status: 'computed', src: `UD Total Station v${UD_VERSION.v} ออกแบบ WSD (fc ${df2(r.crit.fc, 0)} ksc, ${r.crit.main.grade}/${r.crit.stir.grade}, หุ้ม ${c.cov} ซม.)` };
     n++;
   });
   if (!n) return toast('ยังไม่มีคานที่ออกแบบได้ — กรอกแรงก่อน');
-  if (m.quantities) m.quantities.stale = true;
-  if (S.viewer) buildLayers(S.viewer.load(m));
-  toast(`เขียนเหล็กเสริมคาน ${n} ตัวลงโมเดลแล้ว · ดาวน์โหลด .bm.json แล้วรัน tools/takeoff.py --write เพื่อปรับ BOQ`);
-  renderDesign(); if (typeof renderProject === 'function') renderProject();
+  autosave();
+  dsgRequantify().then(msg => toast(`เขียนเหล็กเสริมคาน ${n} ตัวลงโมเดลแล้ว · ${msg}`));
+}
+/** ถอดปริมาณเหล็กเสริมใหม่ในเว็บ (lib/rebartk.js วิธีเดียวกับ takeoff.py) แล้วอัปเดต 3D / ปร.1 / แผนงาน */
+async function dsgRequantify() {
+  const m = S.model, q = m.quantities; let msg;
+  if (q && Array.isArray(q.items)) {
+    const wasStale = !!q.stale, r = RebarTk.apply(m, `UD Total Station v${UD_VERSION.v}`);
+    if (r.ok) {
+      try { q.design_hash = await RebarTk.designHash(m); } catch (e) { q.design_hash = ''; }
+      q.stale = wasStale;
+      msg = `ถอดเหล็กเสริมใหม่ ${r.rows.length} รายการใน ปร.1 แล้ว` + (wasStale ? ' (ปริมาณส่วนอื่นยังเก่า — รัน takeoff.py)' : '');
+    } else msg = r.error;
+  } else msg = 'โมเดลยังไม่มีปริมาณ — รัน tools/takeoff.py --write';
+  if (S.viewer) buildLayers(S.viewer.load(m)); else if (typeof renderClash === 'function') renderClash();
+  renderAll();
+  return msg;
+}
+/** เปิดโมเดลซ้ำ: ใส่ผลออกแบบที่เคยเขียน (เก็บในงาน BOQ ของเบราว์เซอร์นี้) กลับเข้าโมเดล */
+function dsgOnLoad() {
+  const A = (S.boq.dsg || {}).applied; if (!A || !S.model) return false;
+  const m = S.model, ids = new Set((m.members || []).map(x => x.id)); m.design = m.design || {}; m.design.members = m.design.members || {};
+  let n = 0;
+  for (const [id, e] of Object.entries(A)) {
+    if (!ids.has(id)) { delete A[id]; continue; }
+    if (JSON.stringify((m.design.members[id] || {}).rebar) !== JSON.stringify(e.rebar)) { m.design.members[id] = e; n++; }
+  }
+  if (n) dsgRequantify().then(msg => toast(`ใส่ผลออกแบบคาน ${n} ตัวที่เคยเขียนไว้กลับเข้าโมเดล · ${msg}`));
+  return n > 0;
 }
 function dsgPrint(beams) {
   const D = dsg(), list = D.sel ? beams.filter(b => b.id === D.sel) : beams.filter(b => S.dsgOut[b.id] && S.dsgOut[b.id].rebar);

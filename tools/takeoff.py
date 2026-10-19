@@ -16,7 +16,7 @@ from collections import OrderedDict, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from validate import qty_hash  # noqa: E402
+from validate import qty_hash, qty_base_hash, design_hash  # noqa: E402
 from roofgeom import roof_planes, plane_lines, poly_area3, v_len, v_sub  # noqa: E402
 
 DEFAULTS = {
@@ -899,7 +899,7 @@ def main():
             for r in items:
                 wr.writerow([r["group_code"], r["name"], r["unit"], r["qty_net"], r["waste"] * 100, r["qty"], " ".join(r["from"])])
     if a.write:
-        m["quantities"] = {"model_hash": qty_hash(m), "stale": False, "generated_by": "tools/takeoff.py",
+        m["quantities"] = {"model_hash": qty_hash(m), "base_hash": qty_base_hash(m), "design_hash": design_hash(m), "stale": False, "generated_by": "tools/takeoff.py",
                            "settings": used, "notes": notes, "items": items, "routes": tk.routes}
         m.setdefault("history", []).append({"at": __import__("datetime").datetime.now().astimezone().isoformat(timespec="seconds"),
                                             "by": "tools/takeoff.py", "sections": ["quantities"]})

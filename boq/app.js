@@ -109,6 +109,7 @@ function loadModel(json, name) {
   }
   $('#meta-proj').textContent = p.name; restoreImgs();
   $('#file-status').innerHTML = `เปิด <b>${esc(name)}</b>${saved ? ' · ดึงงาน BOQ ที่บันทึกไว้ในเบราว์เซอร์นี้' : ''}`;
+  if (typeof dsgOnLoad === 'function' && dsgOnLoad()) return;   // ใส่ผลออกแบบที่เคยเขียนแล้ว render ให้เอง
   if (S.viewer) buildLayers(S.viewer.load(m)); else renderClash();
   renderAll();
 }

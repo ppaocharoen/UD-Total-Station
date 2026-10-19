@@ -2337,6 +2337,18 @@
               }
             }
           }
+        },
+        "base_hash": {
+          "type": "string",
+          "description": "hash ส่วนที่มีผลต่อปริมาณ ยกเว้น design"
+        },
+        "design_hash": {
+          "type": "string",
+          "description": "hash ของ design ตอนถอดเหล็กเสริม (takeoff.py หรือเว็บ lib/rebartk.js)"
+        },
+        "rebar_by": {
+          "type": "string",
+          "description": "ผู้ถอดเหล็กเสริมรอบล่าสุด เมื่อเว็บถอดใหม่หลังออกแบบ"
         }
       }
     },

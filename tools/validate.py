@@ -43,6 +43,15 @@ def qty_hash(model):
     return canonical_hash(model, HASH_SECTIONS + QTY_EXTRA)
 
 
+def qty_base_hash(model):
+    """ส่วนที่มีผลต่อปริมาณ ยกเว้น design — เว็บถอดเหล็กเสริมใหม่ได้เอง (lib/rebartk.js) แล้วเขียน design_hash ใหม่"""
+    return canonical_hash(model, HASH_SECTIONS + [k for k in QTY_EXTRA if k != "design"])
+
+
+def design_hash(model):
+    return canonical_hash(model, ["design"])
+
+
 class Report:
     def __init__(self):
         self.errors, self.warnings, self.flags = [], [], []
@@ -318,7 +327,11 @@ def staleness(m):
         if not sec: return False
         if sec.get("model_hash"): return sec["model_hash"] != ref
         return bool(sec.get("stale"))
-    return h, hq, {"results": is_stale(res, h), "design": is_stale(des, h), "quantities": is_stale(qty, hq)}
+    if qty.get("base_hash") and qty.get("design_hash"):   # แยก 2 ส่วน: เว็บอัปเดตเหล็กเสริมหลังออกแบบได้
+        q_stale = qty["base_hash"] != qty_base_hash(m) or qty["design_hash"] != design_hash(m)
+    else:
+        q_stale = is_stale(qty, hq)
+    return h, hq, {"results": is_stale(res, h), "design": is_stale(des, h), "quantities": q_stale}
 
 
 def validate(model):
