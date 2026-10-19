@@ -90,6 +90,40 @@ sfix.cases.forEach((cs, i) => {
     check(`fix slab${i} ${p.kind} ${k}`, near(g[k], e[k], 1e-9), `เว็บ ${g[k]} Excel ${e[k]}`);
   });
 });
+
+// เสาปลอกเดี่ยว / ฐานแผ่ (ฉบับแก้: e = M/P ไม่วนอ้างอิง)
+const cf = require('./rcwsd_colfoot_cases.json');
+cf.cases.forEach((cs, i) => {
+  const p = Object.assign({ excel: true }, cs.input), e = cs.expect, cr = W.criteria({ fcp: p.fcp, fy: p.fy, fyv: p.fyv || 2400, mode: p.mode || 1, F: p.F || 0.45 });
+  if (p.kind === 'col') {
+    p.rT = e.rT; p.rB = e.rB;
+    const r = W.columnCheck(p, cr);
+    ['LB', 'Ag', 'rho', 'Pa', 'Fa', 'Fb', 'P0', 'dp', 'Ix', 'Iy', 'Mfx', 'Mfy', 'eax', 'eay', 'ebx', 'eby', 'Pbx', 'Pby', 'Mbx', 'Mby', 'Mox', 'Moy', 'ex', 'ey', 'Pd', 'fa', 'fbx', 'fby', 'Mxd', 'Myd', 'R'].forEach(k => {
+      if (typeof e[k] === 'number') check(`col${i} ${k}`, near(r[k], e[k], 1e-9), `เว็บ ${r[k]} Excel ${e[k]}`);
+    });
+    check(`col${i} sTie`, near(Math.min(16 * W.slabBar(p.dMain, true).D, 48 * W.slabBar(p.dTie, true).D, Math.min(p.Bx, p.By)), e.sTie));
+    check(`col${i} zone`, r.zone === { 'e < ea': 1, 'ea ≤ e ≤ eb': 2, 'e > eb': 3 }[e.zone], r.zone + ' ' + e.zone);
+    if (typeof e.res === 'number') check(`col${i} ratio`, near(r.ratio, e.res, 1e-9), `${r.ratio} ${e.res}`);
+    const main = r.checks.find(c => ['pa', 'inter'].includes(c.code));
+    if (e.R > 0) check(`col${i} ผล`, main && main.ok === (e.ok === 'Ok.'), JSON.stringify(main));
+    else check(`col${i} R ≤ 0 ต้องไม่ผ่าน (Excel ขึ้น Ok.)`, !r.ok);
+  } else {
+    const r = W.footingCheck(p, cr);
+    Object.keys(e).forEach(k => { if (typeof e[k] === 'number' && r[k] !== undefined) check(`foot${i} ${k}`, near(r[k], e[k], 1e-9), `เว็บ ${r[k]} Excel ${e[k]}`); });
+    const ck = c => r.checks.find(x => x.code === c).ok;
+    check(`foot${i} ok d`, ck('d') === (e.okD === 'Ok.')); check(`foot${i} ok vb`, ck('vb') === (e.okVb === 'Ok.')); check(`foot${i} ok vp`, ck('vp') === (e.okVp === 'Ok.'));
+    check(`foot${i} ok asL`, ck('asL') === (e.okL === 'Ok.')); check(`foot${i} ok asS`, ck('asS') === (e.okS === 'Ok.'));
+    check(`foot${i} ok bondL`, ck('bondL') === (e.okBL === 'Ok.')); check(`foot${i} ok bondS`, ck('bondS') === (e.okBS === 'Ok.'));
+    check(`foot${i} ok q`, (ck('qy') && ck('qy0') && ck('qx') && ck('qx0')) === [e.okQ1, e.okQ2, e.okQ3, e.okQ4].every(v => v === 'Ok.'));
+  }
+});
+const cc = W.criteria({ fcp: 240, fy: 4000, mode: 1 });
+const cd = W.columnDesign({ L: 3, Bx: 20, By: 20, cov: 3, P: 15000, Mx: 300, My: 200, case: 1 }, cc);
+check('ออกแบบเสา ผ่าน', cd.ok, JSON.stringify({ d: cd.dMain, nX: cd.nX, nY: cd.nY, e: cd.error }));
+console.log(`  เสา: ${cd.nX + cd.nY - 4}-DB${cd.dMain} ปลอก RB${cd.dTie}@${cd.sTie}`);
+const fd = W.footingDesign({ cov: 7.5, t: 0.3, Bx: 1.2, By: 1.2, Df: 1.5, P: 30000, Mx: 300, My: 300, qa: 15000, gamma: 1800, pier: 1, bx: 0.2, by: 0.2 }, cc, { resize: true });
+check('ออกแบบฐาน ผ่าน', fd.ok, JSON.stringify({ p: fd.p, e: fd.error }));
+console.log(`  ฐาน: ${fd.p.Bx}×${fd.p.By}×${fd.p.t} DB${fd.p.dLong}@${fd.p.sLong} / DB${fd.p.dShort}@${fd.p.sShort}`);
 // ออกแบบพื้น: ผลผ่าน และระยะไม่น้อยกว่า 0.10
 const cs = W.criteria({ fcp: 240, mode: 1, fy: 2400, fyv: 2400 });
 [['two', { S: 3.5, L: 4.2, t: 0.12, cov: 2, SDL: 100, LL: 300, case: 3 }], ['one', { L: 2.5, t: 0.1, cov: 2, SDL: 50, LL: 200, type: 1 }], ['cant', { L: 1.2, t: 0.1, cov: 2, SDL: 50, LL: 200, P: 100, a: 1 }],
