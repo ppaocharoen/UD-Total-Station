@@ -617,6 +617,39 @@ function totals() {
   const grand = r2(build + eqTotal + sp);
   return { pr, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand };
 }
+// ---------------------------------------------------------------- ส่งออก Excel ตามแบบฟอร์มหน่วยงาน (lib/formxlsx.js + boq/form_template.xlsx)
+const EXCELJS = { src: 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js', sri: 'sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz' };
+function loadScript(src, sri) {
+  return new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; if (sri) { s.integrity = sri; s.crossOrigin = 'anonymous'; } s.onload = ok; s.onerror = () => no(new Error('โหลดไม่ได้: ' + src)); document.head.appendChild(s); });
+}
+function formData() {
+  const T = totals(), p = S.boq.project, fc = S.boq.factor;
+  const sections = SECTIONS.map(([c, n]) => {
+    const inSec = T.pr.filter(r => sectionOf(r.group_code) === c);
+    const codes = [...new Set(inSec.map(r => r.group_code))];
+    return { code: c, name: n, groups: codes.map(g => { const gr = inSec.filter(r => r.group_code === g);
+      return { code: g, name: gr[0].group || '', rows: gr.map(r => ({ name: r.name, qty: r.qty, unit: r.unit, mat: r.mat_unit, lab: r.lab_unit })) }; }) };
+  }).filter(s => s.groups.length);
+  return { mode: p.mode || 'estimate', project: p, people: people(), sections,
+    factor: { F: T.ff.F, advance: +fc.advance || 0, retention: +fc.retention || 0, loanShare: (+fc.loanPct || 0) / 100, table: FactorF.TABLES[`adv${+fc.advance || 0}_ret${+fc.retention || 0}`] || [] },
+    pr2: S.boq.pr2, pr3: S.boq.pr3, expect: T.grand };
+}
+async function exportXlsx() {
+  if (!S.model) { toast('เปิดโมเดลก่อน'); return; }
+  toast('กำลังสร้างไฟล์ Excel…');
+  try {
+    if (!window.ExcelJS) await loadScript(EXCELJS.src, EXCELJS.sri);
+    if (!window.FormXlsx) await loadScript('../lib/formxlsx.js?v=' + (window.UD_VERSION ? UD_VERSION.v : ''));
+    const buf = await (await fetch('form_template.xlsx', { cache: 'no-cache' })).arrayBuffer();
+    const o = await FormXlsx.build(window.ExcelJS, buf, formData());
+    const out = await o.wb.xlsx.writeBuffer();
+    const nm = (S.boq.project.mode === 'central' ? 'ราคากลาง_' : 'ประมาณราคา_') + (S.boq.project.name || 'โครงการ').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60) + '.xlsx';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    a.download = nm; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('ส่งออก ' + nm);
+  } catch (e) { console.error(e); toast('ส่งออก Excel ไม่สำเร็จ: ' + e.message); }
+}
 function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box }) {
   const est = p.mode === 'estimate', show = est ? roundDown1000(grand) : grand;   // คิดเพียง เฉพาะประมาณราคา · ราคากลางไม่ปัด
   const sig = sigHtml();
@@ -1367,6 +1400,7 @@ function bind() {
   });
   $('#b-addrow').onclick = addCustomRow;
   $('#b-add-pr2').onclick = () => { S.boq.pr2.push({ id: Survey.uid('e'), name: '', qty: 1, unit: 'ชุด', price: 0, install: 0 }); autosave(); renderPR23(); };
+  $$('[data-xlsx]').forEach(b => b.onclick = exportXlsx);
   $('#b-add-pr3').onclick = () => { S.boq.pr3.push({ id: Survey.uid('x'), name: '', qty: 1, unit: 'งาน', amount: 0, note: '' }); autosave(); renderPR23(); };
   $('#pl-start').onchange = e => { S.boq.plan.start = e.target.value; autosave(); renderPlan(); };
   $('#pl-n').onchange = e => { S.boq.plan.inst.n = Math.max(1, Math.min(24, +e.target.value || 1)); S.boq.plan.inst.assign = {}; autosave(); renderPlan(); };
