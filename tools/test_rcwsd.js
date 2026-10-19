@@ -52,5 +52,31 @@ const crit = W.criteria({ fcp: 240, F: 0.45, mode: 1, fy: 4000, fyv: 2400 });
 });
 // หน้าตัดเล็กเกิน → ไม่ผ่าน
 check('หน้าตัดเล็กเกิน', !W.beamDesign({ Mpos: 20000, Mneg: 25000, V: 30000, T: 0 }, { b: 0.15, h: 0.3, L: 6, type: 3, cov: 3 }, crit).ok);
+
+// ชีตพื้น (Two-way / One-way / Cantilever slaps) — โหมด excel: true ต้องตรงทุกค่า
+const slabs = require('./rcwsd_slab_cases.json');
+slabs.cases.forEach((cs, i) => {
+  const p = Object.assign({ excel: true }, cs.input), e = cs.expect, cr = W.criteria(p);
+  const r = p.kind === 'two' ? W.slabTwoWay(p, cr) : p.kind === 'one' ? W.slabOneWay(p, cr) : W.slabCant(p, cr);
+  const g = { fc: cr.fc, fs: cr.main.fs, k: cr.main.k, j: cr.main.j, R: cr.main.R, self: r.self, w: r.w, hmin: r.hmin, dreq: r.dreq, d: r.d };
+  if (p.kind === 'two') {
+    Object.assign(g, { m: r.m, dL: r.dL, McS: r.McS, McL: r.McL, sS: r.sS, sL: r.sL, RS: r.RS, RL: r.RL });
+    ['Sd', 'Sm', 'Sc', 'Ld', 'Lm', 'Lc'].forEach(k => { g['c' + k] = r.C[k]; g['M' + k] = r.M[k]; g['As' + k] = r.As[k]; });
+  } else Object.assign(g, { M: r.M, V: r.V, As: r.As, sMain: r.sMain, Vc: r.Vc, Mc: r.Mc, Asmin: r.Asmin, sTemp: r.sTemp, N: r.N, U: r.U, Ua: r.Ua, Vb: r.Vb });
+  Object.keys(e).forEach(k => {
+    if (k === 'bond') { check(`slab${i} bond`, (e[k] === '[Ok.]') === r.bondExcel); return; }
+    if (typeof e[k] !== 'number') return;
+    check(`slab${i} ${p.kind} ${k}`, near(g[k], e[k], 1e-9), `เว็บ ${g[k]} Excel ${e[k]}`);
+  });
+});
+// ออกแบบพื้น: ผลผ่าน และระยะไม่น้อยกว่า 0.10
+const cs = W.criteria({ fcp: 240, mode: 1, fy: 2400, fyv: 2400 });
+[['two', { S: 3.5, L: 4.2, t: 0.12, cov: 2, SDL: 100, LL: 300, case: 3 }], ['one', { L: 2.5, t: 0.1, cov: 2, SDL: 50, LL: 200, type: 1 }], ['cant', { L: 1.2, t: 0.1, cov: 2, SDL: 50, LL: 200, P: 100, a: 1 }],
+ ['two', { S: 4, L: 4, t: 0.12, cov: 2, SDL: 100, LL: 300, case: 5 }]].forEach(([k, p], i) => {
+  const d = W.slabDesign(k, p, cs, [9, 12]);
+  check(`ออกแบบพื้น ${i} ผ่าน`, d.ok, JSON.stringify({ dm: d.dm, dt: d.dt, sA: d.sA, sB: d.sB, e: d.error }));
+  console.log(`  พื้น ${i} ${k}: ${d.dm}@${d.sA} / ${d.dt}@${d.sB}`, d.ok ? 'ผ่าน' : d.error);
+});
+check('พื้นบางเกิน', !W.slabDesign('one', { L: 4.5, t: 0.1, cov: 2, SDL: 100, LL: 400, type: 1 }, cs).ok);
 console.log((ok ? 'PASS' : 'FAIL') + ` rcwsd ${n} ข้อ`);
 process.exit(ok ? 0 : 1);

@@ -2098,6 +2098,47 @@
         },
         "wire_mesh": {
           "type": "string"
+        },
+        "mesh_xy": {
+          "type": "object",
+          "description": "พื้น: เหล็กสองแนวต่างขนาด/ระยะ — x = เหล็กวางตามแนวแกน x (เรียงตามแกน y)",
+          "properties": {
+            "x": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              ],
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "[ขนาด มม., ระยะ ม.]"
+            },
+            "y": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              ],
+              "minItems": 2,
+              "maxItems": 2
+            },
+            "layers": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },

@@ -525,3 +525,5 @@ table.dsg-calc td:nth-child(1){width:15%}table.dsg-calc td:nth-child(3){width:19
   #dsg-printout .d-ok{color:#000}#dsg-printout .d-ng{color:#a00}
   #dsg-printout .dsg-sec .con{fill:#fff;stroke:#000}#dsg-printout .dsg-sec .stp{stroke:#000}#dsg-printout .dsg-sec circle{fill:#000}
 }
+.dsg-cant{font-size:11px;margin-top:3px;display:flex;flex-wrap:wrap;gap:3px;align-items:center}.dsg-cant input.price{width:56px}
+.dsg-actions{padding-top:10px;padding-bottom:10px}

@@ -42,6 +42,8 @@ async function cmp(label, m) {
   const m2 = clone(m); m2.design.slabs[m.slabs[0].id].rebar = { wire_mesh: 'WM-4@0.20' }; delete m2.design.supports[Object.keys(m2.design.supports)[0]];
   await cmp('ตะแกรงสำเร็จรูป + ฐานไม่มีเหล็ก', m2);
   const m3 = clone(m); m3.design = {}; await cmp('ไม่มี design', m3);
+  const m4 = clone(m); m4.design.slabs[m.slabs[0].id].rebar = { mesh_xy: { x: [9, 0.15], y: [12, 0.2] } }; await cmp('พื้นเหล็กสองแนว', m4);
+  const m5 = clone(m); m5.design.slabs[m.slabs[0].id].rebar = { mesh_xy: { x: [9, 0.125], y: [9, 0.25], layers: 2 } }; await cmp('พื้นเหล็กสองแนว 2 ชั้น', m5);
   check('pyJson เลขยกกำลัง', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]) === '[1e-05,1.5e-07,0.0001,2.5]', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]));
   console.log((ok ? 'PASS' : 'FAIL') + ` rebartk ${n} ข้อ`);
   process.exit(ok ? 0 : 1);

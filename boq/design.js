@@ -1,12 +1,13 @@
 /* design.js — แท็บออกแบบโครงสร้าง (WSD) ใช้ lib/rcwsd.js
- * ส่วนแรก: เกณฑ์ออกแบบ + คาน (กลางช่วง +M / ที่ฐานรองรับ −M / เฉือน / บิด) → เหล็กเสริมเขียนลง design.members ของโมเดล
+ * เกณฑ์ออกแบบ + คาน (กลางช่วง +M / ที่ฐานรองรับ −M / เฉือน / บิด) + พื้น (สองทาง / ทางเดียว / ยื่น) → เหล็กเสริมเขียนลง design ของโมเดล
  * ใช้ตัวแปรร่วมจาก app.js: S, $, $$, esc, fmt, toast, download, autosave, buildLayers
  */
 'use strict';
-const DSG_DEF = () => ({ crit: { F: 0.45, mode: 1, fy: 4000, fyv: 2400, cov: 2.5, dias: [12, 16, 20, 25] }, beams: {}, sel: '' });
+const DSG_DEF = () => ({ crit: { F: 0.45, mode: 1, fy: 4000, fyv: 2400, cov: 2.5, dias: [12, 16, 20, 25], slabFy: 2400, slabCov: 2, slabDias: [9, 12] }, beams: {}, slabs: {}, sel: '' });
+const SLAB_DIAS = fy => fy <= 2400 ? [9, 12, 15] : [10, 12, 16];
 function dsg() {
   const b = S.boq; if (!b.dsg) b.dsg = DSG_DEF();
-  const d = b.dsg; d.crit = Object.assign(DSG_DEF().crit, d.crit || {}); d.beams = d.beams || {}; return d;
+  const d = b.dsg; d.crit = Object.assign(DSG_DEF().crit, d.crit || {}); d.beams = d.beams || {}; d.slabs = d.slabs || {}; return d;
 }
 const df2 = (x, n = 2) => (x === null || x === undefined || Number.isNaN(+x)) ? '-' : (+x).toLocaleString('en-US', { minimumFractionDigits: n, maximumFractionDigits: n });
 const okTag = ok => ok ? '<b class="d-ok">[Ok.]</b>' : '<b class="d-ng">[Fail]</b>';
@@ -75,6 +76,7 @@ function renderDesign() {
   const D = dsg(), c = D.crit, beams = dsgBeamList(), fcp = beams[0] ? beams[0].fcp : dsgFcp(''), cr = dsgCrit(fcp);
   S.dsgOut = {};
   beams.forEach(bm => { S.dsgOut[bm.id] = dsgRun(bm); });
+  const slabs = dsgSlabList(); S.dsgSlab = {}; slabs.forEach(sl => { S.dsgSlab[sl.id] = dsgSlabRun(sl); });
   const nRes = Object.keys((S.model.results && S.model.results.members) || {}).length;
   const opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
   const done = beams.filter(b => S.dsgOut[b.id]), pass = done.filter(b => S.dsgOut[b.id].ok).length;
@@ -87,16 +89,20 @@ function renderDesign() {
       <label>เหล็กหลัก<select data-dc="fy">${opt(3000, c.fy, 'SD30 (fy 3,000)')}${opt(4000, c.fy, 'SD40 (fy 4,000)')}${opt(5000, c.fy, 'SD50 (fy 5,000)')}</select></label>
       <label>เหล็กปลอก<select data-dc="fyv">${opt(2400, c.fyv, 'SR24 (fy 2,400)')}</select></label>
       <label>ระยะหุ้มคาน (ซม.)<input data-dc="cov" inputmode="decimal" value="${esc(c.cov)}"></label>
+      <label>เหล็กพื้น<select data-dc="slabFy">${opt(2400, c.slabFy, 'SR24 (fy 2,400)')}${opt(3000, c.slabFy, 'SD30 (fy 3,000)')}${opt(4000, c.slabFy, 'SD40 (fy 4,000)')}</select></label>
+      <label>ระยะหุ้มพื้น (ซม.)<input data-dc="slabCov" inputmode="decimal" value="${esc(c.slabCov)}"></label>
       <div class="dsg-dias"><span>ขนาดเหล็กหลักที่ใช้</span>${[12, 16, 20, 25, 28].map(d => `<label class="ck"><input type="checkbox" data-dia="${d}" ${(c.dias || []).map(Number).includes(d) ? 'checked' : ''}>DB${d}</label>`).join('')}</div>
+      <div class="dsg-dias"><span>ขนาดเหล็กพื้นที่ใช้</span>${SLAB_DIAS(+c.slabFy).map(d => `<label class="ck"><input type="checkbox" data-sdia="${d}" ${(c.slabDias || []).map(Number).includes(d) ? 'checked' : ''}>${RcWsd.barName(d, +c.slabFy)}</label>`).join('')}</div>
     </div>
     <div class="table-wrap"><table class="boq dsg-kv"><tr><th>fc</th><th>fs เหล็กหลัก</th><th>fs ปลอก</th><th>Ec</th><th>n</th><th>k</th><th>j</th><th>R</th><th>vc</th></tr>
       <tr><td class="r">${df2(cr.fc)}${cr.capped ? ' <span class="pill warn">จำกัด 65</span>' : ''}</td><td class="r">${df2(cr.main.fs, 0)}</td><td class="r">${df2(cr.stir.fs, 0)}</td><td class="r">${df2(cr.Ec, 0)}</td><td class="r">${df2(cr.n, 3)}${cr.nOk ? '' : ' <span class="pill err">&lt; 6</span>'}</td><td class="r">${df2(cr.main.k, 4)}</td><td class="r">${df2(cr.main.j, 4)}</td><td class="r">${df2(cr.main.R, 3)}</td><td class="r">${df2(cr.vc, 3)}</td></tr></table></div>
     ${cr.note ? `<p class="d-note">หมายเหตุที่ต้องระบุในแบบ: ${esc(cr.note)}</p>` : ''}
     <p class="hint">ที่มา: รายการคำนวณ RC_Design_WSD (สูตรเดียวกันทุกเซลล์) · ประกาศ มท. การออกแบบอาคารและคุณสมบัติวัสดุ 2567</p>
   </div>
+  <div class="card dsg-actions"><div class="btn-row"><button class="btn primary" id="dsg-write">เขียนเหล็กคานและพื้นลงโมเดล</button><button class="btn" id="dsg-dl">ดาวน์โหลด .bm.json</button><button class="btn" id="dsg-print">พิมพ์รายการคำนวณ</button></div>
+    <p class="hint">เขียนแล้ว 3D และ ปร.1 อัปเดตเหล็กเสริมทันที · พิมพ์: ถ้าเลือกแถวไว้จะพิมพ์ตัวนั้น ไม่เลือกจะพิมพ์ทุกตัวที่ออกแบบได้</p></div>
   <div class="card"><h2>คาน คสล. <span class="hint">${done.length}/${beams.length} ตัวมีแรง · ผ่าน ${pass}</span></h2>
     <p class="hint">${nRes ? `แรงจากผลวิเคราะห์ SAP (${nRes} ชิ้น) — แก้ในช่องได้ ช่องที่แก้จะใช้แทนผล SAP` : 'ยังไม่มีผลวิเคราะห์ SAP ในโมเดล — กรอก M+ (กลางช่วง) M− (ที่ฐานรองรับ) V T ของแต่ละคาน หรือรัน tools/sap_results.py --write'} · ประเภทคานเดาจากการต่อเนื่องของคานในแนวเดียวกัน แก้ได้</p>
-    <div class="btn-row"><button class="btn primary" id="dsg-write">เขียนเหล็กลงโมเดล</button><button class="btn" id="dsg-dl">ดาวน์โหลด .bm.json</button><button class="btn" id="dsg-print">พิมพ์รายการคำนวณ</button></div>
     <div class="table-wrap"><table class="boq dsg-tab"><tr><th>คาน</th><th>b×h (ม.)</th><th>L (ม.)</th><th>ประเภท</th><th>M+ กก.-ม.</th><th>M− กก.-ม.</th><th>V กก.</th><th>T กก.-ม.</th><th>เหล็กเสริม</th><th>ratio</th><th></th></tr>
     ${beams.map(bm => {
       const r = S.dsgOut[bm.id], u = D.beams[bm.id] || {}, inp = dsgInput(bm);
@@ -110,12 +116,28 @@ function renderDesign() {
     }).join('')}</table></div>
     <p class="hint">* = ประเภทที่ระบบเดา · ratio = แรงที่ต้องรับ ÷ ที่หน้าตัดรับได้ (เหล็ก/หน่วยแรงเฉือน ค่ามากสุด) · เหล็กเสริมบนยาว 2/3 ช่วง เหล็กเสริมล่างยาว 0.75 ช่วง (ตามวิธีถอดปริมาณ)</p>
   </div>
-  <div id="dsg-report">${D.sel && S.dsgOut[D.sel] ? beamReport(beams.find(b => b.id === D.sel), S.dsgOut[D.sel]) : '<div class="card hint">แตะแถวคานเพื่อดูรายการคำนวณ</div>'}</div>`;
-  bindDesign(beams);
+  ${slabCard(slabs)}
+  <div id="dsg-report">${D.sel && D.sel.startsWith('slab:') && S.dsgSlab[D.sel.slice(5)] && S.dsgSlab[D.sel.slice(5)].r ? slabReport(slabs.find(x => x.id === D.sel.slice(5)), S.dsgSlab[D.sel.slice(5)])
+    : D.sel && S.dsgOut[D.sel] ? beamReport(beams.find(b => b.id === D.sel), S.dsgOut[D.sel]) : '<div class="card hint">แตะแถวคานหรือพื้นเพื่อดูรายการคำนวณ</div>'}</div>`;
+  bindDesign(beams, slabs);
 }
-function bindDesign(beams) {
+function bindDesign(beams, slabs) {
   const D = dsg(), re = () => { autosave(); renderDesign(); };
-  $$('#dsg-body [data-dc]').forEach(el => el.onchange = () => { const k = el.dataset.dc; D.crit[k] = k === 'cov' ? (+el.value || 2.5) : +el.value; re(); });
+  $$('#dsg-body [data-dc]').forEach(el => el.onchange = () => {
+    const k = el.dataset.dc; D.crit[k] = k === 'cov' ? (+el.value || 2.5) : k === 'slabCov' ? (+el.value || 2) : +el.value;
+    if (k === 'slabFy') D.crit.slabDias = SLAB_DIAS(+el.value).slice(0, 2);
+    re();
+  });
+  $$('#dsg-body [data-sdia]').forEach(el => el.onchange = () => { const s = new Set((D.crit.slabDias || []).map(Number)); el.checked ? s.add(+el.dataset.sdia) : s.delete(+el.dataset.sdia); if (!s.size) { el.checked = true; return toast('ต้องเลือกอย่างน้อย 1 ขนาด'); } D.crit.slabDias = [...s].sort((a, b) => a - b); re(); });
+  $$('#dsg-body tr[data-sl]').forEach(tr => {
+    const id = tr.dataset.sl;
+    tr.querySelectorAll('[data-sf]').forEach(el => el.onchange = () => {
+      const u = D.slabs[id] = D.slabs[id] || {}, k = el.dataset.sf, v = el.value.trim().replace(/,/g, '');
+      if (k === 'type') u.type = v; else if (v === '') delete u[k]; else u[k] = Math.abs(+v) || 0;
+      D.sel = 'slab:' + id; re();
+    });
+    tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION'].includes(e.target.tagName)) return; D.sel = 'slab:' + id; renderDesign(); const r = $('#dsg-report'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  });
   $$('#dsg-body [data-dia]').forEach(el => el.onchange = () => { const s = new Set((D.crit.dias || []).map(Number)); el.checked ? s.add(+el.dataset.dia) : s.delete(+el.dataset.dia); if (!s.size) { el.checked = true; return toast('ต้องเลือกอย่างน้อย 1 ขนาด'); } D.crit.dias = [...s].sort((a, b) => a - b); re(); });
   $$('#dsg-body tr[data-bm]').forEach(tr => {
     const id = tr.dataset.bm;
@@ -126,11 +148,11 @@ function bindDesign(beams) {
     });
     tr.addEventListener('click', e => { if (['INPUT', 'SELECT', 'OPTION'].includes(e.target.tagName)) return; D.sel = id; renderDesign(); const r = $('#dsg-report'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   });
-  $('#dsg-write').onclick = () => dsgWrite(beams);
+  $('#dsg-write').onclick = () => dsgWrite(beams, slabs);
   $('#dsg-dl').onclick = () => { download(S.modelName.replace(/(\.bm)?\.json$/, '') + '.bm.json', JSON.stringify(S.model, null, 1)); };
-  $('#dsg-print').onclick = () => dsgPrint(beams);
+  $('#dsg-print').onclick = () => dsgPrint(beams, slabs);
 }
-function dsgWrite(beams) {
+function dsgWrite(beams, slabs) {
   const m = S.model, c = dsg().crit, D = dsg(); m.design = m.design || {}; m.design.members = m.design.members || {};
   let n = 0; D.applied = D.applied || {};
   beams.forEach(bm => {
@@ -140,9 +162,16 @@ function dsgWrite(beams) {
       status: 'computed', src: `UD Total Station v${UD_VERSION.v} ออกแบบ WSD (fc ${df2(r.crit.fc, 0)} ksc, ${r.crit.main.grade}/${r.crit.stir.grade}, หุ้ม ${c.cov} ซม.)` };
     n++;
   });
-  if (!n) return toast('ยังไม่มีคานที่ออกแบบได้ — กรอกแรงก่อน');
+  let ns = 0; m.design.slabs = m.design.slabs || {}; D.appliedSlabs = D.appliedSlabs || {};
+  (slabs || []).forEach(sl => {
+    const o = S.dsgSlab[sl.id]; if (!o || !o.rebar) return;
+    m.design.slabs[sl.id] = D.appliedSlabs[sl.id] = { method: 'WSD', rebar: o.rebar, pass: !!o.ok, governing: o.label, status: 'computed',
+      src: `UD Total Station v${UD_VERSION.v} ออกแบบพื้น WSD (fc ${df2(o.crit.fc, 0)} ksc, ${o.crit.main.grade}, หุ้ม ${c.slabCov} ซม.)` };
+    ns++;
+  });
+  if (!n && !ns) return toast('ยังไม่มีคานหรือพื้นที่ออกแบบได้ — กรอกแรง/น้ำหนักบรรทุกก่อน');
   autosave();
-  dsgRequantify().then(msg => toast(`เขียนเหล็กเสริมคาน ${n} ตัวลงโมเดลแล้ว · ${msg}`));
+  dsgRequantify().then(msg => toast(`เขียนเหล็กเสริม คาน ${n} ตัว · พื้น ${ns} แผ่น ลงโมเดลแล้ว · ${msg}`));
 }
 /** ถอดปริมาณเหล็กเสริมใหม่ในเว็บ (lib/rebartk.js วิธีเดียวกับ takeoff.py) แล้วอัปเดต 3D / ปร.1 / แผนงาน */
 async function dsgRequantify() {
@@ -161,20 +190,27 @@ async function dsgRequantify() {
 }
 /** เปิดโมเดลซ้ำ: ใส่ผลออกแบบที่เคยเขียน (เก็บในงาน BOQ ของเบราว์เซอร์นี้) กลับเข้าโมเดล */
 function dsgOnLoad() {
-  const A = (S.boq.dsg || {}).applied; if (!A || !S.model) return false;
+  const A = (S.boq.dsg || {}).applied || {}; if (!S.model || !S.boq.dsg) return false;
   const m = S.model, ids = new Set((m.members || []).map(x => x.id)); m.design = m.design || {}; m.design.members = m.design.members || {};
   let n = 0;
   for (const [id, e] of Object.entries(A)) {
     if (!ids.has(id)) { delete A[id]; continue; }
     if (JSON.stringify((m.design.members[id] || {}).rebar) !== JSON.stringify(e.rebar)) { m.design.members[id] = e; n++; }
   }
-  if (n) dsgRequantify().then(msg => toast(`ใส่ผลออกแบบคาน ${n} ตัวที่เคยเขียนไว้กลับเข้าโมเดล · ${msg}`));
+  const AS = (S.boq.dsg || {}).appliedSlabs || {}, sids = new Set((m.slabs || []).map(x => x.id)); m.design.slabs = m.design.slabs || {};
+  for (const [id, e] of Object.entries(AS)) {
+    if (!sids.has(id)) { delete AS[id]; continue; }
+    if (JSON.stringify((m.design.slabs[id] || {}).rebar) !== JSON.stringify(e.rebar)) { m.design.slabs[id] = e; n++; }
+  }
+  if (n) dsgRequantify().then(msg => toast(`ใส่ผลออกแบบ ${n} ชิ้นที่เคยเขียนไว้กลับเข้าโมเดล · ${msg}`));
   return n > 0;
 }
-function dsgPrint(beams) {
-  const D = dsg(), list = D.sel ? beams.filter(b => b.id === D.sel) : beams.filter(b => S.dsgOut[b.id] && S.dsgOut[b.id].rebar);
-  if (!list.length) return toast('ยังไม่มีรายการคำนวณ');
-  $('#dsg-printout').innerHTML = list.map(b => beamReport(b, S.dsgOut[b.id])).join('');
+function dsgPrint(beams, slabs) {
+  const D = dsg(), sel = D.sel || '';
+  const bl = sel ? beams.filter(b => b.id === sel) : beams.filter(b => S.dsgOut[b.id] && S.dsgOut[b.id].rebar);
+  const sl = sel ? slabs.filter(x => 'slab:' + x.id === sel && S.dsgSlab[x.id] && S.dsgSlab[x.id].r) : slabs.filter(x => S.dsgSlab[x.id] && S.dsgSlab[x.id].r);
+  if (!bl.length && !sl.length) return toast('ยังไม่มีรายการคำนวณ');
+  $('#dsg-printout').innerHTML = bl.map(b => beamReport(b, S.dsgOut[b.id])).join('') + sl.map(x => slabReport(x, S.dsgSlab[x.id])).join('');
   document.body.classList.add('print-dsg');
   setTimeout(() => { window.print(); document.body.classList.remove('print-dsg'); }, 300);
 }
@@ -249,4 +285,128 @@ function beamReport(bm, d) {
     <div class="dsg-secs">${d.mid ? secSvg(d.mid, 'กลางช่วง') : ''}${secSvg(d.sup, 'ที่ฐานรองรับ')}</div>
     ${d.error ? `<p class="d-ng">${esc(d.error)}</p>` : ''}${C.note ? `<p class="d-note">${esc(C.note)}</p>` : ''}
   </div>`;
+}
+
+// ------------------------------------------------------------------ พื้น (ชีต Two-way / One-way / Cantilever slaps)
+const SLAB_TYPES = [['two:1', 'สองทาง · ต่อเนื่อง 4 ด้าน'], ['two:2', 'สองทาง · ไม่ต่อเนื่อง 1 ด้าน'], ['two:3', 'สองทาง · ไม่ต่อเนื่อง 2 ด้าน'], ['two:4', 'สองทาง · ไม่ต่อเนื่อง 3 ด้าน'], ['two:5', 'สองทาง · ไม่ต่อเนื่อง 4 ด้าน'],
+  ['one:1', 'ทางเดียว · ช่วงเดียว'], ['one:2', 'ทางเดียว · ต่อเนื่องปลายเดียว'], ['one:3', 'ทางเดียว · ต่อเนื่องสองปลาย'], ['cant', 'พื้นยื่น']];
+const slabTypeTh = t => (SLAB_TYPES.find(x => x[0] === t) || [, t])[1];
+/** พื้นในโมเดล + ช่วงสั้น/ยาว + ด้านที่ต่อเนื่อง (มีพื้นหล่อในที่ระดับเดียวกันชิดขอบ) + น้ำหนักบรรทุกจาก area_loads */
+function dsgSlabList() {
+  const m = S.model; if (!m) return [];
+  const ms = m.materials || [], L = m.loads || {}, pats = Object.fromEntries((L.patterns || []).map(p => [p.id, p.kind]));
+  const bb = s => { const xs = s.polygon.map(p => p[0]), ys = s.polygon.map(p => p[1]); return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) }; };
+  const ov = (a0, a1, b0, b1) => Math.min(a1, b1) - Math.max(a0, b0), near = (a, b) => Math.abs(a - b) < 0.02;
+  const all = m.slabs || [];
+  return all.map(s => {
+    const b = bb(s), Lx = b.x1 - b.x0, Ly = b.y1 - b.y0, shortX = Lx <= Ly;
+    const mt = ms.find(y => y.id === s.material && y.kind === 'concrete') || ms.find(y => y.kind === 'concrete') || {};
+    const oth = all.filter(o => o !== s && o.kind === 'cast' && Math.abs(o.top - s.top) <= 0.02).map(bb);
+    const cont = { x0: oth.some(o => near(o.x1, b.x0) && ov(o.y0, o.y1, b.y0, b.y1) > 0.1), x1: oth.some(o => near(o.x0, b.x1) && ov(o.y0, o.y1, b.y0, b.y1) > 0.1),
+      y0: oth.some(o => near(o.y1, b.y0) && ov(o.x0, o.x1, b.x0, b.x1) > 0.1), y1: oth.some(o => near(o.y0, b.y1) && ov(o.x0, o.x1, b.x0, b.x1) > 0.1) };
+    const S0 = Math.min(Lx, Ly), L0 = Math.max(Lx, Ly), nCont = Object.values(cont).filter(Boolean).length;
+    const ends = (shortX ? [cont.x0, cont.x1] : [cont.y0, cont.y1]).filter(Boolean).length;
+    const auto = S0 / L0 < 0.5 ? 'one:' + (ends === 2 ? 3 : ends === 1 ? 2 : 1) : 'two:' + (5 - nCont);
+    let sdl = null, ll = null;
+    (L.area_loads || []).filter(a => (a.targets || []).includes(s.id)).forEach(a => {
+      const k = pats[a.pattern];
+      if (k === 'live' || k === 'roof_live') ll = (ll || 0) + (+a.value || 0); else if (k && k !== 'wind' && k !== 'dead') sdl = (sdl || 0) + (+a.value || 0);
+    });
+    const rect = s.polygon.length === 4 && Math.abs(Lx * Ly - Math.abs(s.polygon.reduce((a, p, i) => { const q = s.polygon[(i + 1) % 4]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2) < 0.01;
+    return { id: s.id, mark: s.mark || '', kind: s.kind, level: s.level || '', t: +s.t, Lx, Ly, S: S0, L: L0, shortX, auto, cont, rect, unitW: +mt.unit_weight || 2400, fcp: +mt.fc || 240, sdl, ll, use: s.use || '' };
+  });
+}
+function dsgSlabInput(sl) {
+  const u = dsg().slabs[sl.id] || {}, has = k => u[k] !== undefined && u[k] !== '';
+  const type = u.type || sl.auto;
+  return { type, SDL: has('SDL') ? +u.SDL : sl.sdl, LL: has('LL') ? +u.LL : sl.ll, P: has('P') ? +u.P : 0, a: has('a') ? +u.a : 0, Lc: has('Lc') ? +u.Lc : sl.S,
+    src: (has('SDL') || has('LL')) ? 'กรอกเอง' : (sl.sdl !== null || sl.ll !== null) ? 'จากโมเดล' : '' };
+}
+function dsgSlabRun(sl) {
+  if (sl.kind !== 'cast') return { skip: sl.kind === 'ground' ? 'พื้นวางบนดิน — ออกแบบในชุดถัดไป (จากไฟล์ Neo)' : 'พื้นสำเร็จรูป — ใช้ตามผู้ผลิต' };
+  const c = dsg().crit, inp = dsgSlabInput(sl);
+  if (inp.LL === null || inp.LL === undefined) return { need: 'ใส่น้ำหนักบรรทุกจร (LL)', inp };
+  const crit = RcWsd.criteria({ fcp: sl.fcp, F: +c.F, mode: +c.mode, fy: +c.slabFy, fyv: +c.fyv });
+  const [kind, cs] = inp.type.split(':');
+  const base = { t: sl.t, cov: +c.slabCov, unitW: sl.unitW, SDL: inp.SDL || 0, LL: inp.LL };
+  const p = kind === 'two' ? Object.assign(base, { S: sl.S, L: sl.L, case: +cs }) : kind === 'one' ? Object.assign(base, { L: sl.S, type: +cs }) : Object.assign(base, { L: inp.Lc, P: inp.P, a: inp.a });
+  const d = RcWsd.slabDesign(kind, p, crit, (c.slabDias || []).map(Number));
+  const main = [d.dm, d.sA], sec = [d.dt, d.sB];   // main = เหล็กวางตามช่วงสั้น (หรือแนวยื่น)
+  const rebar = { mesh_xy: sl.shortX ? { x: main, y: sec } : { x: sec, y: main } };
+  return { r: d.r, ok: d.ok, error: d.error || '', d, crit, inp, kind, p, rebar, label: slabTypeTh(inp.type) };
+}
+const slabRbText = (o, fy) => {
+  if (!o || !o.d) return '';
+  const n = d => RcWsd.barName(d, fy);
+  return o.kind === 'two' ? `ช่วงสั้น ${n(o.d.dm)} @${o.d.sA} · ช่วงยาว ${n(o.d.dt)} @${o.d.sB}` : `เหล็กหลัก ${n(o.d.dm)} @${o.d.sA} · กันร้าว ${n(o.d.dt)} @${o.d.sB}`;
+};
+function slabCard(slabs) {
+  const D = dsg(), c = D.crit, opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
+  const dsn = slabs.filter(x => S.dsgSlab[x.id] && S.dsgSlab[x.id].r), pass = dsn.filter(x => S.dsgSlab[x.id].ok).length;
+  return `<div class="card"><h2>พื้น คสล. <span class="hint">${dsn.length}/${slabs.length} แผ่นออกแบบได้ · ผ่าน ${pass}</span></h2>
+    <p class="hint">น้ำหนักบรรทุกคงที่เพิ่ม (SDL) และจร (LL) ดึงจาก area_loads ของโมเดล ถ้าไม่มีให้กรอก · ประเภทเดาจาก S/L และพื้นข้างเคียงที่ชิดขอบ แก้ได้ · น้ำหนักพื้นคิดจากความหนา × หน่วยน้ำหนักวัสดุ</p>
+    ${slabs.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>พื้น</th><th>S×L (ม.)</th><th>t (ม.)</th><th>ประเภท</th><th>SDL กก./ตร.ม.</th><th>LL กก./ตร.ม.</th><th>เหล็กเสริม</th><th></th></tr>
+    ${slabs.map(sl => {
+      const o = S.dsgSlab[sl.id], u = D.slabs[sl.id] || {}, inp = dsgSlabInput(sl), cast = sl.kind === 'cast';
+      const cell = (k, v) => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-sf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (v === null || v === undefined ? '' : esc(v))}" placeholder="-">`;
+      return `<tr class="row ${D.sel === 'slab:' + sl.id ? 'sel' : ''}" data-sl="${esc(sl.id)}"><td class="c-name"><b>${esc(sl.mark)}</b> <span class="hint">${esc(sl.id)}</span>${sl.use ? `<span class="src">${esc(sl.use)}</span>` : ''}${sl.rect ? '' : '<span class="warnline">ไม่ใช่สี่เหลี่ยมผืนผ้า — ใช้กรอบนอก</span>'}</td>
+        <td class="r" data-l="S×L (ม.)">${df2(sl.S)}×${df2(sl.L)}</td><td class="r" data-l="t (ม.)">${df2(sl.t)}</td>
+        <td data-l="ประเภท">${cast ? `<select data-sf="type">${SLAB_TYPES.map(([v, t]) => opt(v, inp.type, t + (v === sl.auto ? ' *' : ''))).join('')}</select>${inp.type === 'cant' ? `<div class="dsg-cant">ยื่น ${cell('Lc', df2(inp.Lc))} ม. · P ${cell('P', 0)} กก./ม. ที่ ${cell('a', 0)} ม.</div>` : ''}` : `<span class="hint">${sl.kind === 'ground' ? 'วางบนดิน' : 'สำเร็จรูป'}</span>`}</td>
+        <td data-l="SDL กก./ตร.ม.">${cast ? cell('SDL', sl.sdl) : ''}</td><td data-l="LL กก./ตร.ม.">${cast ? cell('LL', sl.ll) : ''}</td>
+        <td class="dsg-rb">${o.r ? esc(slabRbText(o, +c.slabFy)) + (o.error ? `<span class="warnline">${esc(o.error)}</span>` : '') : `<span class="hint">${esc(o.skip || o.need || '')}</span>`}</td>
+        <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
+    }).join('')}</table></div>` : '<p class="hint">ไม่มีพื้นในโมเดล</p>'}
+    <p class="hint">* = ประเภทที่ระบบเดา · เหล็กพื้นเขียนลงโมเดลเป็นเหล็กสองแนว (ช่วงสั้น/ยาว หรือ หลัก/กันร้าว) ใช้ถอดปริมาณ</p>
+  </div>`;
+}
+function slabReport(sl, o) {
+  if (!sl || !o || !o.r) return '';
+  const r = o.r, C = o.crit, p = o.p, fy = C.fy, pj = S.boq.project || {}, bn = d => RcWsd.barName(d, fy);
+  const row = (a, eq, v, u = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${u}</td><td>${tag}</td></tr>`;
+  const ck = k => (r.checks.find(x => x.code === k) || {}).ok;
+  const head = `<div class="dsg-head"><b>${o.kind === 'two' ? 'Two-way slabs' : o.kind === 'one' ? 'One-way slabs' : 'Cantilever slabs'} Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>พื้น <b>${esc(sl.mark)}</b> (${esc(sl.id)}) ${sl.level ? 'ชั้น ' + esc(sl.level) : ''} · ${esc(o.label)} · น้ำหนักบรรทุกจาก${esc(o.inp.src || '-')}</div>`;
+  const data = `<h4>1. ข้อมูล</h4><table class="dsg-calc">
+    ${row("f'c / fc", `fc = ${C.F} f'c${C.capped ? ' ≤ 65' : ''}`, `${df2(C.fcp, 0)} / ${df2(C.fc, 2)}`, 'ksc')}${row('fy / fs', C.main.grade, `${df2(fy, 0)} / ${df2(C.main.fs, 0)}`, 'ksc')}
+    ${row('n, k, j, R', '', `${df2(C.n, 3)} · ${df2(C.main.k, 4)} · ${df2(C.main.j, 4)} · ${df2(C.main.R, 3)}`, '', okTag(C.nOk))}
+    ${row('ความหนา', '', df2(p.t, 2), 'ม.')}${row('ระยะหุ้ม', '', df2(p.cov, 1), 'ซม.')}
+    ${row('น้ำหนักพื้น', `${df2(p.unitW, 0)} × ${df2(p.t, 2)}`, df2(r.self, 0), 'กก./ตร.ม.')}${row('w', 'น้ำหนักพื้น + SDL + LL', `${df2(r.self, 0)} + ${df2(p.SDL, 0)} + ${df2(p.LL, 0)} = ${df2(r.w, 0)}`, 'กก./ตร.ม.')}
+  </table>`;
+  let body;
+  if (o.kind === 'two') {
+    const lab = { Sc: 'M− ต่อเนื่อง', Sd: 'M− ไม่ต่อเนื่อง', Sm: 'M+ กลางช่วง', Lc: 'M− ต่อเนื่อง', Ld: 'M− ไม่ต่อเนื่อง', Lm: 'M+ กลางช่วง' };
+    const mrow = (k, dir) => row(lab[k], `C = ${df2(r.C[k], 4)} · C·w·S²`, df2(r.M[k], 2), 'กก.-ม./ม.', r.s[k] === null ? '' : `As ${df2(r.As[k], 3)} → s ${df2(r.s[k], 2)} ม.`);
+    body = `<h4>2. ตรวจความหนา</h4><table class="dsg-calc">
+      ${row('S, L, m', 'm = S/L (ไม่น้อยกว่า 0.50)', `${df2(p.S)} · ${df2(p.L)} · ${df2(r.m, 2)}`, 'ม.')}
+      ${row('t min', '≥ 8 ซม. และ ≥ เส้นรอบรูป/180', df2(r.hmin, 3), 'ม.', `≤ ${df2(p.t)} ${okTag(ck('hmin'))}`)}
+      ${row('d ช่วงสั้น / ยาว', 't − หุ้ม − ½D · t − หุ้ม − Dสั้น − ½Dยาว', `${df2(r.d)} / ${df2(r.dL)}`, 'ซม.')}
+      ${row('d ต้องการ', '√(M max / R)', df2(r.dreq, 2), 'ซม.', okTag(ck('dreq')))}
+    </table>
+    <h4>3. โมเมนต์ (ตารางสัมประสิทธิ์ ว.ส.ท. · ${esc(o.label)})</h4><table class="dsg-calc">
+      <tr><td colspan="5"><b>ช่วงสั้น S = ${df2(p.S)} ม.</b></td></tr>${mrow('Sc')}${mrow('Sd')}${mrow('Sm')}
+      ${row('Mc ช่วงสั้น', 'R·b·d²', df2(r.McS, 2), 'กก.-ม./ม.', okTag(ck('mcS')))}
+      <tr><td colspan="5"><b>ช่วงยาว L = ${df2(p.L)} ม.</b></td></tr>${mrow('Lc')}${mrow('Ld')}${mrow('Lm')}
+      ${row('Mc ช่วงยาว', 'R·b·d²', df2(r.McL, 2), 'กก.-ม./ม.', okTag(ck('mcL')))}
+    </table>
+    <h4>4. เหล็กเสริม</h4><table class="dsg-calc">
+      ${row('As min', `ρ·b·t (ρ = ${RcWsd.rhoTemp(fy)})`, df2(r.Asmin, 2), 'ตร.ซม./ม.')}
+      ${row('ระยะช่วงสั้น', 'min(3t, ทุกโมเมนต์, As min, 0.45)', df2(r.sS, 2), 'ม.', `ใช้ ${bn(o.d.dm)} @${o.d.sA}`)}
+      ${row('ระยะช่วงยาว', 'min(3t, ทุกโมเมนต์, As min, 0.45)', df2(r.sL, 2), 'ม.', `ใช้ ${bn(o.d.dt)} @${o.d.sB}`)}
+      ${row('แรงลงคานช่วงสั้น', 'w·S/3', df2(r.RS, 2), 'กก./ม.')}${row('แรงลงคานช่วงยาว', 'w·S/3·(3 − m²)/2', df2(r.RL, 2), 'กก./ม.')}
+    </table>`;
+  } else {
+    const one = o.kind === 'one';
+    body = `<h4>2. โมเมนต์และแรงเฉือน</h4><table class="dsg-calc">
+      ${one ? row('M', `w·L²/${{ 1: 8, 2: 9, 3: 10 }[p.type]}`, df2(r.M, 2), 'กก.-ม./ม.') : row('M', 'w·L²/2 + P·a', df2(r.M, 2), 'กก.-ม./ม.')}
+      ${one ? row('V', `${p.type === 1 ? '' : '1.15·'}w·L/2 − w·d`, df2(r.V, 2), 'กก./ม.') : row('V', 'w·L + P', df2(r.V, 2), 'กก./ม.')}
+      ${row('t min', one ? `L/${{ 1: 20, 2: 24, 3: 28 }[p.type]}${fy >= 4000 ? '' : '·(0.4 + fy/7000)'}` : `L/10${fy >= 4000 ? '' : '·(0.4 + fy/7000)'}`, df2(r.hmin, 3), 'ม.', `≤ ${df2(p.t)} ${okTag(ck('hmin'))}`)}
+      ${row('d', 't − หุ้ม − ½D', df2(r.d, 2), 'ซม.')}${row('d ต้องการ', '√(M/R)', df2(r.dreq, 2), 'ซม.', okTag(ck('dreq')))}
+      ${row('Vc', "0.29√f'c·b·d", df2(r.Vc, 0), 'กก./ม.', okTag(ck('vc')))}${row('Mc', 'R·b·d²', df2(r.Mc, 2), 'กก.-ม./ม.', okTag(ck('mc')))}
+    </table>
+    <h4>3. เหล็กเสริม</h4><table class="dsg-calc">
+      ${row('As', 'M/(fs·j·d)', df2(r.As, 3), 'ตร.ซม./ม.')}${row('ระยะเหล็กหลัก', 'min(A/As, 3t, 0.45, As min)', df2(r.sMain, 2), 'ม.', `ใช้ ${bn(o.d.dm)} @${o.d.sA}`)}
+      ${row('As min (กันร้าว)', `ρ·b·t (ρ = ${RcWsd.rhoTemp(fy)})`, df2(r.Asmin, 2), 'ตร.ซม./ม.')}${row('ระยะกันร้าว', 'min(A/As min, 5t, 0.45)', df2(r.sTemp, 2), 'ม.', `ใช้ ${bn(o.d.dt)} @${o.d.sB}`)}
+      ${row('ยึดหน่วง U', 'V/(Σo·N·j·d)', df2(r.U, 2), 'ksc', `≤ ${df2(Math.min(r.Ua, r.Ucap), 2)} ${okTag(ck('bond'))}`)}
+    </table>`;
+  }
+  return `<div class="card dsg-rep">${head}${data}${body}<h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">${esc(slabRbText(o, fy))}</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}${r.warn ? `<p class="d-note">${esc(r.warn)}</p>` : ''}${C.note ? `<p class="d-note">${esc(C.note)}</p>` : ''}</div>`;
 }

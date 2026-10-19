@@ -440,6 +440,17 @@ class Takeoff:
                 fill = A / (Lx * Ly) if Lx * Ly else 1
                 L = ((math.floor(Ly / sp) + 1) * Lx + (math.floor(Lx / sp) + 1) * Ly) * layers * fill
                 self.rebar(s["id"], dia, L, f"ตะแกรง @{sp:g} {layers} ชั้น ยาวรวม {L:.2f} ม.")
+            elif rb.get("mesh_xy"):   # เหล็กสองแนวต่างขนาด/ระยะ (ผลออกแบบพื้นจากเว็บ): x = เหล็กวางตามแนวแกน x
+                mx = rb["mesh_xy"]; layers = mx.get("layers", 1)
+                xs = [p[0] for p in s["polygon"]]; ys = [p[1] for p in s["polygon"]]
+                Lx, Ly = max(xs) - min(xs), max(ys) - min(ys)
+                fill = A / (Lx * Ly) if Lx * Ly else 1
+                if mx.get("x"):
+                    dia, sp = mx["x"]; L = (math.floor(Ly / sp) + 1) * Lx * layers * fill
+                    self.rebar(s["id"], dia, L, f"แนว x @{sp:g} {math.floor(Ly / sp) + 1} เส้น × {Lx:.2f} ม. = {L:.2f} ม.")
+                if mx.get("y"):
+                    dia, sp = mx["y"]; L = (math.floor(Lx / sp) + 1) * Ly * layers * fill
+                    self.rebar(s["id"], dia, L, f"แนว y @{sp:g} {math.floor(Lx / sp) + 1} เส้น × {Ly:.2f} ม. = {L:.2f} ม.")
             elif rb.get("wire_mesh"):
                 self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task=lt)
             else:
