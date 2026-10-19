@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Share+Tech+Mono&family=VT323&family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script>try { if (localStorage.getItem('udboq:theme') === 'dos') document.documentElement.classList.add('dos'); } catch (e) { /* */ }</script>
+<script>(function () { let t = 'plain'; try { t = localStorage.getItem('udboq:theme') || 'plain'; } catch (e) { /* */ } if (t === 'dos' || t === 'plain') document.documentElement.classList.add(t); })();</script>
 </head>
 <body>
 <div id="boot"><canvas id="boot-rain"></canvas><div class="boot-txt" id="boot-txt">&gt; UD_TOTAL_STATION
@@ -25,7 +25,7 @@
     <div class="nav-tab" data-tab="plan">แผนงาน / งวดงาน</div>
     <div class="nav-tab" data-tab="diff">เทียบรุ่น</div>
   </nav>
-  <div class="meta-bar"><div><div id="meta-proj" class="meta-proj">ยังไม่ได้เปิดโครงการ</div><div id="meta-price" class="meta-price">กำลังโหลดราคา…</div></div><button class="crt-btn" id="b-theme" title="สลับธีม TERMINAL (มืด) / DOS SHELL (สว่าง)">THEME:TERMINAL</button><button class="crt-btn" id="b-crt" title="เปิด/ปิดเอฟเฟกต์จอ CRT">CRT:ON</button></div>
+  <div class="meta-bar"><div><div id="meta-proj" class="meta-proj">ยังไม่ได้เปิดโครงการ</div><div id="meta-price" class="meta-price">กำลังโหลดราคา…</div></div><button class="crt-btn" id="b-theme" title="สลับธีม ปกติ / TERMINAL (มืด) / DOS SHELL">ธีม: ปกติ</button><button class="crt-btn" id="b-crt" title="เปิด/ปิดเอฟเฟกต์จอ CRT">CRT:ON</button></div>
 </header>
 
 <nav class="bnav" id="bnav">

@@ -968,12 +968,15 @@ function bootDone(msg) {
   $('#boot-txt').innerHTML = `&gt; UD_TOTAL_STATION v${UD_VERSION.v}\n&gt; ${esc(msg)}\n&gt; ready<span class="cur">_</span>`;
   setTimeout(() => { el.classList.add('off'); setTimeout(() => { S.stopRain && S.stopRain(); el.remove(); }, 700); }, Math.max(300, 1400 - (Date.now() - S.bootAt)));
 }
-/** ธีม: terminal (มืด, The Matrix) / dos (สว่าง แบบ MS-DOS Shell) — จำไว้ในเครื่อง */
+/** ธีม: plain (ปกติ ค่าเริ่มต้น) / terminal (มืด, The Matrix) / dos (สว่าง แบบ MS-DOS Shell) — จำไว้ในเครื่อง */
+const THEMES = ['plain', 'terminal', 'dos'], THEME_NAME = { plain: 'ปกติ', terminal: 'TERMINAL', dos: 'DOS SHELL' };
+const curTheme = () => document.documentElement.classList.contains('dos') ? 'dos' : document.documentElement.classList.contains('plain') ? 'plain' : 'terminal';
 function setTheme(name) {
-  const dos = name === 'dos'; document.documentElement.classList.toggle('dos', dos);
-  $('#b-theme').textContent = 'THEME:' + (dos ? 'DOS SHELL' : 'TERMINAL');
-  if (S.viewer) S.viewer.setTheme(dos ? 'dos' : 'terminal');
-  try { localStorage.setItem('udboq:theme', dos ? 'dos' : 'terminal'); } catch (e) { /* */ }
+  if (!THEMES.includes(name)) name = 'plain';
+  THEMES.forEach(t => document.documentElement.classList.toggle(t, t === name && t !== 'terminal'));
+  $('#b-theme').textContent = name === 'plain' ? 'ธีม: ปกติ' : 'THEME:' + THEME_NAME[name];
+  if (S.viewer) S.viewer.setTheme(name);
+  try { localStorage.setItem('udboq:theme', name); } catch (e) { /* */ }
 }
 function setCrt(on) {
   document.body.classList.toggle('nocrt', !on); $('#b-crt').textContent = 'CRT:' + (on ? 'ON' : 'OFF');
@@ -1173,7 +1176,7 @@ function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
   S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => showPick(d) });
   try { if (localStorage.getItem('udboq:proj') === 'para') $('#proj-seg [data-proj=para]').click(); } catch (e) { /* */ }
-  if (document.documentElement.classList.contains('dos')) S.viewer.setTheme('dos');
+  if (curTheme() !== 'terminal') S.viewer.setTheme(curTheme());
   if (S.model) buildLayers(S.viewer.load(S.model));
   const sel = S.selKey && (S.priced || []).find(r => r.key === S.selKey);
   if (sel) S.viewer.highlight(sel.from || []);
@@ -1410,8 +1413,8 @@ function bind() {
   $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '+ ขยาย' : '− ย่อ'; };
   $('#dk-q').oninput = () => renderPlan();
   $('#b-crt').onclick = () => setCrt(document.body.classList.contains('nocrt'));
-  $('#b-theme').onclick = () => setTheme(document.documentElement.classList.contains('dos') ? 'terminal' : 'dos');
-  setTheme(document.documentElement.classList.contains('dos') ? 'dos' : 'terminal');
+  $('#b-theme').onclick = () => setTheme(THEMES[(THEMES.indexOf(curTheme()) + 1) % THEMES.length]);
+  setTheme(curTheme());
   try { if (localStorage.getItem('udboq:crt') === '0') setCrt(false); } catch (er) { /* */ }
   $('#tl-day').oninput = e => { tlStop(); tlSet(+e.target.value); };
   $('#tl-done').onclick = tlDone;
