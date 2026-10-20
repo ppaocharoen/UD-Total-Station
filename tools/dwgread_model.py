@@ -32,6 +32,19 @@ def find_grid(sheet):
         t = [q for q in texts if dist(q['at'], c['c']) <= c['r'] * 1.2]
         if t:
             bub.append({'label': t[0]['text'], 'c': c['c'], 'r': c['r']})
+    # หัวกริดขนาดเท่ากันทั้งชุด — ถ้ามีวงกลมหลายขนาด (ป้ายชี้วัสดุ ตารางสัญลักษณ์) ใช้ขนาดใหญ่สุดที่ได้ทั้งแกน X และ Y
+    sizes = sorted({round(b['r'] / sc, 1) for b in bub}, reverse=True)
+    if len(sizes) > 1:
+        for sz in sizes:
+            sub = [b for b in bub if round(b['r'] / sc, 1) == sz]
+            if len(sub) >= 3:
+                X, Y = _grid_rows(sub, sc)
+                if X and Y:
+                    return X, Y
+    return _grid_rows(bub, sc)
+
+
+def _grid_rows(bub, sc):
     # ตัดซ้ำ (หัวกริดสองฝั่ง)
     rows = defaultdict(list); cols = defaultdict(list)
     for b in bub:
@@ -300,6 +313,64 @@ def roof_specs(sheets):
     return {k: sorted(v) for k, v in out.items()}
 
 
+def roof_plan_tags(sheets):
+    """แปลนโครงหลังคา: วงกลมหมายเลขชี้ด้วยเส้นโยง (leader) ไปที่แนวกริด → [(ป้าย, รายการวัสดุ, แกน, ชื่อกริด, ตำแหน่งปลายเส้นตามแนวกริด)]
+    ตารางสัญลักษณ์ = วงกลมที่มีข้อความยาวอยู่ทางขวาแถวเดียวกัน"""
+    out = []
+    for sh in sheets:
+        if not sh['num'].startswith('S.'):
+            continue
+        GXs, GYs = find_grid(sh)
+        if not GXs or not GYs:
+            continue
+        sc = sh['scale'] / 1000.0; P = sh['prims']
+        circles = [q for q in P if q['kind'] == 'circle' and 2 * sc <= q['r'] <= 8 * sc]
+        texts = [q for q in P if q['kind'] == 'text']
+        legend, tags = {}, []
+        for c in circles:
+            lab = next((q['text'].strip() for q in texts if re.fullmatch(r"[A-Z0-9]{1,3}", q['text'].strip()) and dist(q['at'], c['c']) <= c['r'] * 1.2), None)
+            if not lab or (lab in GXs and abs(GXs[lab] - c['c'][0]) < c['r']) or (lab in GYs and abs(GYs[lab] - c['c'][1]) < c['r']):
+                continue
+            row = [q for q in texts if len(q['text']) > 8 and abs(q['at'][1] - c['c'][1]) < c['r'] * 1.2 and 0 < q['at'][0] - c['c'][0] < c['r'] * 8]
+            if row:
+                legend[lab] = row[0]['text'].replace('\n', ' ')
+            else:
+                tags.append((lab, c))
+        if not legend or not tags:
+            continue
+        segs = []
+        for q in P:
+            if q['kind'] == 'line':
+                segs.append(q['p'])
+            elif q['kind'] == 'poly' and not q.get('closed'):
+                segs += list(zip(q['p'], q['p'][1:]))
+        tol = 0.6 * sc
+        x0, y0 = min(GXs.values()), min(GYs.values())
+        for lab, c in tags:
+            end = None
+            for a, b in segs:
+                for s0, s1 in ((a, b), (b, a)):
+                    if abs(dist(s0, c['c']) - c['r']) < tol and dist(s1, c['c']) > c['r'] * 1.5:
+                        cur, used = s1, 1
+                        while used < 6:   # เดินต่อเส้นที่ต่อปลายกัน
+                            nxt = next((t1 if dist(t0, cur) < tol else t0 for t0, t1 in segs if (dist(t0, cur) < tol or dist(t1, cur) < tol)
+                                        and dist(t1 if dist(t0, cur) < tol else t0, cur) > tol and dist(t1 if dist(t0, cur) < tol else t0, c['c']) > dist(cur, c['c'])), None)
+                            if nxt is None:
+                                break
+                            cur = nxt; used += 1
+                        if end is None or dist(cur, c['c']) > dist(end, c['c']):
+                            end = cur
+            if end is None:
+                continue
+            cand = [(abs(end[0] - v), 'X', k, end[1] - y0) for k, v in GXs.items()] + [(abs(end[1] - v), 'Y', k, end[0] - x0) for k, v in GYs.items()]
+            d, ax, g, along = min(cand)
+            if d < 1.5 * sc * 10:
+                out.append({'label': lab, 'item': legend.get(lab), 'axis': ax, 'grid': g, 'at': round(along, 2), 'src': sh['num']})
+        if out:
+            return out
+    return out
+
+
 def steel_section(text):
     """'จันทันเหล็ก C - 75x45x15x3.2 มม. @1.08 ม.' → {name, shape, dims, spacing}"""
     t = text.replace('×', 'x')
@@ -349,6 +420,16 @@ def build_model(doc, sheets, info):
             beams.append(dict(b, c=r3(b['c'] - off), **{'from': r3(b['from'] - offl), 'to': r3(b['to'] - offl)}))
         panels = [[r3(p[0] - bx0), r3(p[1] - by0), r3(p[2] - bx0), r3(p[3] - by0)] for p in pn]
     roof = roof_specs(sheets)
+    roof['tags'] = roof_plan_tags(sheets)
+    # หน้าตัด Truss จากแผ่นรายละเอียด (ข้อความเหล็กกล่องในแผ่นที่มีคำว่า EQ) — ใหญ่สุด = คอร์ด เล็กสุด = ค้ำ
+    tb = []
+    for sh_ in sheets:
+        if sh_['num'].startswith('S.') and any(q['kind'] == 'text' and re.search(r'\d+EQ', q['text']) for q in sh_['prims']):
+            tb += [(steel_section(q['text']), sh_['num']) for q in sh_['prims'] if q['kind'] == 'text' and 'เหล็กกล่อง' in q['text']]
+    tb = [t for t in tb if t[0]]
+    if tb:
+        tb.sort(key=lambda t: t[0]['dims']['h'])
+        roof['truss_sec'] = {'chord': tb[-1][0], 'web': tb[0][0], 'src': tb[0][1]}
     sizes = {}
     for x in sup:
         if x['footing'] and x['footing']['mark']:
@@ -569,6 +650,32 @@ def to_bm(rep, sheets, Q):
                           'polygon': [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], 'material': 'C240', 'use': 'ทางเดินรอบอาคาร',
                           'status': 'from_drawing', 'src': rep['beam_sheet'] + ' + A.2.01 (พื้นวางบนดินผืนเดียว แบ่งสี่เหลี่ยมเพื่อเก็บในโมเดล)'})
             design['slabs'][sid] = {'rebar': {'wire_mesh': 'WM-4@0.20'}, 'status': 'from_drawing', 'src': 'S.3.02'}
+    # คานนอกอาคาร (เช่น B3 รอบทางลาด): หลังคานเท่าผิวพื้นที่มันรับ — ทางลาดคิดระดับตามแนวลาด
+    def surf(x, y):
+        best = None
+        for sl in slabs:
+            if sl['mark'] == 'S1':
+                continue
+            xs_ = [q[0] for q in sl['polygon']]; ys_ = [q[1] for q in sl['polygon']]
+            if not (min(xs_) - 0.15 <= x <= max(xs_) + 0.15 and min(ys_) - 0.15 <= y <= max(ys_) + 0.15):
+                continue
+            z = sl['top']; r = sl.get('ramp')
+            if r:
+                ax = 0 if 'X' in r['dir'] else 1; v = (x, y)[ax]; lo, hi = (min(xs_), max(xs_)) if ax == 0 else (min(ys_), max(ys_))
+                f = min(1, max(0, (v - lo) / (hi - lo))) if hi > lo else 1
+                if r['dir'][0] == '-':
+                    f = 1 - f
+                z = r['low'] + (r['high'] - r['low']) * f
+            best = z if best is None else (max(best, z) if not r else z)   # ทางลาดมีสิทธิ์ก่อน
+            if r:
+                break
+        return best
+    inside = lambda n: -0.02 <= n['x'] <= xmax + 0.02 and -0.02 <= n['y'] <= ymax + 0.02
+    for n in nodes.values():
+        if n.get('level') == '1F' and not inside(n):
+            z = surf(n['x'], n['y'])
+            if z is not None:
+                n['z'] = round(z, 3)
     # หลังคาเพิง: จากรูปตัด (สูงฝั่งกริด A ระดับหลัง Truss, ต่ำฝั่งกริด C ระดับอะเส) + ระยะยื่นจากแปลนโครงหลังคา
     roofs = []
     rs = rep.get('roof') or {}
@@ -594,43 +701,76 @@ def to_bm(rep, sheets, Q):
                       'purlin': {'section': add_steel(pur), 'spacing': pur['spacing']} if pur else None,
                       'status': 'from_drawing', 'src': 'S.2.03–S.2.05 + A.4.01'})
         roofs[-1] = {k: v for k, v in roofs[-1].items() if v is not None}
-        # Truss T1 + อะเส 2C ตามแนวกริดฝั่งสูง (Earth: แนว A อย่างเดียว) · อะเส C เดี่ยวฝั่งต่ำ (กริดสุดท้าย)
-        def box(a, b, t):
-            return add_steel({'id': f'BOX{a}x{b}x{t}', 'shape': 'box', 'dims': {'h': a / 1000, 'b': b / 1000, 't': t / 1000}})
+        # โครงหลังคาจากแปลนโครงหลังคา: ป้ายวงกลม + เส้นโยงชี้แนวกริด (roof_plan_tags) — Truss / อะเส / ดั้ง
         hiY, loY = min(GY, key=GY.get), max(GY, key=GY.get)
-        ch, wb = box(75, 75, 3.2), box(38, 38, 1.6)
         top = round(roof + chain[2], 3)
-        xs = sorted(GX.values()); pts = [xs[0]]
-        sp_r = raf['spacing'] if raf and raf.get('spacing') else 1.0
-        for a, b in zip(xs, xs[1:]):    # จุดต่อแบ่งช่องเท่ากันตามระยะจันทัน (แบบ: 4EQ / 2EQ / 4EQ)
-            n = max(1, round((b - a) / sp_r)); pts += [round(a + (b - a) * k / n, 3) for k in range(1, n + 1)]
-        yA = GY[hiY]; tm = {}
+        zpl = lambda y: round(top + (roof - top) * (y - GY[hiY]) / ((GY[loY] - GY[hiY]) or 1), 3)   # ระนาบท้องจันทัน
+        xs = sorted(GX.values()); ys_ = sorted(GY.values())
+        tags = rs.get('tags') or []
+        tm = {}
         def mem(mk, tp, i, j, sec, src, st='from_drawing', note=None):
             tm[mk] = tm.get(mk, 0) + 1
             members.append(dict({'id': f'{mk}-{tm[mk]:02d}', 'mark': mk, 'type': tp, 'i': i, 'j': j, 'section': sec, 'material': 'SSC400', 'level': 'ROOF',
                                  'group': 'roof_frame', 'status': st, 'src': src}, **({'note': note} if note else {})))
-        bot_n = [node(x, yA, roof) for x in pts]; top_n = [node(x, yA, top) for x in pts]
-        for k in range(len(pts) - 1):
-            mem('T1', 'truss_chord', bot_n[k], bot_n[k + 1], ch, 'S.2.04 รายละเอียด Truss')
-            mem('T1', 'truss_chord', top_n[k], top_n[k + 1], ch, 'S.2.04 รายละเอียด Truss')
-        for k in range(len(pts)):
-            mem('T1', 'truss_web', bot_n[k], top_n[k], wb, 'S.2.04 รายละเอียด Truss')
-        for k in range(len(pts) - 1):   # ทแยงสลับทิศ (ตามรูปขยาย: ทแยงลงหาเสากลางช่วง)
-            i, j = (bot_n[k], top_n[k + 1]) if (k % 2 == 0) else (top_n[k], bot_n[k + 1])
-            mem('T1', 'truss_web', i, j, wb, 'S.2.04 รายละเอียด Truss', 'assumed', 'ทิศทแยงสมมติสลับฟันปลา — ความยาวรวมใกล้เคียงทุกแบบ')
-        plate2 = next((steel_section(t) for t in rs.get('plate', []) if '2C' in t and steel_section(t)), None)
-        plate1 = next((steel_section(t) for t in rs.get('plate', []) if '2C' not in t and steel_section(t)), None)
-        if plate2:
-            sid2 = add_steel(plate2)
-            for a, b in zip(xs, xs[1:]):
-                mem('P1', 'steel_beam', node(a, yA, roof), node(b, yA, roof), sid2, 'S.2.03 แปลนโครงหลังคา')
-        if plate1:
-            sid1 = add_steel(plate1)
-            for a, b in zip(xs, xs[1:]):
-                mem('P2', 'steel_beam', node(a, GY[loY], roof), node(b, GY[loY], roof), sid1, 'S.2.03 แปลนโครงหลังคา', 'assumed', f'อะเส C เดี่ยว ใส่แนวกริด {loY} (ฝั่งต่ำ) — รอ Earth ยืนยัน')
+        def box(sec):
+            return add_steel(dict(sec, id=f"BOX{round(sec['dims']['h'] * 1000)}x{round(sec['dims']['b'] * 1000)}x{sec['dims']['t'] * 1000:g}"))
+        ts = rs.get('truss_sec') or {}
+        tsrc = (ts.get('src') or 'S.2.04') + ' รายละเอียด Truss'
+        truss_lines = sorted({t['grid'] for t in tags if t['axis'] == 'Y' and 'TRUSS' in (t['item'] or '')}) or [hiY]
+        for gy in truss_lines:
+            yA = GY[gy]; zb, zt = roof, zpl(yA)
+            ch = box(ts['chord']) if ts.get('chord') else box({'shape': 'box', 'dims': {'h': 0.075, 'b': 0.075, 't': 0.0032}})
+            wb = box(ts['web']) if ts.get('web') else box({'shape': 'box', 'dims': {'h': 0.038, 'b': 0.038, 't': 0.0016}})
+            pts = [xs[0]]
+            sp_r = raf['spacing'] if raf and raf.get('spacing') else 1.0
+            for a, b in zip(xs, xs[1:]):    # แบ่งช่องเท่ากันตามระยะจันทัน (แบบ: 4EQ / 2EQ / 4EQ)
+                n = max(1, round((b - a) / sp_r)); pts += [round(a + (b - a) * k / n, 3) for k in range(1, n + 1)]
+            bot_n = [node(x, yA, zb) for x in pts]; top_n = [node(x, yA, zt) for x in pts]
+            ends = [node(xs[0] - ov, yA, zt)] + top_n + [node(xs[-1] + ov, yA, zt)]   # คอร์ดบนยื่นถึงชายคา (รูปขยาย 1.10 ม.)
+            for a, b in zip(ends, ends[1:]):
+                mem('T1', 'truss_chord', a, b, ch, tsrc)
+            for k in range(len(pts) - 1):
+                mem('T1', 'truss_chord', bot_n[k], bot_n[k + 1], ch, tsrc)
+            for k in range(len(pts)):
+                mem('T1', 'truss_web', bot_n[k], top_n[k], wb, tsrc)
+            for k in range(len(pts) - 1):   # ทแยงฟันปลา: ล่าง→บน แล้วบน→ล่าง (ตามรูปขยาย)
+                i, j = (bot_n[k], top_n[k + 1]) if (k % 2 == 0) else (top_n[k], bot_n[k + 1])
+                mem('T1', 'truss_web', i, j, wb, tsrc)
+        done = set()
+        for t in tags:
+            it = t['item'] or ''; sec = steel_section(it)
+            if not sec or 'TRUSS' in it:
+                continue
+            sid = add_steel(sec)
+            if 'ดั้ง' in it:   # เสาสั้นเหล็กบนหัวเสา คสล. ถึงระนาบท้องจันทัน — ป้ายชี้จุดตัดกริด
+                if t['axis'] == 'X':
+                    x, y = GX[t['grid']], min(ys_, key=lambda v: abs(v - t['at']))
+                else:
+                    x, y = min(xs, key=lambda v: abs(v - t['at'])), GY[t['grid']]
+                k = ('post', round(x, 2), round(y, 2))
+                if k in done or zpl(y) - roof < 0.05:
+                    continue
+                done.add(k)
+                mem('CX', 'steel_column', node(x, y, roof), node(x, y, zpl(y)), sid, t['src'])
+            elif 'อะเส' in it:
+                k = ('plate', t['axis'], t['grid'])
+                if k in done:
+                    continue
+                done.add(k)
+                mk = 'P1' if '2C' in it else 'P2'
+                if t['axis'] == 'Y':   # ตามแนวกริดตัวอักษร ตลอดความยาว แบ่งที่กริดตัวเลข
+                    y = GY[t['grid']]
+                    for a, b in zip(xs, xs[1:]):
+                        mem(mk, 'steel_beam', node(a, y, zpl(y)), node(b, y, zpl(y)), sid, t['src'])
+                else:                  # ตามแนวกริดตัวเลข เฉพาะช่วงที่ป้ายชี้ (ลาดตามระนาบจันทัน)
+                    x = GX[t['grid']]
+                    seg = next(((a, b) for a, b in zip(ys_, ys_[1:]) if a <= t['at'] <= b), None)
+                    if seg:
+                        mem(mk, 'steel_beam', node(x, seg[0], zpl(seg[0])), node(x, seg[1], zpl(seg[1])), sid, t['src'])
         if 'SSC400' not in {m['id'] for m in mats}:
             mats.append({'id': 'SSC400', 'kind': 'cold_formed', 'grade': 'SSC400 (มอก.1228)', 'fy': 2450, 'status': 'assumed'})
-        Q.append({'id': 'roof', 'q': f'หลังคา: Truss T1 + อะเส 2C ใส่แนวกริด {hiY} ระดับ +{roof:.2f}/+{top:.2f} แล้ว · ฝั่งต่ำแนวกริด {loY} ใส่อะเส C-100x50x20x2.3 เดี่ยวรับปลายจันทัน (แบบมีป้ายอะเส C เดี่ยว) — ถูกไหม และอะเส 2C แนว {hiY} อยู่ใต้คอร์ดล่าง Truss (ซ้อนกัน) ใช่ไหม'})
+        if not tags:
+            Q.append({'id': 'roof', 'q': f'แปลนโครงหลังคาไม่พบป้ายชี้ — ใส่ Truss แนวกริด {hiY} อย่างเดียว อะเส/ดั้งอยู่แนวไหน'})
     bm = {'schema_version': '0.1', 'meta': meta, 'site': {'v50': 25, 'terrain': 'A', 'seismic_zone': 'none', 'site_class': 'D', 'status': 'assumed'},
           'grids': G, 'levels': levels, 'materials': mats, 'sections': list(secs.values()), 'nodes': list(nodes.values()), 'members': members,
           'supports': supports, 'slabs': slabs, 'walls': [], 'roofs': roofs, 'design': design,

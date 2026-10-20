@@ -83,6 +83,15 @@ def _text_of(e):
     return ''
 
 
+def _w(e, p):
+    """พิกัด OCS → WCS (บล็อกที่ถูก mirror จะมี extrusion = -Z: TEXT/CIRCLE/ARC/LWPOLYLINE เก็บพิกัดแบบ OCS)"""
+    ex = e.dxf.get('extrusion', None)
+    if ex is None or (abs(ex[0]) < 1e-9 and abs(ex[1]) < 1e-9 and ex[2] > 0):
+        return (p[0], p[1])
+    v = e.ocs().to_wcs((p[0], p[1], p[2] if len(p) > 2 else 0))
+    return (v[0], v[1])
+
+
 def flatten(entities, depth=0, parent=None, out=None):
     """คืน list ของ dict ชิ้นพื้นฐาน: kind, layer, block (ชื่อบล็อกแม่), geom… — INSERT แตกซ้อนได้ 4 ชั้น"""
     out = [] if out is None else out
@@ -107,13 +116,13 @@ def flatten(entities, depth=0, parent=None, out=None):
             s = text_of(e)
             if s and t != 'ATTDEF':
                 h = e.dxf.char_height if t == 'MTEXT' else e.dxf.height
-                out.append({'kind': 'text', 'text': s, 'at': (e.dxf.insert.x, e.dxf.insert.y), 'h': h, 'layer': e.dxf.layer, 'parent': parent})
+                out.append({'kind': 'text', 'text': s, 'at': (e.dxf.insert.x, e.dxf.insert.y) if t == 'MTEXT' else _w(e, e.dxf.insert), 'h': h, 'layer': e.dxf.layer, 'parent': parent})
         elif t == 'LINE':
             out.append({'kind': 'line', 'p': [(e.dxf.start.x, e.dxf.start.y), (e.dxf.end.x, e.dxf.end.y)], 'layer': e.dxf.layer, 'parent': parent,
                         'lt': e.dxf.get('linetype', '')})
         elif t in ('LWPOLYLINE', 'POLYLINE'):
             try:
-                pts = [(p[0], p[1]) for p in (e.get_points('xy') if t == 'LWPOLYLINE' else [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices])]
+                pts = [_w(e, p) for p in e.get_points('xy')] if t == 'LWPOLYLINE' else [(v.dxf.location.x, v.dxf.location.y) for v in e.vertices]
             except Exception:
                 continue
             closed = bool(e.closed) if t == 'LWPOLYLINE' else e.is_closed
@@ -121,10 +130,17 @@ def flatten(entities, depth=0, parent=None, out=None):
                 pts = pts + [pts[0]]
             out.append({'kind': 'poly', 'p': pts, 'closed': closed or (len(pts) > 3 and pts[0] == pts[-1]), 'layer': e.dxf.layer, 'parent': parent,
                         'lt': e.dxf.get('linetype', '')})
+        elif t == 'LEADER':   # เส้นโยงป้าย (WCS)
+            pts = [(v[0], v[1]) for v in e.vertices]
+            if len(pts) >= 2:
+                out.append({'kind': 'poly', 'p': pts, 'closed': False, 'layer': e.dxf.layer, 'parent': parent, 'lt': '', 'leader': True})
         elif t == 'CIRCLE':
-            out.append({'kind': 'circle', 'c': (e.dxf.center.x, e.dxf.center.y), 'r': e.dxf.radius, 'layer': e.dxf.layer, 'parent': parent})
+            out.append({'kind': 'circle', 'c': _w(e, e.dxf.center), 'r': e.dxf.radius, 'layer': e.dxf.layer, 'parent': parent})
         elif t == 'ARC':
-            out.append({'kind': 'arc', 'c': (e.dxf.center.x, e.dxf.center.y), 'r': e.dxf.radius, 'a0': e.dxf.start_angle, 'a1': e.dxf.end_angle,
+            a0, a1 = e.dxf.start_angle, e.dxf.end_angle
+            if e.dxf.get('extrusion', (0, 0, 1))[2] < 0:   # mirror: มุมกลับด้าน
+                a0, a1 = (180 - a1) % 360, (180 - a0) % 360
+            out.append({'kind': 'arc', 'c': _w(e, e.dxf.center), 'r': e.dxf.radius, 'a0': a0, 'a1': a1,
                         'layer': e.dxf.layer, 'parent': parent})
         elif t == 'HATCH':
             try:
