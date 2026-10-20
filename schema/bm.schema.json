@@ -1036,6 +1036,14 @@
             "pinned"
           ],
           "default": "fixed"
+        },
+        "sand": {
+          "$ref": "#/$defs/nonneg",
+          "description": "ทรายรองใต้ฐานราก หนา ม. (ไม่มี = ค่าตั้งต้นของ takeoff)"
+        },
+        "lean": {
+          "$ref": "#/$defs/nonneg",
+          "description": "คอนกรีตหยาบรองใต้ฐานราก หนา ม. (ไม่มี = ค่าตั้งต้นของ takeoff)"
         }
       }
     },
@@ -1097,6 +1105,26 @@
         "pe_sheet": {
           "type": "boolean",
           "description": "พื้นวางบนดิน: คิดแผ่นพลาสติกรองใต้พื้น (ค่าตั้งต้น true)"
+        },
+        "ramp": {
+          "type": "object",
+          "description": "พื้นทางลาด: ระดับหลังพื้นต่ำ/สูง และทิศที่สูงขึ้น (top = ด้านสูง)",
+          "properties": {
+            "low": {
+              "type": "number"
+            },
+            "high": {
+              "type": "number"
+            },
+            "dir": {
+              "enum": [
+                "+X",
+                "-X",
+                "+Y",
+                "-Y"
+              ]
+            }
+          }
         }
       }
     },

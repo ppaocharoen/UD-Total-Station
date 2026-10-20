@@ -283,6 +283,9 @@ class Takeoff:
             if f.get("kind") not in ("spread", "pile_cap"):
                 continue
             b, d, h, bot = f["b"], f["d"], f["h"], f["bottom"]
+            st, lt = f.get("sand", s["sand_thk"]), f.get("lean", s["lean_thk"])
+            if "sand" not in f or "lean" not in f:
+                self._sl_default = True
             depth = self.GL - bot
             if depth <= 0:
                 self.note(f"ฐานราก {f['id']}: ท้องฐานรากอยู่สูงกว่า GL ไม่คิดงานขุด")
@@ -295,16 +298,16 @@ class Takeoff:
                 exc_total = exc * (1 + s["excav_waste"])
             else:
                 mg = s["excav_deep_margin"]
-                exc = (b + 2 * mg) * (d + 2 * mg) * (depth + s["sand_thk"] + s["lean_thk"])
+                exc = (b + 2 * mg) * (d + 2 * mg) * (depth + st + lt)
                 self.add("1.1.2", "excav_deep", "งานขุดดินฐานรากและถมคืน (ลึกเกิน 2.00 ม.)", "ลบ.ม.", exc, f["id"], task="footing")
                 exc_total = exc
                 self.note(f"ฐานราก {f['id']} ขุดลึก {depth:.2f} ม. เกิน 2 ม. — พิจารณาค่าใช้จ่ายพิเศษระบบป้องกันดินพัง (ปร.3)")
             vol_f = b * d * h
             pier = self._pier_volume(f)
             self.backfill += max(exc_total - vol_f - pier, 0)   # ข้อมูลเท่านั้น — ค่าแรงรวมอยู่ในงานขุด (ว480 1.3)
-            self.add("1.1.4", "sand_base", "ทรายรองใต้ฐานราก (บดอัดแรงคน)", "ลบ.ม.", b * d * s["sand_thk"], f["id"],
-                     waste=s["sand_waste"], task="footing")
-            self.add("1.1.12", "lean_conc", "คอนกรีตหยาบรองใต้ฐานราก (1:3:5)", "ลบ.ม.", b * d * s["lean_thk"], f["id"], task="footing")
+            self.add("1.1.4", "sand_base", "ทรายรองใต้ฐานราก (บดอัดแรงคน)", "ลบ.ม.", b * d * st, f["id"],
+                     waste=s["sand_waste"], task="footing", calc=f"{b:g} × {d:g} × หนา {st:g} = {b * d * st:.3f} ลบ.ม.")
+            self.add("1.1.12", "lean_conc", "คอนกรีตหยาบรองใต้ฐานราก (1:3:5)", "ลบ.ม.", b * d * lt, f["id"], task="footing", calc=f"{b:g} × {d:g} × หนา {lt:g} = {b * d * lt:.3f} ลบ.ม.")
             name, key = self.conc_name(f.get("material"))
             self.add("1.1.12", key, name, "ลบ.ม.", vol_f, f["id"], task="footing", calc=f"{b:g} × {d:g} × หนา {h:g} = {vol_f:.3f} ลบ.ม.")
             self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * (b + d) * h, f["id"], task="footing",
@@ -337,7 +340,8 @@ class Takeoff:
             self.note("ไม่มีฐานราก (supports) ในโมเดล")
         elif self.backfill:
             self.note(f"ปริมาณถมคืน (ข้อมูล) {self.backfill:.2f} ลบ.ม. — ไม่แยกรายการ เพราะค่าแรง ว480 ข้อ 1.3 รวมขุดและถมกลับแล้ว")
-        self.note(f"ทรายรอง {self.s['sand_thk']*100:g} ซม. และคอนกรีตหยาบ {self.s['lean_thk']*100:g} ซม. ใต้ฐานราก เป็นค่าตั้งต้น (แบบไม่ระบุ)")
+        if getattr(self, "_sl_default", False):
+            self.note(f"ทรายรอง {self.s['sand_thk']*100:g} ซม. และคอนกรีตหยาบ {self.s['lean_thk']*100:g} ซม. ใต้ฐานราก เป็นค่าตั้งต้น (ฐานรากที่แบบไม่ระบุ)")
 
     def _pier_volume(self, f):
         """ปริมาตรเสาส่วนที่อยู่ใต้ GL บนฐานรากนี้ (ตอม่อ)"""

@@ -257,14 +257,29 @@ def beam_plan(sheet, X, Y, bw=0.2):
                     merged.append((ax, c, cur[0], cur[1])); cur = [lo, hi]
             merged.append((ax, c, cur[0], cur[1]))
     labs = [q for q in P if q['kind'] == 'text' and re.fullmatch(r'[BG]B?\d{1,2}', q['text'])]
-    out = []
-    for ax, c, lo, hi in merged:
-        def d(q):
-            x, y = q['at']
-            return (abs(y - c) + max(0, lo - x, x - hi)) if ax == 'H' else (abs(x - c) + max(0, lo - y, y - hi))
-        near = [q for q in labs if d(q) < 12 * sc]
-        marks = Counter(q['text'] for q in near)
-        out.append({'axis': ax, 'c': c, 'from': lo, 'to': hi, 'marks': dict(marks)})
+    # ตัดแนวที่ขอบตัวอาคาร (กริดนอกสุด) — ส่วนที่ยื่นออกนอกอาคารเป็นคานก็ต่อเมื่อมีชื่อคานกำกับบนส่วนนั้นเอง
+    if X and Y:
+        bx = (min(X.values()), max(X.values())); by = (min(Y.values()), max(Y.values()))
+        cut = []
+        for ax, c, lo, hi in merged:
+            bnd = bx if ax == 'H' else by
+            pts = [lo] + [b for b in bnd if lo + 0.05 < b < hi - 0.05] + [hi]
+            cut += [(ax, c, a0, a1) for a0, a1 in zip(pts, pts[1:])]
+        merged = cut
+    # ชื่อคานแต่ละตัว → แนวเดียวที่ใกล้ที่สุด (ต้องอยู่ภายในช่วงของแนว และห่างตั้งฉาก ≤ 8 มม.บนกระดาษ)
+    # แนวที่ไม่มีชื่อเลย = เส้นแบ่งแผงพื้นสมมติ/ขอบพื้นวางบนดิน ไม่ใช่คาน (Earth 20 ต.ค. 2569)
+    marks = [Counter() for _ in merged]
+    for q in labs:
+        x, y = q['at']; best = None
+        for k, (ax, c, lo, hi) in enumerate(merged):
+            u, v = (x, y) if ax == 'H' else (y, x)
+            if lo - 0.1 <= u <= hi + 0.1:
+                dd = abs(v - c)
+                if dd <= 8 * sc and (best is None or dd < best[0]):
+                    best = (dd, k)
+        if best:
+            marks[best[1]][q['text']] += 1
+    out = [{'axis': ax, 'c': c, 'from': lo, 'to': hi, 'marks': dict(marks[k])} for k, (ax, c, lo, hi) in enumerate(merged)]
     return out, panels
 
 
@@ -345,9 +360,19 @@ def build_model(doc, sheets, info):
         dias = sorted({b[1] for b in f['bars']}); pd = f['plan_bar_dias']
         if pd and dias and set(pd) != set(dias):
             Q.append({'id': f'{mk}-bars', 'q': f'แบบขยาย {mk} ({f["src"]}): แปลนขยายเขียนเหล็กตะแกรง DB{"/".join(map(str, pd))} แต่รูปตัดเขียน DB{"/".join(map(str, dias))} — ใช้ขนาดไหน'})
+    # ตำแหน่งคำว่า SLOPE / ทางลาด ในแปลนสถาปัตย์ (พิกัดโมเดล) — ใช้แยกแผงทางลาด
+    slope_marks = []
+    for sh in sheets:
+        if not sh['num'].startswith('A.2'):
+            continue
+        SX, SY = find_grid(sh)
+        if not SX or not SY:
+            continue
+        sx0, sy0 = min(SX.values()), min(SY.values())
+        slope_marks += [(r3(q['at'][0] - sx0), r3(q['at'][1] - sy0)) for q in sh['prims'] if q['kind'] == 'text' and re.search(r'SLOPE|ทางลาด', q['text'])]
     rep = {'source': info, 'foundation_sheet': fplan['num'] if fplan else None, 'grids': grids,
            'supports': [dict(x, x=r3(x['x'] - ox), y=r3(x['y'] - oy)) for x in sup],
-           'schedules': {k: [dict(e, parsed=parse_section(e)) for e in v] for k, v in sched.items()}, 'roof': roof, 'footing_details': fdet, 'beam_sheet': bsh['num'] if bsh else None, 'beams': beams, 'panels': panels}
+           'schedules': {k: [dict(e, parsed=parse_section(e)) for e in v] for k, v in sched.items()}, 'roof': roof, 'footing_details': fdet, 'beam_sheet': bsh['num'] if bsh else None, 'beams': beams, 'panels': panels, 'slope_marks': slope_marks}
     return rep, Q
 
 
@@ -412,6 +437,7 @@ def to_bm(rep, sheets, Q):
         t = det.get('t') or 0.3; bot = -(det.get('depth') or deep)
         nb = node(x['x'], x['y'], bot + t, None, g)
         supports.append({'id': f"{f['mark'] or 'F'}-{g.replace('/', '')}", 'mark': f['mark'], 'node': nb, 'kind': 'spread', 'b': f['b'], 'd': f['d'], 'h': t, 'bottom': bot,
+                         **({'sand': det['sand']} if det.get('sand') else {}), **({'lean': det['lean']} if det.get('lean') else {}),
                          'material': 'C240', 'fixity': 'fixed', 'status': 'from_drawing' if det else 'assumed', 'src': rep['foundation_sheet'] + (' + ' + det['src'] if det else '')})
         if det.get('bars'):
             n, d = det['bars'][0]
@@ -427,6 +453,7 @@ def to_bm(rep, sheets, Q):
                     design['members'][mid] = {'rebar': {'main': [p['bars'][0][0], p['bars'][0][2]], **({'stirrup': [p['stirrup'][1], p['stirrup'][2]]} if p['stirrup'] else {})},
                                               'status': 'from_drawing', 'src': sch['C1'][0]['sheet'] + (f' แถว{row}' if row in col_rows else '')}
     # คานคอดิน: แนวที่มีชื่อ B# เท่านั้น
+    xmax = max(GX.values()) if GX else 0; ymax = max(GY.values()) if GY else 0
     lines = [b for b in rep['beams'] if b['marks']]
     skipped = [b for b in rep['beams'] if not b['marks']]
     # แนวขอบแผงที่ไม่มีชื่อคาน = ขอบพื้นวางบนดิน (Earth ยืนยัน 20 ต.ค. 2569) — ไม่สร้างคาน
@@ -439,7 +466,9 @@ def to_bm(rep, sheets, Q):
             Q.append({'id': f'{mark}-sec', 'q': f'ไม่พบตารางหน้าตัด {mark}'})
         sec = rc(p['b'] or 0.2, p['h'] or 0.4, sch[mark][0]['sheet'] if mark in sch else rep['beam_sheet'])
         c = round(b['c'], 2)
-        pts = {round(b['from'], 2), round(b['to'], 2)}
+        lim = (0, xmax) if b['axis'] == 'H' else (0, ymax)
+        inb = lambda u: lim[0] - 0.02 <= u <= lim[1] + 0.02
+        pts = {round(u, 2) for u in (b['from'], b['to']) if inb(u)}   # ปลายที่ยื่นนอกอาคาร ตัดที่คานที่ตัดผ่าน
         for o in lines:
             if o['axis'] != b['axis'] and o['from'] - 0.02 <= c <= o['to'] + 0.02 and b['from'] - 0.02 <= o['c'] <= b['to'] + 0.02:
                 pts.add(round(o['c'], 2))
@@ -463,18 +492,83 @@ def to_bm(rep, sheets, Q):
         pass
     if 'C1' in sch and len(sch['C1']) > 1:
         Q.append({'id': 'C1-rows', 'q': 'ตาราง C1 มี 2 แถว (' + ' / '.join(f"{e['row']}: {', '.join(e['texts'][:1])}" for e in sch['C1']) + ') — ผมใส่ ตอม่อ = ใต้พื้น, อะเส = เหนือพื้นถึงอะเส ถูกไหม'})
-    # พื้น: แผงพื้นจากแปลนคาน — ในตัวอาคาร = S1 (พื้นห้องน้ำ) · นอกอาคาร = S2 (ทางเดินรอบอาคาร) — วางบนดินทั้งหมด
-    xmax = max(GX.values()) if GX else 0; ymax = max(GY.values()) if GY else 0
+    # พื้น (Earth 20 ต.ค. 2569: เส้นประแบ่งแผงในแปลน = เส้นสมมติ · รอบอาคารเป็นพื้นวางบนดินผืนเดียว ไม่มีคาน)
+    #  - ในอาคาร: แผงระหว่างคาน (ขอบแผง + ครึ่งคาน = แนวศูนย์คาน) → S1
+    #  - นอกอาคารที่มีคานมีชื่อล้อม (เช่น B3 รอบทางลาด): แผงในกรอบนั้น → ทางลาด (แผงที่มีคำว่า SLOPE/ทางลาด) หรือชานพัก
+    #  - นอกอาคารที่เหลือ: ทางเดินรอบอาคาร = กรอบนอกสุดลบตัวอาคารลบกรอบทางลาด แบ่งเป็นสี่เหลี่ยม → S2
     slabs = []; design['slabs'] = {}
-    for k, (x0, y0, x1, y1) in enumerate(sorted(rep['panels'], key=lambda p: (-p[1], p[0]))):
-        inside = x0 >= -0.05 and y0 >= -0.05 and x1 <= xmax + 0.05 and y1 <= ymax + 0.05
-        sid = f"{'S1' if inside else 'S2'}-{k + 1:02d}"
-        slabs.append({'id': sid, 'mark': 'S1' if inside else 'S2', 'kind': 'ground', 't': 0.10, 'top': f1 if inside else 0.05, 'level': '1F',
-                      'polygon': [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 'material': 'C240', 'use': 'ห้องน้ำ' if inside else 'ทางเดิน',
-                      'status': 'from_drawing', 'src': rep['beam_sheet'] + ' + S.3.02'})
-        design['slabs'][sid] = {'rebar': {'mesh': [9, 0.30, 1]} if inside else {'wire_mesh': 'WM-4@0.20'}, 'status': 'from_drawing', 'src': 'S.3.02'}
-    if slabs:
-        Q.append({'id': 'slab', 'q': 'พื้น: ในอาคารใส่พื้นวางบนดินหนา 0.10 ม. เหล็ก RB9@0.30 (รายละเอียด "พื้นห้องน้ำ" S.3.02) ระดับ +0.20 · ทางเดินรอบอาคารหนา 0.10 ม. ตะแกรง Wire mesh Ø4@0.20 ระดับ +0.05 — ทางลาด (F3) ใส่เป็นทางเดินไปก่อน ถูกไหม'})
+    h = 0.1
+    P = [(round(p[0] - h, 2), round(p[1] - h, 2), round(p[2] + h, 2), round(p[3] + h, 2)) for p in rep['panels']]
+    inb = lambda p: p[0] >= -0.05 and p[1] >= -0.05 and p[2] <= xmax + 0.05 and p[3] <= ymax + 0.05
+    ext_lines = [b for b in lines if not (b['axis'] == 'H' and -0.02 <= b['c'] <= ymax + 0.02 and b['from'] >= -0.02 and b['to'] <= xmax + 0.02)
+                 and not (b['axis'] == 'V' and -0.02 <= b['c'] <= xmax + 0.02 and b['from'] >= -0.02 and b['to'] <= ymax + 0.02)]
+    RP_ = rep['panels']   # ขอบนอกสุด = ขอบแผงจริง (ไม่บวกครึ่งคาน เพราะขอบนอกเป็นขอบพื้น ไม่ใช่แนวคาน)
+    outer = (min(p[0] for p in RP_), min(p[1] for p in RP_), max(p[2] for p in RP_), max(p[3] for p in RP_)) if RP_ else None
+    zones = []
+    if ext_lines:
+        xs = [b['c'] for b in ext_lines if b['axis'] == 'V'] + [v for b in ext_lines if b['axis'] == 'H' for v in (b['from'], b['to'])]
+        ys = [b['c'] for b in ext_lines if b['axis'] == 'H'] + [v for b in ext_lines if b['axis'] == 'V' for v in (b['from'], b['to'])]
+        z = [round(min(xs), 2), round(min(ys), 2), round(max(xs), 2), round(max(ys), 2)]
+        if outer:   # กรอบที่เกือบชนขอบนอกสุด (≤ 0.2 ม.) ขยายถึงขอบนอก
+            z = [outer[0] if z[0] - outer[0] <= 0.2 else z[0], outer[1] if z[1] - outer[1] <= 0.2 else z[1],
+                 outer[2] if outer[2] - z[2] <= 0.2 else z[2], outer[3] if outer[3] - z[3] <= 0.2 else z[3]]
+        zones.append(z)
+    slope_pts = rep.get('slope_marks') or []
+    k = 0
+    for p in sorted(P, key=lambda p: (-p[1], p[0])):
+        if inb(p):
+            k += 1; sid = f'S1-{k:02d}'
+            slabs.append({'id': sid, 'mark': 'S1', 'kind': 'ground', 't': 0.10, 'top': f1, 'level': '1F', 'polygon': [[p[0], p[1]], [p[2], p[1]], [p[2], p[3]], [p[0], p[3]]],
+                          'material': 'C240', 'use': 'ห้องน้ำ', 'status': 'from_drawing', 'src': rep['beam_sheet'] + ' + S.3.02'})
+            design['slabs'][sid] = {'rebar': {'mesh': [9, 0.30, 1]}, 'status': 'from_drawing', 'src': 'S.3.02 พื้นห้องน้ำ'}
+    for z in zones:
+        inz = [p for p in P if p[0] >= z[0] - 0.05 and p[2] <= z[2] + 0.05 and p[1] >= z[1] - 0.15 and p[3] <= z[3] + 0.05]
+        hit = [p for p in inz if any(p[0] <= x <= p[2] and p[1] - 0.6 <= y <= p[3] + 0.6 for x, y in slope_pts)]
+        if not hit and len(inz) >= 2:   # ไม่เจอคำว่า SLOPE ในแปลน → แผงใหญ่สุดในกรอบ = ทางลาด ที่เหลือ = ชานพัก
+            hit = [max(inz, key=lambda p: (p[2] - p[0]) * (p[3] - p[1]))]
+        # ขอบแผงชิดขอบกรอบ (≤ 0.25 ม.) ยืดให้เต็มกรอบ — ไม่ให้เหลือช่องว่างระหว่างทางลาดกับทางเดิน/ตัวอาคาร
+        snap = lambda p: (z[0] if p[0] - z[0] <= 0.25 else p[0], z[1] if p[1] - z[1] <= 0.25 else p[1],
+                          z[2] if z[2] - p[2] <= 0.25 else p[2], z[3] if z[3] - p[3] <= 0.25 else p[3])
+        inz = [tuple(round(float(v), 3) for v in snap(p)) for p in inz]; hit = [tuple(round(float(v), 3) for v in snap(p)) for p in hit]
+        cnt = {}
+        for n, p in enumerate(sorted(inz, key=lambda p: p[0])):
+            ramp = p in hit
+            if ramp:   # ทิศขึ้นลาด: จากฝั่งไกลชานพัก → เข้าหาชานพัก
+                land = [o for o in inz if o not in hit]
+                cx = sum((o[0] + o[2]) / 2 for o in land) / len(land) if land else p[2]
+                cy = sum((o[1] + o[3]) / 2 for o in land) / len(land) if land else (p[1] + p[3]) / 2
+                dx, dy = cx - (p[0] + p[2]) / 2, cy - (p[1] + p[3]) / 2
+                rdir = ('+X' if dx > 0 else '-X') if abs(dx) >= abs(dy) else ('+Y' if dy > 0 else '-Y')
+            cnt[ramp] = cnt.get(ramp, 0) + 1
+            sid = f"{'RP' if ramp else 'S3'}-{cnt[ramp]:02d}"
+            sl = {'id': sid, 'mark': 'RP' if ramp else 'S3', 'kind': 'ground', 't': 0.10, 'top': 0.25, 'level': '1F', **({'note': 'ทางลาด: แผงใหญ่สุดในกรอบคาน B3 (แปลนไม่มีคำ SLOPE ตรงแผง) — Earth ยืนยันเป็นพื้นทางลาด'} if ramp and not slope_pts else {}),
+                  'polygon': [[p[0], p[1]], [p[2], p[1]], [p[2], p[3]], [p[0], p[3]]], 'material': 'C240', 'use': 'ทางลาด' if ramp else 'ชานพักทางเข้า',
+                  'status': 'from_drawing', 'src': rep['beam_sheet'] + ' + A.2.01'}
+            if ramp:
+                sl['ramp'] = {'low': 0.05, 'high': 0.25, 'dir': rdir}
+            slabs.append(sl)
+            design['slabs'][sid] = {'rebar': {'wire_mesh': 'WM-4@0.20'}, 'status': 'from_drawing', 'src': 'S.3.02'}
+    if outer:
+        holes = [(0.0, 0.0, xmax, ymax)] + [tuple(z) for z in zones]
+        XS = sorted({outer[0], outer[2]} | {v for hh in holes for v in (hh[0], hh[2]) if outer[0] < v < outer[2]})
+        YS = sorted({outer[1], outer[3]} | {v for hh in holes for v in (hh[1], hh[3]) if outer[1] < v < outer[3]})
+        rects = []
+        for y0, y1 in zip(YS, YS[1:]):
+            row = []
+            for x0, x1 in zip(XS, XS[1:]):
+                cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+                if not any(hh[0] < cx < hh[2] and hh[1] < cy < hh[3] for hh in holes):
+                    if row and abs(row[-1][2] - x0) < 1e-6:
+                        row[-1][2] = x1
+                    else:
+                        row.append([x0, y0, x1, y1])
+            rects += row
+        for n, r in enumerate(rects):
+            sid = f'S2-{n + 1:02d}'
+            slabs.append({'id': sid, 'mark': 'S2', 'kind': 'ground', 't': 0.10, 'top': 0.05, 'level': '1F',
+                          'polygon': [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]], 'material': 'C240', 'use': 'ทางเดินรอบอาคาร',
+                          'status': 'from_drawing', 'src': rep['beam_sheet'] + ' + A.2.01 (พื้นวางบนดินผืนเดียว แบ่งสี่เหลี่ยมเพื่อเก็บในโมเดล)'})
+            design['slabs'][sid] = {'rebar': {'wire_mesh': 'WM-4@0.20'}, 'status': 'from_drawing', 'src': 'S.3.02'}
     # หลังคาเพิง: จากรูปตัด (สูงฝั่งกริด A ระดับหลัง Truss, ต่ำฝั่งกริด C ระดับอะเส) + ระยะยื่นจากแปลนโครงหลังคา
     roofs = []
     rs = rep.get('roof') or {}
@@ -500,7 +594,43 @@ def to_bm(rep, sheets, Q):
                       'purlin': {'section': add_steel(pur), 'spacing': pur['spacing']} if pur else None,
                       'status': 'from_drawing', 'src': 'S.2.03–S.2.05 + A.4.01'})
         roofs[-1] = {k: v for k, v in roofs[-1].items() if v is not None}
-        Q.append({'id': 'roof', 'q': f'หลังคา: ใส่เป็นหลังคาเพิงสูงฝั่งกริด A ต่ำฝั่งกริด C ลาด {pitch:.1f}° ยื่น 1.10 ม. รอบ — โครง Truss T1 (75x75x3.2 / 38x38x1.6 ลึก 0.40) และอะเส 2C-100x50x20x2.3 อยู่แนวกริดไหนบ้าง (ยังไม่ได้ใส่เป็นชิ้นส่วน)'})
+        # Truss T1 + อะเส 2C ตามแนวกริดฝั่งสูง (Earth: แนว A อย่างเดียว) · อะเส C เดี่ยวฝั่งต่ำ (กริดสุดท้าย)
+        def box(a, b, t):
+            return add_steel({'id': f'BOX{a}x{b}x{t}', 'shape': 'box', 'dims': {'h': a / 1000, 'b': b / 1000, 't': t / 1000}})
+        hiY, loY = min(GY, key=GY.get), max(GY, key=GY.get)
+        ch, wb = box(75, 75, 3.2), box(38, 38, 1.6)
+        top = round(roof + chain[2], 3)
+        xs = sorted(GX.values()); pts = [xs[0]]
+        sp_r = raf['spacing'] if raf and raf.get('spacing') else 1.0
+        for a, b in zip(xs, xs[1:]):    # จุดต่อแบ่งช่องเท่ากันตามระยะจันทัน (แบบ: 4EQ / 2EQ / 4EQ)
+            n = max(1, round((b - a) / sp_r)); pts += [round(a + (b - a) * k / n, 3) for k in range(1, n + 1)]
+        yA = GY[hiY]; tm = {}
+        def mem(mk, tp, i, j, sec, src, st='from_drawing', note=None):
+            tm[mk] = tm.get(mk, 0) + 1
+            members.append(dict({'id': f'{mk}-{tm[mk]:02d}', 'mark': mk, 'type': tp, 'i': i, 'j': j, 'section': sec, 'material': 'SSC400', 'level': 'ROOF',
+                                 'group': 'roof_frame', 'status': st, 'src': src}, **({'note': note} if note else {})))
+        bot_n = [node(x, yA, roof) for x in pts]; top_n = [node(x, yA, top) for x in pts]
+        for k in range(len(pts) - 1):
+            mem('T1', 'truss_chord', bot_n[k], bot_n[k + 1], ch, 'S.2.04 รายละเอียด Truss')
+            mem('T1', 'truss_chord', top_n[k], top_n[k + 1], ch, 'S.2.04 รายละเอียด Truss')
+        for k in range(len(pts)):
+            mem('T1', 'truss_web', bot_n[k], top_n[k], wb, 'S.2.04 รายละเอียด Truss')
+        for k in range(len(pts) - 1):   # ทแยงสลับทิศ (ตามรูปขยาย: ทแยงลงหาเสากลางช่วง)
+            i, j = (bot_n[k], top_n[k + 1]) if (k % 2 == 0) else (top_n[k], bot_n[k + 1])
+            mem('T1', 'truss_web', i, j, wb, 'S.2.04 รายละเอียด Truss', 'assumed', 'ทิศทแยงสมมติสลับฟันปลา — ความยาวรวมใกล้เคียงทุกแบบ')
+        plate2 = next((steel_section(t) for t in rs.get('plate', []) if '2C' in t and steel_section(t)), None)
+        plate1 = next((steel_section(t) for t in rs.get('plate', []) if '2C' not in t and steel_section(t)), None)
+        if plate2:
+            sid2 = add_steel(plate2)
+            for a, b in zip(xs, xs[1:]):
+                mem('P1', 'steel_beam', node(a, yA, roof), node(b, yA, roof), sid2, 'S.2.03 แปลนโครงหลังคา')
+        if plate1:
+            sid1 = add_steel(plate1)
+            for a, b in zip(xs, xs[1:]):
+                mem('P2', 'steel_beam', node(a, GY[loY], roof), node(b, GY[loY], roof), sid1, 'S.2.03 แปลนโครงหลังคา', 'assumed', f'อะเส C เดี่ยว ใส่แนวกริด {loY} (ฝั่งต่ำ) — รอ Earth ยืนยัน')
+        if 'SSC400' not in {m['id'] for m in mats}:
+            mats.append({'id': 'SSC400', 'kind': 'cold_formed', 'grade': 'SSC400 (มอก.1228)', 'fy': 2450, 'status': 'assumed'})
+        Q.append({'id': 'roof', 'q': f'หลังคา: Truss T1 + อะเส 2C ใส่แนวกริด {hiY} ระดับ +{roof:.2f}/+{top:.2f} แล้ว · ฝั่งต่ำแนวกริด {loY} ใส่อะเส C-100x50x20x2.3 เดี่ยวรับปลายจันทัน (แบบมีป้ายอะเส C เดี่ยว) — ถูกไหม และอะเส 2C แนว {hiY} อยู่ใต้คอร์ดล่าง Truss (ซ้อนกัน) ใช่ไหม'})
     bm = {'schema_version': '0.1', 'meta': meta, 'site': {'v50': 25, 'terrain': 'A', 'seismic_zone': 'none', 'site_class': 'D', 'status': 'assumed'},
           'grids': G, 'levels': levels, 'materials': mats, 'sections': list(secs.values()), 'nodes': list(nodes.values()), 'members': members,
           'supports': supports, 'slabs': slabs, 'walls': [], 'roofs': roofs, 'design': design,
