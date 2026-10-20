@@ -595,6 +595,8 @@ class Takeoff:
         for w in self.m.get("walls", []):
             pts = w["path"]
             L = sum(dist2(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+            if w.get("rise") and L > 0:   # ผนังวางเอียงตามพื้นลาด: ยาวตามแนวลาด
+                L = math.hypot(L, w["rise"])
             # หักเสาที่ผนังชน (เสาที่อยู่บนแนวผนัง ภายในช่วงความสูงผนัง)
             ded = 0.0
             for i in range(len(pts) - 1):
