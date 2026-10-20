@@ -386,9 +386,8 @@ def to_bm(rep, sheets, Q):
     meta = {'name': 'อ่านจากแบบ ' + rep['source']['source'], 'owner': 'เทศบาลนครอุดรธานี', 'province': 'อุดรธานี', 'design_method': 'WSD', 'work_group': 'building',
             'drawings': [{'sheet': s['num'], 'title': (s.get('title') or [''])[0] if s.get('title') else ''} for s in sheets],
             'units': {'length': 'm', 'force': 'kgf', 'stress': 'ksc'}, 'notes': ['สร้างโดย tools/dwgread.py — ตรวจกับแบบก่อนใช้งาน']}
-    mats = [{'id': 'C240', 'kind': 'concrete', 'fc': 240, 'unit_weight': 2400, 'status': 'assumed', 'note': 'แบบไม่ระบุ f\'c — ต้องถาม'},
+    mats = [{'id': 'C240', 'kind': 'concrete', 'fc': 240, 'unit_weight': 2400, 'status': 'user', 'note': "แบบไม่ระบุ f'c — ค่าตั้งต้น 240 ksc ตามที่ Earth กำหนด (20 ต.ค. 2569)"},
             {'id': 'SD40', 'kind': 'rebar', 'fy': 4000, 'status': 'assumed'}, {'id': 'SR24', 'kind': 'rebar', 'fy': 2400, 'status': 'assumed'}]
-    Q.append({'id': 'fc', 'q': "กำลังคอนกรีต f'c เท่าไร (แบบไม่ระบุ — ใส่ 240 ksc ไว้ชั่วคราว)"})
     secs = {}
     def rc(b, h, src):
         k = f'RC-{round(b * 100)}x{round(h * 100)}'
@@ -430,8 +429,7 @@ def to_bm(rep, sheets, Q):
     # คานคอดิน: แนวที่มีชื่อ B# เท่านั้น
     lines = [b for b in rep['beams'] if b['marks']]
     skipped = [b for b in rep['beams'] if not b['marks']]
-    if skipped:
-        Q.append({'id': 'beam-unlabeled', 'q': f'แปลนคาน {rep["beam_sheet"]}: มีแนวขอบแผงพื้น {len(skipped)} แนวที่ไม่มีชื่อคาน (ส่วนใหญ่อยู่นอกตัวอาคาร/ทางเดินรอบอาคาร) — ไม่ได้ใส่เป็นคาน ถูกไหม'})
+    # แนวขอบแผงที่ไม่มีชื่อคาน = ขอบพื้นวางบนดิน (Earth ยืนยัน 20 ต.ค. 2569) — ไม่สร้างคาน
     colxy = [(nodes[k]['x'], nodes[k]['y']) for k in nodes if nodes[k].get('level') == '1F']
     cnt = Counter()
     for b in lines:
@@ -465,10 +463,47 @@ def to_bm(rep, sheets, Q):
         pass
     if 'C1' in sch and len(sch['C1']) > 1:
         Q.append({'id': 'C1-rows', 'q': 'ตาราง C1 มี 2 แถว (' + ' / '.join(f"{e['row']}: {', '.join(e['texts'][:1])}" for e in sch['C1']) + ') — ผมใส่ ตอม่อ = ใต้พื้น, อะเส = เหนือพื้นถึงอะเส ถูกไหม'})
-    Q.append({'id': 'roof', 'q': 'โครงหลังคา (จันทัน แป อะเส Truss T1) อ่านสเปกได้แล้ว แต่ยังไม่ขึ้นรูปทรงหลังคาในรอบนี้ — ทำต่อรอบหน้า'})
+    # พื้น: แผงพื้นจากแปลนคาน — ในตัวอาคาร = S1 (พื้นห้องน้ำ) · นอกอาคาร = S2 (ทางเดินรอบอาคาร) — วางบนดินทั้งหมด
+    xmax = max(GX.values()) if GX else 0; ymax = max(GY.values()) if GY else 0
+    slabs = []; design['slabs'] = {}
+    for k, (x0, y0, x1, y1) in enumerate(sorted(rep['panels'], key=lambda p: (-p[1], p[0]))):
+        inside = x0 >= -0.05 and y0 >= -0.05 and x1 <= xmax + 0.05 and y1 <= ymax + 0.05
+        sid = f"{'S1' if inside else 'S2'}-{k + 1:02d}"
+        slabs.append({'id': sid, 'mark': 'S1' if inside else 'S2', 'kind': 'ground', 't': 0.10, 'top': f1 if inside else 0.05, 'level': '1F',
+                      'polygon': [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], 'material': 'C240', 'use': 'ห้องน้ำ' if inside else 'ทางเดิน',
+                      'status': 'from_drawing', 'src': rep['beam_sheet'] + ' + S.3.02'})
+        design['slabs'][sid] = {'rebar': {'mesh': [9, 0.30, 1]} if inside else {'wire_mesh': 'WM-4@0.20'}, 'status': 'from_drawing', 'src': 'S.3.02'}
+    if slabs:
+        Q.append({'id': 'slab', 'q': 'พื้น: ในอาคารใส่พื้นวางบนดินหนา 0.10 ม. เหล็ก RB9@0.30 (รายละเอียด "พื้นห้องน้ำ" S.3.02) ระดับ +0.20 · ทางเดินรอบอาคารหนา 0.10 ม. ตะแกรง Wire mesh Ø4@0.20 ระดับ +0.05 — ทางลาด (F3) ใส่เป็นทางเดินไปก่อน ถูกไหม'})
+    # หลังคาเพิง: จากรูปตัด (สูงฝั่งกริด A ระดับหลัง Truss, ต่ำฝั่งกริด C ระดับอะเส) + ระยะยื่นจากแปลนโครงหลังคา
+    roofs = []
+    rs = rep.get('roof') or {}
+    raf = next((steel_section(t) for t in rs.get('rafter', []) if steel_section(t)), None)
+    pur = next((steel_section(t) for t in rs.get('purlin', []) if steel_section(t)), None)
+    def add_steel(sec):
+        if not sec:
+            return None
+        d = sec['dims']; t = d['t']
+        per = (d['h'] + 2 * d['b'] + 2 * d.get('lip', 0) - 4 * t) if sec['shape'].startswith('lipped') else 2 * (d['h'] + d['b'] - 2 * t)
+        kg = round(per * t * 7850 * (2 if sec['shape'].endswith('double') else 1), 2)
+        secs.setdefault(sec['id'], {'id': sec['id'], 'kind': 'cold_formed', 'shape': 'lipped_C' if sec['shape'].startswith('lipped') else 'box', 'name': sec['id'], 'kg_m': kg,
+                                    'status': 'from_drawing', 'src': 'S.2.03', 'note': 'น้ำหนักต่อเมตรคิดจากเส้นกลางแผ่น (ไม่ใช่ตาราง มอก.)'})
+        return sec['id']
+    if chain and len(chain) > 2 and GX and GY:
+        ov = 1.1
+        pitch = math.degrees(math.atan(chain[2] / ymax)) if ymax else 0
+        eave = round(roof - (ov * chain[2] / ymax), 3)
+        cover = 'metal_sheet' if any('เมทัลชีท' in t for t in rs.get('cover', [])) else 'metal_sheet'
+        roofs.append({'id': 'R1', 'form': 'shed', 'low': 'y2', 'outline': [[-ov, -ov], [xmax + ov, -ov], [xmax + ov, ymax + ov], [-ov, ymax + ov]],
+                      'eave': eave, 'pitch': round(pitch, 2), 'overhang': ov, 'cover': cover,
+                      'rafter': {'section': add_steel(raf), 'spacing': raf['spacing']} if raf else None,
+                      'purlin': {'section': add_steel(pur), 'spacing': pur['spacing']} if pur else None,
+                      'status': 'from_drawing', 'src': 'S.2.03–S.2.05 + A.4.01'})
+        roofs[-1] = {k: v for k, v in roofs[-1].items() if v is not None}
+        Q.append({'id': 'roof', 'q': f'หลังคา: ใส่เป็นหลังคาเพิงสูงฝั่งกริด A ต่ำฝั่งกริด C ลาด {pitch:.1f}° ยื่น 1.10 ม. รอบ — โครง Truss T1 (75x75x3.2 / 38x38x1.6 ลึก 0.40) และอะเส 2C-100x50x20x2.3 อยู่แนวกริดไหนบ้าง (ยังไม่ได้ใส่เป็นชิ้นส่วน)'})
     bm = {'schema_version': '0.1', 'meta': meta, 'site': {'v50': 25, 'terrain': 'A', 'seismic_zone': 'none', 'site_class': 'D', 'status': 'assumed'},
           'grids': G, 'levels': levels, 'materials': mats, 'sections': list(secs.values()), 'nodes': list(nodes.values()), 'members': members,
-          'supports': supports, 'slabs': [], 'walls': [], 'design': design,
+          'supports': supports, 'slabs': slabs, 'walls': [], 'roofs': roofs, 'design': design,
           'history': [{'at': datetime.datetime.now().astimezone().isoformat(timespec='seconds'), 'by': 'tools/dwgread.py', 'sections': ['*'], 'note': 'อ่านจาก ' + rep['source']['source']}]}
     if csrc:
         for l in bm['levels']:

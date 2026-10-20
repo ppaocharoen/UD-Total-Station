@@ -278,6 +278,7 @@ def check_sheets(doc, sheets):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('src'); ap.add_argument('--out'); ap.add_argument('--report')
+    ap.add_argument('--overlay', help='ไฟล์ JSON ส่วนที่อ่านด้วยภาพ/กรอกเพิ่ม (walls, opening_types, openings, …) — รวมเข้าโมเดลทับส่วนเดียวกัน')
     ap.add_argument('--sheets-only', action='store_true', help='แค่แยกแผ่นและตรวจเลขแผ่น')
     a = ap.parse_args()
     doc, info = load(a.src)
@@ -298,6 +299,21 @@ def main():
     from dwgread_model import to_bm
     found, questions = build_model(doc, sheets, info)
     bm = to_bm(found, sheets, questions)
+    if a.overlay:
+        ov = json.load(open(a.overlay))
+        for k, v in ov.items():
+            if k.startswith('_'):
+                continue
+            if isinstance(v, list) and isinstance(bm.get(k), list):
+                ids = {x.get('id') for x in v if isinstance(x, dict)}
+                bm[k] = [x for x in bm[k] if x.get('id') not in ids] + v
+            elif isinstance(v, dict) and isinstance(bm.get(k), dict):
+                bm[k].update(v)
+            else:
+                bm[k] = v
+        drop = set(ov.get('_resolved', []))
+        questions[:] = [q for q in questions if q['id'] not in drop]
+        bm['history'].append({'at': bm['history'][0]['at'], 'by': 'tools/dwgread.py --overlay', 'sections': [k for k in ov if not k.startswith('_')], 'note': os.path.basename(a.overlay)})
     rep['found'] = found; rep['questions'] = questions
     if a.out:
         json.dump(bm, open(a.out, 'w'), ensure_ascii=False, indent=1)
