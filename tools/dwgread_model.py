@@ -692,6 +692,55 @@ def to_bm(rep, sheets, Q):
             z = surf(n['x'], n['y'])
             if z is not None:
                 n['z'] = round(z, 3)
+    # คานนอกอาคารที่วิ่งมาชนคานขอบอาคาร: ไม่ยกขึ้นไปหาระดับคานอาคาร — วิ่งราบระดับเดียวกับช่วงนอกไปชนข้างคาน
+    # และช่วงสั้นที่ถูกตัดด้วยคานขวาง ต่อเป็นตัวเดียว (Earth 20 ต.ค. 2569: B3 ข้างทางลาดวิ่งยาวไปชน B2)
+    NID = {n['id']: n for n in nodes.values()}
+    for x in [x for x in members if x['type'] == 'tie_beam']:
+        a, b = NID[x['i']], NID[x['j']]
+        for end, other in (('i', b), ('j', a)):
+            e = NID[x[end]]
+            if inside(e) and not inside(other) and abs(e['z'] - other['z']) > 1e-6:
+                k = (e['x'], e['y'], other['z'])
+                x[end] = node(*k, '1F')
+                NID = {n['id']: n for n in nodes.values()}
+    merged = True
+    while merged:
+        merged = False
+        tb = [x for x in members if x['type'] == 'tie_beam']
+        for x in tb:
+            a, b = NID[x['i']], NID[x['j']]
+            if not (inside(a) and not inside(b) or inside(b) and not inside(a)):
+                continue
+            if not ((inside(a) and (a['x'] in (0, xmax) or a['y'] in (0, ymax))) or (inside(b) and (b['x'] in (0, xmax) or b['y'] in (0, ymax)))):
+                continue
+            out_ = x['j'] if inside(a) else x['i']; on_ = x['i'] if inside(a) else x['j']
+            nb = next((y for y in tb if y is not x and y['mark'] == x['mark'] and out_ in (y['i'], y['j'])
+                       and abs((NID[y['i']]['x'] - NID[y['j']]['x']) * (NID[on_]['y'] - NID[out_]['y']) - (NID[y['i']]['y'] - NID[y['j']]['y']) * (NID[on_]['x'] - NID[out_]['x'])) < 1e-6), None)
+            if nb and abs(NID[nb['i']]['z'] - NID[nb['j']]['z']) < 1e-6:
+                far = nb['i'] if nb['j'] == out_ else nb['j']
+                nb['i'], nb['j'] = far, on_
+                members.remove(x); design['members'].pop(x['id'], None)
+                merged = True
+                break
+    # จุดแบ่งคานที่ไม่เหลือชิ้นอื่นมาต่อ (เช่น คานนอกอาคารย้ายไปชนข้างคาน) → รวมสองท่อนที่ต่อตรงกันเป็นตัวเดียว
+    merged = True
+    while merged:
+        merged = False
+        use = Counter(n for x in members for n in (x['i'], x['j']))
+        for nid, c_ in use.items():
+            if c_ != 2:
+                continue
+            two = [x for x in members if nid in (x['i'], x['j'])]
+            if len(two) != 2 or any(x['type'] != 'tie_beam' for x in two) or two[0]['mark'] != two[1]['mark']:
+                continue
+            p_ = [NID[two[0]['i'] if two[0]['j'] == nid else two[0]['j']], NID[nid], NID[two[1]['i'] if two[1]['j'] == nid else two[1]['j']]]
+            if abs((p_[1]['x'] - p_[0]['x']) * (p_[2]['y'] - p_[0]['y']) - (p_[1]['y'] - p_[0]['y']) * (p_[2]['x'] - p_[0]['x'])) > 1e-6 or abs(p_[0]['z'] - p_[2]['z']) > 1e-6:
+                continue
+            keep, drop = two
+            keep['i'], keep['j'] = p_[0]['id'], p_[2]['id']
+            members.remove(drop); design['members'].pop(drop['id'], None)
+            merged = True
+            break
     # หลังคาเพิง: จากรูปตัด (สูงฝั่งกริด A ระดับหลัง Truss, ต่ำฝั่งกริด C ระดับอะเส) + ระยะยื่นจากแปลนโครงหลังคา
     roofs = []
     rs = rep.get('roof') or {}
@@ -782,10 +831,10 @@ def to_bm(rep, sheets, Q):
                     for a, b in zip(xs, xs[1:]):
                         mem(mk, 'steel_beam', node(a, y, zpl(y)), node(b, y, zpl(y)), sid, t['src'])
                 else:                  # ตามแนวกริดตัวเลข เฉพาะช่วงที่ป้ายชี้ (ลาดตามระนาบจันทัน)
+                    # อะเสแนวกริดตัวเลข = อะเสบนผนังหัวท้าย วิ่งราบระดับอะเสตลอดแนว ชนโครงถักฝั่งสูง (รูปตัด A.4.06; Earth 20 ต.ค. 2569)
                     x = GX[t['grid']]
-                    seg = next(((a, b) for a, b in zip(ys_, ys_[1:]) if a <= t['at'] <= b), None)
-                    if seg:
-                        mem(mk, 'steel_beam', node(x, seg[0], zpl(seg[0])), node(x, seg[1], zpl(seg[1])), sid, t['src'])
+                    for a, b in zip(ys_, ys_[1:]):
+                        mem(mk, 'steel_beam', node(x, a, roof), node(x, b, roof), sid, t['src'] + ' + รูปตัด A.4')
         # จันทัน / แป ตามตำแหน่งที่ป้ายชี้ในแปลนจันทัน-แป (ลูกศรแต่ละเส้น = 1 ตัว) ยาวเต็มขอบชายคา
         ox0, ox1, oy0, oy1 = xs[0] - ov, xs[-1] + ov, ys_[0] - ov, ys_[-1] + ov
         def snap(v, lo, hi):   # ปลายลูกศรชี้ไม่เป๊ะ: ใกล้ขอบชายคา ≤ 0.10 / ใกล้แนวกริด ≤ 0.05 → ยึดค่านั้น
@@ -829,7 +878,7 @@ def to_bm(rep, sheets, Q):
         if not tags:
             Q.append({'id': 'roof', 'q': f'แปลนโครงหลังคาไม่พบป้ายชี้ — ใส่ Truss แนวกริด {hiY} อย่างเดียว อะเส/ดั้งอยู่แนวไหน'})
     bm = {'schema_version': '0.1', 'meta': meta, 'site': {'v50': 25, 'terrain': 'A', 'seismic_zone': 'none', 'site_class': 'D', 'status': 'assumed'},
-          'grids': G, 'levels': levels, 'materials': mats, 'sections': list(secs.values()), 'nodes': list(nodes.values()), 'members': members,
+          'grids': G, 'levels': levels, 'materials': mats, 'sections': list(secs.values()), 'nodes': [n for n in nodes.values() if n['id'] in {v for x in members for v in (x['i'], x['j'])} | {sp['node'] for sp in supports}], 'members': members,
           'supports': supports, 'slabs': slabs, 'walls': [], 'roofs': roofs, 'design': design,
           'history': [{'at': datetime.datetime.now().astimezone().isoformat(timespec='seconds'), 'by': 'tools/dwgread.py', 'sections': ['*'], 'note': 'อ่านจาก ' + rep['source']['source']}]}
     if csrc:
