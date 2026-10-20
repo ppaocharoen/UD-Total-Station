@@ -454,6 +454,13 @@ class Takeoff:
                 self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {t*100:g} ซม.", "ตร.ม.", A, s["id"], task=lt)
                 continue
             self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {t:g} = {A*t:.3f} ลบ.ม.")
+            et = s.get("edge_thicken")
+            if et and et.get("sides"):   # ขอบพื้นพับลง (คางหมู กว้างบน/ล่าง ลึกเพิ่ม d) ตามด้านของ polygon ที่ระบุ
+                pg = s["polygon"]
+                Le = sum(dist2(pg[i], pg[(i + 1) % len(pg)]) for i in et["sides"])
+                ae = (et.get("w_top", 0) + et.get("w_bot", 0)) / 2 * et.get("d", 0)
+                self.add("1.1.12", key, name, "ลบ.ม.", Le * ae, s["id"], task=lt,
+                         calc=f"ขอบพับลง ยาว {Le:.2f} × ({et.get('w_top', 0):g}+{et.get('w_bot', 0):g})/2 × ลึก {et.get('d', 0):g} = {Le*ae:.3f} ลบ.ม.")
             if s["kind"] == "cast":
                 self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task=lt,
                          calc=f"ท้องพื้น {A:.2f} + ขอบ {P:.2f}×{t:g} = {A+P*t:.2f} ตร.ม.")

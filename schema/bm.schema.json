@@ -1125,6 +1125,32 @@
               ]
             }
           }
+        },
+        "edge_thicken": {
+          "type": "object",
+          "description": "ขอบพื้นพับลง (พื้นวางบนดินภายนอก): หน้าตัดคางหมูใต้พื้น",
+          "properties": {
+            "d": {
+              "type": "number",
+              "description": "ลึกเพิ่มจากท้องพื้น ม."
+            },
+            "w_top": {
+              "type": "number",
+              "description": "กว้างที่ท้องพื้น ม."
+            },
+            "w_bot": {
+              "type": "number",
+              "description": "กว้างที่ก้น ม."
+            },
+            "sides": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "description": "ด้านของ polygon (จุด i → i+1) ที่พับลง"
+            }
+          }
         }
       }
     },
