@@ -1260,6 +1260,13 @@
         },
         "price_ref": {
           "$ref": "#/$defs/priceRef"
+        },
+        "shape": {
+          "enum": [
+            "rect",
+            "arch"
+          ],
+          "description": "rect = สี่เหลี่ยม (ค่าตั้งต้น) · arch = สี่เหลี่ยม w×h + ครึ่งวงกลมรัศมี w/2 ด้านบน"
         }
       }
     },

@@ -221,6 +221,53 @@ for r in m['roofs']:
 row('หลังคา', 'แผ่นเหล็กหัวเสา × 10', 'Plate 200x200x9 มม. + J-Bolt ชุบกัลวาไนซ์ 10x300 มม. 4 ตัว ที่หัวเสา C1 ทุกต้น (รับ Truss / อะเส)', 'S.3.01', FD, 'ยังไม่ได้ใส่เป็นชิ้นในโมเดล — คิดปริมาณในขั้น BOQ')
 row('อื่นๆ', 'ขอบคันกั้นทางลาด', 'ขอบ ⑥ จากขั้น 1 เป็นคอนกรีตต่อกับพื้นทางลาด (S.3.02 แบบขยายทางลาด)', 'A.5.01, S.3.02', FD, 'เก็บเป็นผนัง other — ปริมาณคอนกรีตยังไม่รวม')
 
+# ---------------------------------------------------------------- ทับหลัง / คานเอ็นใต้ช่อง / เสาเอ็นข้างช่องเปิด (ขนาดตามที่ตกลงกับ Earth 21 ต.ค.)
+# ทับหลัง/คานเอ็น 0.10 (หนาเท่าผนัง) × ลึก 0.10 · RB6 2 เส้น ปลอก RB6@0.20 · ยื่นเลยขอบช่องข้างละ 0.20 · เสาเอ็นเพิ่มเฉพาะข้างที่ยังไม่มี
+c10 = 'RC-10x10'
+MAS = ('brick_mon', 'brick_mon_full', 'aac', 'block', 'block_07')
+OTs = m['opening_types']; WL = {w['id']: w for w in m['walls']}
+opsw = {}
+for o in m['openings']:
+    opsw.setdefault(o['wall'], []).append(o)
+vert = [(nodes[x['i']]['x'], nodes[x['i']]['y']) for x in members if x['type'] in ('stiffener', 'column')]
+nl = ns = nst = 0
+for wid, ops in opsw.items():
+    w = WL[wid]
+    if w['kind'] not in MAS:
+        continue
+    a, b = w['path']; L = math.dist(a, b); ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+    P = lambda u: (a[0] + ux * u, a[1] + uy * u)
+    for o in ops:
+        t = OTs[o['type']]; u0, u1 = o['at'] - t['w'] / 2, o['at'] + t['w'] / 2
+        sill = t.get('sill', 0); ztop = w['bottom'] + sill + t['h'] + (t['w'] / 2 if t.get('shape') == 'arch' else 0)
+        above = any(p is not o and min(u1, q1) - max(u0, q0) > 1e-6 and w['bottom'] + OTs[p['type']].get('sill', 0) <= ztop + 0.01
+                    for p in ops for q0, q1 in [(p['at'] - OTs[p['type']]['w'] / 2, p['at'] + OTs[p['type']]['w'] / 2)])
+        e0, e1 = max(0, u0 - 0.20), min(L, u1 + 0.20)
+        if w['top'] - ztop >= 0.10 - 1e-6 and not above:
+            nl += 1; z = round(ztop + 0.10, 3)
+            mem(f'LT-{nl:02d}', 'ทับหลัง', 'lintel', (*P(e0), z), (*P(e1), z), c10, f'ตกลงกับ Earth (แบบไม่ระบุ) · เหนือ {o["id"]}', 'user')
+        below = any(p is not o and min(u1, q1) - max(u0, q0) > 1e-6 and OTs[p['type']].get('sill', 0) + OTs[p['type']]['h'] >= sill - 0.01
+                    for p in ops for q0, q1 in [(p['at'] - OTs[p['type']]['w'] / 2, p['at'] + OTs[p['type']]['w'] / 2)])
+        if sill > 1e-6 and not below:
+            ns += 1; z = round(w['bottom'] + sill, 3)
+            mem(f'LS-{ns:02d}', 'คานเอ็น', 'lintel', (*P(e0), z), (*P(e1), z), c10, f'ตกลงกับ Earth (แบบไม่ระบุ) · ใต้ {o["id"]}', 'user')
+        for u in (u0 - 0.05, u1 + 0.05):
+            if u < 0.05 or u > L - 0.05:
+                continue   # ชิดปลายผนัง = เสา/เสาเอ็นปลายผนังอยู่แล้ว
+            xy = P(u)
+            if any(math.dist(xy, v) <= 0.15 for v in vert):
+                continue
+            nst += 1
+            mem(f'SA-{nst:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), c10, f'ข้าง {o["id"]} — ตกลงกับ Earth (แบบไม่ระบุ)', 'user')
+            vert.append(xy)
+for x in members:   # เหล็กเสริมเสาเอ็น/ทับหลังรวมในราคาต่อเมตร (ว480) — เก็บเป็นหมายเหตุ ไม่ลง design (กันนับซ้ำ)
+    if x['type'] in ('stiffener', 'lintel'):
+        x['note'] = (x.get('note', '') + ' · เหล็ก RB6 2 เส้น ปลอก RB6@0.20 (ตกลงกับ Earth)').strip(' ·')
+row('ทับหลัง', f'LT-01…LT-{nl:02d}', 'ทับหลัง คสล. 0.10×0.10 เหนือช่องเปิดในผนังก่อที่มีผนังเหนือช่อง ≥ 0.10 ยื่นเลยขอบช่องข้างละ 0.20 (ไม่เกินปลายผนัง)', 'ตกลงกับ Earth 21 ต.ค.', 'user', 'แบบไม่ระบุขนาด — Earth จะปรับดีเทลภายหลัง')
+row('ทับหลัง', f'LS-01…LS-{ns:02d}', 'คานเอ็นใต้ช่อง (ธรณี) 0.10×0.10 ใต้ช่องที่ยกจากพื้น (แผงบล็อกช่องลม/บล็อกแก้ว)', 'ตกลงกับ Earth 21 ต.ค.', 'user')
+row('เสาเอ็น', f'SA-01…SA-{nst:02d}', f'เสาเอ็นเพิ่มข้างช่องเปิด {nst} ต้น เฉพาะข้างที่ยังไม่มีเสาเอ็นจากแปลน/เสา (ห่าง ≤ 0.15)', 'ตกลงกับ Earth 21 ต.ค.', 'user')
+row('ช่องเปิด', 'การหักผนัง', 'ผนังหักพื้นที่ช่องเปิดทุกช่อง (ช่องโค้งหักส่วนครึ่งวงกลมด้วย) · 3D เจาะผนังเป็นช่องจริง · ช่องโล่งไม่มีบานแสดงเป็นช่องว่าง', 'tools/takeoff.py, viewer', FD)
+print('lintel', nl, 'sill', ns, 'stiff', nst)
 bm = dict(m)
 bm['meta'] = dict(m['meta'], name='ห้องสุขา รร.เทศบาล 4 — ขั้น 2 โครงสร้าง', stage=2)
 bm['materials'] = mats

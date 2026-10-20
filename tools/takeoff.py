@@ -171,6 +171,14 @@ def bored_pile_item(p):
     return key, name
 
 
+def open_area(t):
+    """พื้นที่ช่องเปิด: สี่เหลี่ยม w×h (+ ครึ่งวงกลมด้านบนถ้าเป็นช่องโค้ง)"""
+    a = t["w"] * t["h"]
+    if t.get("shape") == "arch":
+        a += math.pi * (t["w"] / 2) ** 2 / 2
+    return a
+
+
 class Takeoff:
     def __init__(self, m, settings=None):
         self.m = m
@@ -248,6 +256,8 @@ class Takeoff:
     # ------------------------------------------------------------ run
     def run(self):
         self.columns = [x for x in self.m.get("members", []) if x["type"] == "column"]
+        # เสาเอ็น/ทับหลังเป็นชิ้นในโมเดล → คิดเป็นรายการต่อเมตรจากชิ้นจริง ไม่ประมาณรอบช่องเปิดเอง
+        self.explicit_lintel = any(x["type"] in ("stiffener", "lintel") for x in self.m.get("members", []))
         self.col_at = defaultdict(list)          # (x,y) ปัด → เสา
         for c in self.columns:
             p, q = self.mem_geom(c)
@@ -401,7 +411,7 @@ class Takeoff:
     def _beams(self):
         c = self.s["cover"]
         for x in self.m.get("members", []):
-            if x["type"] not in ("beam", "tie_beam", "lintel"):
+            if x["type"] not in ("beam", "tie_beam", "lintel") or (x["type"] == "lintel" and self.explicit_lintel):
                 continue
             sec = self.secs.get(x["section"], {})
             if sec.get("kind") != "rc_rect":
@@ -625,7 +635,7 @@ class Takeoff:
                     ded += half * (1 if (t < half + 1e-6 or t > seg - half - 1e-6) else 2)
             H = w["top"] - w["bottom"]
             gross = max(L - ded, 0) * H
-            opens = sum(ot[o["type"]]["w"] * ot[o["type"]]["h"] for o in open_by_wall[w["id"]] if o["type"] in ot)
+            opens = sum(open_area(ot[o["type"]]) for o in open_by_wall[w["id"]] if o["type"] in ot)
             net = max(gross - opens, 0)
             self.add("1.2.3", f"wall_{w['kind']}", WALL_NAME.get(w["kind"], "ผนัง") + f" หนา {w['t']*100:g} ซม.", "ตร.ม.",
                      net, w["id"], task="wall",
@@ -650,7 +660,7 @@ class Takeoff:
                     self.add("1.2.7", "paint_int", "ทาสีน้ำอะคริลิกภายใน", "ตร.ม.", net * sides, w["id"], task="paint")
             for o in open_by_wall[w["id"]]:
                 t = ot.get(o["type"])
-                if t and w["kind"] in ("brick_mon", "brick_mon_full", "aac", "block", "block_07"):
+                if t and not self.explicit_lintel and w["kind"] in ("brick_mon", "brick_mon_full", "aac", "block", "block_07"):
                     ext = self.s["lintel_extra"]
                     run = (t["w"] + 2 * ext) * (2 if t.get("sill", 0) > 0 else 1) + 2 * t["h"]   # ทับหลัง (+ธรณี) + เสาเอ็น 2 ข้าง
                     it = self.add("1.2.3", "lintel", "เสาเอ็น-ทับหลัง คสล. รอบช่องเปิด", "ม.", run, o["id"], task="wall")
@@ -661,7 +671,16 @@ class Takeoff:
                 it = self.add("1.2.6", f"open_{o['type']}", f"{t.get('desc', o['type'])} ({o['type']} {t['w']:g}×{t['h']:g} ม.)",
                          "ชุด", 1, o["id"], count=True, task="opening")
                 it["spec"] = {"t": "opening", "kind": t.get("kind", ""), "w": t["w"], "h": t["h"], "desc": t.get("desc", "")}
-        self.note("เสาเอ็น-ทับหลัง: คิดเฉพาะรอบช่องเปิด (ทับหลัง+ธรณี ยาว w+2×0.30 และเสาเอ็น 2 ข้างสูง h) ยังไม่รวมเสาเอ็นกลางผนัง/ปลายผนัง")
+        if self.explicit_lintel:
+            for x in self.m.get("members", []):
+                if x["type"] in ("stiffener", "lintel"):
+                    p, q = self.mem_geom(x); L = math.dist(p, q)
+                    it = self.add("1.2.3", "lintel", "เสาเอ็น-ทับหลัง คสล.", "ม.", L, x["id"], task="wall",
+                                  calc=f"{'เสาเอ็น' if x['type'] == 'stiffener' else 'ทับหลัง/คานเอ็น'} ยาว {L:.2f} ม.")
+                    it.setdefault("spec", {"t": "lintel"})
+            self.note("เสาเอ็น-ทับหลัง: คิดจากชิ้นเสาเอ็น/ทับหลังในโมเดล (ความยาวจริง)")
+        else:
+            self.note("เสาเอ็น-ทับหลัง: คิดเฉพาะรอบช่องเปิด (ทับหลัง+ธรณี ยาว w+2×0.30 และเสาเอ็น 2 ข้างสูง h) ยังไม่รวมเสาเอ็นกลางผนัง/ปลายผนัง")
 
     # ------------------------------------------------------------ งานผิว
     def _finishes(self):
