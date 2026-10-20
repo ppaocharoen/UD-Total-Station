@@ -688,12 +688,15 @@ def to_bm(rep, sheets, Q):
         per = (d['h'] + 2 * d['b'] + 2 * d.get('lip', 0) - 4 * t) if sec['shape'].startswith('lipped') else 2 * (d['h'] + d['b'] - 2 * t)
         kg = round(per * t * 7850 * (2 if sec['shape'].endswith('double') else 1), 2)
         secs.setdefault(sec['id'], {'id': sec['id'], 'kind': 'cold_formed', 'shape': 'lipped_C' if sec['shape'].startswith('lipped') else 'box', 'name': sec['id'], 'kg_m': kg,
+                                    'dims': {k: round(v * (2 if k == 'b' and sec['shape'].endswith('double') else 1), 4) for k, v in d.items()},
                                     'status': 'from_drawing', 'src': 'S.2.03', 'note': 'น้ำหนักต่อเมตรคิดจากเส้นกลางแผ่น (ไม่ใช่ตาราง มอก.)'})
         return sec['id']
     if chain and len(chain) > 2 and GX and GY:
         ov = 1.1
         pitch = math.degrees(math.atan(chain[2] / ymax)) if ymax else 0
-        eave = round(roof - (ov * chain[2] / ymax), 3)
+        # ระนาบแผ่นหลังคา = ระนาบท้องจันทัน (หลังอะเส/คอร์ดบน) + ครึ่งความลึกอะเส + จันทัน + แป
+        stack = 0.05 + (raf['dims']['h'] if raf else 0) + (pur['dims']['h'] if pur else 0)
+        eave = round(roof - (ov * chain[2] / ymax) + stack, 3)
         cover = 'metal_sheet' if any('เมทัลชีท' in t for t in rs.get('cover', [])) else 'metal_sheet'
         roofs.append({'id': 'R1', 'form': 'shed', 'low': 'y2', 'outline': [[-ov, -ov], [xmax + ov, -ov], [xmax + ov, ymax + ov], [-ov, ymax + ov]],
                       'eave': eave, 'pitch': round(pitch, 2), 'overhang': ov, 'cover': cover,
