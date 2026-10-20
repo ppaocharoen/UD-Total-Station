@@ -313,6 +313,13 @@ def roof_specs(sheets):
     return {k: sorted(v) for k, v in out.items()}
 
 
+def _dseg(p, a, b):
+    """ระยะจากจุดถึงส่วนของเส้นตรง"""
+    dx, dy = b[0] - a[0], b[1] - a[1]; L2 = dx * dx + dy * dy
+    t = 0 if L2 == 0 else max(0, min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    return dist(p, (a[0] + t * dx, a[1] + t * dy))
+
+
 def roof_plan_tags(sheets):
     """แปลนโครงหลังคา: วงกลมหมายเลขชี้ด้วยเส้นโยง (leader) ไปที่แนวกริด → [(ป้าย, รายการวัสดุ, แกน, ชื่อกริด, ตำแหน่งปลายเส้นตามแนวกริด)]
     ตารางสัญลักษณ์ = วงกลมที่มีข้อความยาวอยู่ทางขวาแถวเดียวกัน"""
@@ -345,6 +352,7 @@ def roof_plan_tags(sheets):
             elif q['kind'] == 'poly' and not q.get('closed'):
                 segs += list(zip(q['p'], q['p'][1:]))
         tol = 0.6 * sc
+        leaders = [q for q in P if q['kind'] == 'poly' and q.get('leader') and len(q['p']) >= 2]
         x0, y0 = min(GXs.values()), min(GYs.values())
         for lab, c in tags:
             end = None
@@ -360,14 +368,22 @@ def roof_plan_tags(sheets):
                             cur = nxt; used += 1
                         if end is None or dist(cur, c['c']) > dist(end, c['c']):
                             end = cur
+            # ป้ายเดียวชี้หลายเส้น (LEADER หลายเส้นต่อกันเป็นพัด) → ปลายลูกศรทุกเส้น = ตำแหน่งชิ้นส่วนแต่ละตัว (จันทัน/แป)
+            group = [q for q in leaders if dist(q['p'][-1], c['c']) < c['r'] * 1.6]
+            grow = True
+            while grow:
+                grow = False
+                for q in leaders:
+                    if q not in group and any(_dseg(q['p'][-1], a_, b_) < tol for g_ in group for a_, b_ in zip(g_['p'], g_['p'][1:])):
+                        group.append(q); grow = True
+            tips = sorted((round(q['p'][0][0] - x0, 3), round(q['p'][0][1] - y0, 3)) for q in group)
             if end is None:
                 continue
             cand = [(abs(end[0] - v), 'X', k, end[1] - y0) for k, v in GXs.items()] + [(abs(end[1] - v), 'Y', k, end[0] - x0) for k, v in GYs.items()]
             d, ax, g, along = min(cand)
-            if d < 1.5 * sc * 10:
-                out.append({'label': lab, 'item': legend.get(lab), 'axis': ax, 'grid': g, 'at': round(along, 2), 'src': sh['num']})
-        if out:
-            return out
+            if d < 1.5 * sc * 10 or len(tips) >= 2:
+                out.append({'label': lab, 'item': legend.get(lab), 'axis': ax, 'grid': g, 'at': round(along, 2), 'src': sh['num'],
+                            **({'tips': tips} if len(tips) >= 2 else {})})
     return out
 
 
@@ -770,6 +786,44 @@ def to_bm(rep, sheets, Q):
                     seg = next(((a, b) for a, b in zip(ys_, ys_[1:]) if a <= t['at'] <= b), None)
                     if seg:
                         mem(mk, 'steel_beam', node(x, seg[0], zpl(seg[0])), node(x, seg[1], zpl(seg[1])), sid, t['src'])
+        # จันทัน / แป ตามตำแหน่งที่ป้ายชี้ในแปลนจันทัน-แป (ลูกศรแต่ละเส้น = 1 ตัว) ยาวเต็มขอบชายคา
+        ox0, ox1, oy0, oy1 = xs[0] - ov, xs[-1] + ov, ys_[0] - ov, ys_[-1] + ov
+        def snap(v, lo, hi):   # ปลายลูกศรชี้ไม่เป๊ะ: ใกล้ขอบชายคา ≤ 0.10 / ใกล้แนวกริด ≤ 0.05 → ยึดค่านั้น
+            if abs(v - lo) <= 0.1: return lo
+            if abs(v - hi) <= 0.1: return hi
+            g_ = min(list(GX.values()) + list(GY.values()), key=lambda w: abs(w - v))
+            return g_ if abs(g_ - v) <= 0.05 else round(v, 2)
+        lay = {}
+        for t in tags:
+            it = t['item'] or ''
+            if len(t.get('tips') or []) < 2 or not ('จันทัน' in it or 'แป' in it):
+                continue
+            sec = steel_section(it)
+            if not sec:
+                continue
+            tp = 'rafter' if 'จันทัน' in it else 'purlin'
+            d = lay.setdefault(tp, {'sec': sec, 'src': t['src'], 'x': set(), 'y': set()})
+            tx = [q[0] for q in t['tips']]; ty = [q[1] for q in t['tips']]
+            if max(tx) - min(tx) > max(ty) - min(ty):   # ลูกศรเรียงตามแกน X → ชิ้นส่วนวิ่งตามแกน Y
+                d['x'] |= {snap(v, ox0, ox1) for v in tx}
+            else:
+                d['y'] |= {snap(v, oy0, oy1) for v in ty}
+        hr = lay['rafter']['sec']['dims']['h'] if 'rafter' in lay else 0
+        for tp, d in lay.items():
+            sid = add_steel(d['sec']); mk = 'RF' if tp == 'rafter' else 'PL'
+            hh = d['sec']['dims']['h']
+            zc = (lambda y: zpl(y) + 0.05 + hh / 2) if tp == 'rafter' else (lambda y: zpl(y) + 0.05 + hr + hh / 2)
+            if d['x']:   # วิ่งตามแกน Y — แบ่งที่แนวรับ (กริดตัวอักษร) ให้ต่อกันเป็นช่วง
+                cuts = [oy0] + [v for v in ys_ if oy0 < v < oy1] + [oy1]
+                for x in sorted(d['x']):
+                    for a, b in zip(cuts, cuts[1:]):
+                        mem(mk, tp, node(x, a, zc(a)), node(x, b, zc(b)), sid, d['src'] + ' แปลนจันทัน-แป')
+            if d['y']:   # วิ่งตามแกน X — แบ่งที่ตำแหน่งจันทัน
+                rx = sorted(lay['rafter']['x']) if 'rafter' in lay and lay['rafter']['x'] else []
+                cuts = sorted({ox0, ox1} | {v for v in rx if ox0 < v < ox1})
+                for y in sorted(d['y']):
+                    for a, b in zip(cuts, cuts[1:]):
+                        mem(mk, tp, node(a, y, zc(y)), node(b, y, zc(y)), sid, d['src'] + ' แปลนจันทัน-แป')
         if 'SSC400' not in {m['id'] for m in mats}:
             mats.append({'id': 'SSC400', 'kind': 'cold_formed', 'grade': 'SSC400 (มอก.1228)', 'fy': 2450, 'status': 'assumed'})
         if not tags:
