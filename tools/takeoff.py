@@ -327,9 +327,9 @@ class Takeoff:
             bu = rb.get("bend_up", 0)   # ปลายเหล็กตะแกรงหักขึ้น (ม. ต่อปลาย) — หักขึ้นสองด้าน
             bt = f" + หักขึ้น 2×{bu:g}" if bu else ""
             if rb.get("bars_x"):
-                n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c + 2 * bu), f"แนว x {n} เส้น × ({b - 2*c:.2f}{bt}) ม.")
+                n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c + 2 * bu), f"แนว x {n} เส้น × ({b - 2*c:.2f}{bt}) ม." if bu else f"แนว x {n} เส้น × {b - 2*c:.2f} ม.")
             if rb.get("bars_y"):
-                n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c + 2 * bu), f"แนว y {n} เส้น × ({d - 2*c:.2f}{bt}) ม.")
+                n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c + 2 * bu), f"แนว y {n} เส้น × ({d - 2*c:.2f}{bt}) ม." if bu else f"แนว y {n} เส้น × {d - 2*c:.2f} ม.")
             if rb.get("dowel"):   # เหล็กเดือย (Dowel) จากฐานรากต่อเข้าตอม่อ: [จำนวน, ขนาด, ยาวต่อเส้น ม.]
                 n, dia, ln = rb["dowel"]; self.rebar(f["id"], dia, n * ln, f"เหล็กเดือย {n:g} เส้น × {ln:.2f} ม.")
             if rb.get("rings"):   # ฐานเข็ม 1 ต้น: ปลอกรอบ / ฐานแผ่: เหล็กรัดรอบ
