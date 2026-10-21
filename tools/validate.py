@@ -117,7 +117,7 @@ def check_refs(m, rep):
     existing = {s.get("id") for s in ((m.get("site") or {}).get("existing") or {}).get("structures", []) or []}
     all_elem = set(seen)
     mep = m.get("mep") or {}
-    for grp, keys in (("electrical", ("panels", "points")), ("plumbing", ("fixtures", "pipes", "equipment"))):
+    for grp, keys in (("electrical", ("panels", "points", "conduits")), ("plumbing", ("fixtures", "pipes", "equipment"))):
         for k in keys:
             all_elem |= {x.get("id") for x in (mep.get(grp) or {}).get(k, []) if x.get("id")}
 

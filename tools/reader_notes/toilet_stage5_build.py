@@ -315,11 +315,11 @@ row('สุขาภิบาล', 'ถังบำบัด', 'ถังบำ�
 for k, (x, y) in enumerate([TL, TR], 1):
     sq = [[r2(x - 0.85), r2(y - 0.85)], [r2(x + 0.85), r2(y - 0.85)], [r2(x + 0.85), r2(y + 0.85)], [r2(x - 0.85), r2(y + 0.85)]]
     m['slabs'].append({'id': f'STP-{k}', 'mark': 'STP', 'kind': 'ground', 't': 0.15, 'top': -1.50, 'polygon': sq, 'material': 'C240',
-                       'use': 'พื้นรับน้ำหนักถังบำบัด', 'status': AS, 'src': 'SN.3.01 ขยายพื้นรับน้ำหนักถังบำบัด (หนา 0.15 RB9@0.20#)',
+                       'use': 'พื้นรับน้ำหนักถังบำบัด', 'task': 'mep_ext', 'status': AS, 'src': 'SN.3.01 ขยายพื้นรับน้ำหนักถังบำบัด (หนา 0.15 RB9@0.20#)',
                        'note': 'ขนาด 1.70×1.70 ตามกรอบ A ของ KS-2000 · ระดับคิดเอง (ใต้ถัง H 1.40 + ฝา 0.10)'})
     m['design']['slabs'][f'STP-{k}'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': FD, 'src': 'SN.3.01 RB9 @0.20#'}
     m['slabs'].append({'id': f'STC-{k}', 'mark': 'STC', 'kind': 'ground', 't': 0.10, 'top': 0.00, 'polygon': sq, 'material': 'C240',
-                       'use': 'ค.ส.ล.รัดฝาถังบำบัด', 'status': AS, 'src': 'SN.3.01 ค.ส.ล.รัดฝาถัง หนา 0.10 RB9@0.20#',
+                       'use': 'ค.ส.ล.รัดฝาถังบำบัด', 'task': 'mep_ext', 'status': AS, 'src': 'SN.3.01 ค.ส.ล.รัดฝาถัง หนา 0.10 RB9@0.20#',
                        'note': 'ขนาดเท่าพื้นรับถัง ไม่หักช่องฝา — คิดเอง'})
     m['design']['slabs'][f'STC-{k}'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': FD, 'src': 'SN.3.01 RB9 @0.20#'}
 fin = m['finishes']

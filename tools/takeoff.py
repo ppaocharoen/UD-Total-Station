@@ -229,6 +229,13 @@ class Takeoff:
             lv = n.get("level") or min(self.levels, key=lambda k: abs(self.levels[k] - n["z"]), default="?")
         return "lift:" + lv
 
+    def slab_lift(self, top):
+        """พื้นที่ไม่ระบุระดับ: ไปกับงานโครงสร้างระดับสูงสุดที่ไม่เกินหลังพื้น + 0.20 (พื้นวางบนดินเทหลังคานคอดินรอบพื้น)"""
+        lifts = {self.lift(x) for x in self.m.get("members", []) if x.get("type") in ("beam", "tie_beam", "column")}
+        lz = sorted(((self.levels.get(t[5:], 0.0), t) for t in lifts), key=lambda v: v[0])
+        ok = [t for z, t in lz if z <= top + 0.20 + 1e-6]
+        return ok[-1] if ok else (lz[0][1] if lz else "slab")
+
     def note(self, msg):
         if msg not in self.notes:
             self.notes.append(msg)
@@ -461,7 +468,7 @@ class Takeoff:
     def _slabs(self):
         for s in self.m.get("slabs", []):
             A, P, t = poly_area(s["polygon"]), poly_perim(s["polygon"]), s["t"]
-            lt = "lift:" + s["level"] if s.get("level") else "slab"
+            lt = s.get("task") or ("lift:" + s["level"] if s.get("level") else self.slab_lift(s["top"]))
             name, key = self.conc_name(s.get("material"))
             if s["kind"] == "precast":
                 self.add("1.1.16", "precast_slab", "พื้นคอนกรีตสำเร็จรูป", "ตร.ม.", A, s["id"], task=lt)
@@ -777,19 +784,17 @@ class Takeoff:
                           waste=self.s["branch_wire_waste"], task="mep_rough", note=f"สายเมน {n} เส้น × {Ls:g} ม.")
             it["spec"] = {"t": "wire", "wire": wt, "size": ws}
         if el.get("conduits"):   # แนวท่อร้อยสายที่เก็บไว้ในโมเดล → ใช้ความยาวจริงของแนว ไม่ประมาณใหม่
-            Lc = defaultdict(float)
-            for r in el["conduits"]:
-                Lc[r.get("circuit")] += sum(math.dist(r["pts"][i], r["pts"][i + 1]) for i in range(len(r["pts"]) - 1))
-            for cid, L in Lc.items():
-                c = circuits.get(cid)
+            for r in el["conduits"]:   # คิดรายเส้น (แหล่งที่มา = id แนวท่อ) — แผนงาน/3D รู้ว่าแนวไหนอยู่งานไหน
+                L = sum(math.dist(r["pts"][i], r["pts"][i + 1]) for i in range(len(r["pts"]) - 1))
+                cid = r.get("circuit"); c = circuits.get(cid)
                 if not c or c.get("panel") not in panels:
                     self.note(f"ไฟฟ้า: แนวท่อวงจร {cid} ไม่มีวงจร/แผงที่อ้างถึง — ไม่ได้คิด")
                     continue
-                it = self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, c["panel"],
+                it = self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, r["id"],
                               waste=self.s["branch_conduit_waste"], task="mep_rough", note="ตามแนวท่อร้อยสายในโมเดล; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
                 it["spec"] = {"t": "conduit", "conduit": conduit}
                 n, size = c.get("conductors") or 2, c.get("wire_size")
-                it = self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, c["panel"],
+                it = self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, r["id"],
                               waste=self.s["branch_wire_waste"], task="mep_rough", note="ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
                 it["spec"] = {"t": "wire", "wire": wire_t, "size": size}
             if not svc.get("length"):
