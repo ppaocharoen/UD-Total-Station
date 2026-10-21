@@ -328,7 +328,9 @@ class Takeoff:
                 n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c), f"แนว x {n} เส้น × {b - 2*c:.2f} ม.")
             if rb.get("bars_y"):
                 n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c), f"แนว y {n} เส้น × {d - 2*c:.2f} ม.")
-            if rb.get("rings"):   # ฐานเข็ม 1 ต้น: ปลอกรอบ
+            if rb.get("dowel"):   # เหล็กเดือย (Dowel) จากฐานรากต่อเข้าตอม่อ: [จำนวน, ขนาด, ยาวต่อเส้น ม.]
+                n, dia, ln = rb["dowel"]; self.rebar(f["id"], dia, n * ln, f"เหล็กเดือย {n:g} เส้น × {ln:.2f} ม.")
+            if rb.get("rings"):   # ฐานเข็ม 1 ต้น: ปลอกรอบ / ฐานแผ่: เหล็กรัดรอบ
                 k, dia = rb["rings"]; per = 2 * (b + d) - 8 * c
                 self.rebar(f["id"], dia, int(k) * per, f"ปลอกรอบ {int(k)} วง × {per:.2f} ม.")
             if rb.get("bands"):   # ฐานเข็ม 3 ต้น: แถบเหล็กเหนือหัวเข็มแต่ละคู่
