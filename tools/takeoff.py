@@ -800,7 +800,9 @@ class Takeoff:
                "drain": pl.get("drain_material", "PVC ชั้น 8.5")}
         runs = defaultdict(float); src = defaultdict(list); est_note = defaultdict(list); plen = defaultdict(dict)
         drawn = defaultdict(list)    # system -> จุดปลายท่อที่เขียนไว้
+        served = defaultdict(set)    # system -> สุขภัณฑ์ที่ท่อในโมเดลระบุว่าต่อแล้ว (pipe.serves)
         for p in pl.get("pipes", []):
+            served[p["system"]].update(p.get("serves", []))
             Lp = sum(math.dist(p["pts"][i], p["pts"][i + 1]) for i in range(len(p["pts"]) - 1))
             k = (p["system"], p.get("material") or mat[p["system"]], p["dia"])
             runs[k] += Lp; src[k].append(p["id"]); plen[k][p["id"]] = Lp
@@ -810,7 +812,7 @@ class Takeoff:
         for f in pl.get("fixtures", []):
             kind = ft.get(f["type"], {}).get("kind")
             for sysn, dia in PIPE_DEFAULT.get(kind, []):
-                if any(math.dist(f["xyz"], q) < 0.3 for q in drawn[sysn]):
+                if f.get("id") in served[sysn] or any(math.dist(f["xyz"], q) < 0.3 for q in drawn[sysn]):
                     continue
                 need[sysn].append((f, dia))
         for sysn, items in need.items():
