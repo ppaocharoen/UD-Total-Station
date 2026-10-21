@@ -24,6 +24,7 @@ zc = lambda y: _cl['slope']['z'] + _cl['slope']['dz'] * (y - _cl['slope']['at'])
 
 # ================================================================ ไฟฟ้า E.2.01
 X0, Y0 = origin(30)
+EX0, EY0, ESH = X0, Y0, S[30]
 sh = S[30]
 inplan = lambda x, y: -1.0 < x < 11.6 and -1.0 < y < 7.0
 pts_by = collections.defaultdict(list)
@@ -31,7 +32,7 @@ for q in sh['prims']:
     if q['kind'] == 'insert' and q.get('parent') is None:
         x, y = q['at'][0] - X0, q['at'][1] - Y0
         if inplan(x, y):
-            pts_by[q['name']].append((round(x, 2), round(y, 2), q['rot']))
+            pts_by[q['name']].append((round(x, 2), round(y, 2), q['rot'], q.get('sx', 1)))
 el = {'route_height': CEIL, 'conduit': 'PVC สีเหลือง (ท่อร้อยสาย)', 'wire_type': 'THW',
       'point_types': {
           'L18': {'kind': 'light', 'desc': 'โคมหลอด LED T8 18W พร้อมอุปกรณ์ครบชุด', 'dims': [1.20, 0.08, 0.05]},
@@ -71,15 +72,20 @@ def P(t, x, y, z, c, rot=None, wall=False):
     if rot is not None:
         p['rot'] = rot
     el['points'].append(p)
-for x, y, rt in sorted(pts_by['A$C59DC7984']):
-    P('L18', x, y, zc(y), 'L1' if x < XL else 'L2', rot=round(rt) % 180)
-for x, y, rt in sorted(pts_by['A$C1201696c']):
-    P('L9', x, y, zc(y), 'L1' if x < XL else 'L2', rot=round(rt) % 180)
-for x, y, _ in sorted(pts_by['WALl WASHER LIGHT2']):
-    P('WL', x, y, 2.40, 'L1' if x < XL else 'L2', wall=True)
-for x, y, _ in sorted(pts_by['SWICH']):
-    P('SW', x, y, FLOOR + 1.20, 'L1' if x < XL else 'L2', wall=True)
-for x, y, _ in sorted(pts_by['SWICH-1']):
+def lamp_center(x, y, rt, sx, L):   # จุดแทรกบล็อกโคมอยู่ปลายหลอด → ศูนย์กลาง = ปลาย + ครึ่งความยาวตามทิศบล็อก
+    a = math.radians(rt); dx, dy = (1 if sx > 0 else -1) * math.cos(a), (1 if sx > 0 else -1) * math.sin(a)
+    return r2(x + dx * L / 2), r2(y + dy * L / 2)
+RAW = {}   # id → จุดแทรกเดิม (ใช้จับปลายเส้นสายไฟในแบบ)
+for x, y, rt, sx in sorted(pts_by['A$C59DC7984']):
+    cx, cy = lamp_center(x, y, rt, sx, 1.20); P('L18', cx, cy, zc(cy), 'L1' if cx < XL else 'L2', rot=round(rt) % 180); RAW[el['points'][-1]['id']] = (x, y, rt, sx, 1.20)
+for x, y, rt, sx in sorted(pts_by['A$C1201696c']):
+    cx, cy = lamp_center(x, y, rt, sx, 0.60); P('L9', cx, cy, zc(cy), 'L1' if cx < XL else 'L2', rot=round(rt) % 180); RAW[el['points'][-1]['id']] = (x, y, rt, sx, 0.60)
+# โคมกิ่ง: A1 ติดหน้าเสา A1 ด้านนอก · A4 ติดปลายผนังก่อต่อจากเสา A4 (W-A4c) — หันออกทิศ −Y
+for (x, y) in [(0.0, -0.10), (10.8, -0.30)]:
+    P('WL', x, y, 2.40, 'L1', rot=270)
+for x, y, _, _ in sorted(pts_by['SWICH']):
+    P('SW', x, y, FLOOR + 1.20, 'L1' if x < XL else 'L2', wall=True); RAW[el['points'][-1]['id']] = (x, y)
+for x, y, _, _ in sorted(pts_by['SWICH-1']):
     if y > 5.0:
         P('OP', x, y, 0.60, 'P1', wall=True)       # เต้ารับปั๊ม นอกอาคารด้านหลัง (ข้างป้าย PUMP)
     else:
@@ -296,12 +302,109 @@ row('สุขาภิบาล', 'งานโยธาถังบำบั�
 m['meta'] = dict(m['meta'], name='ห้องสุขา รร.เทศบาล 4 — ขั้น 5 งานระบบ', stage=5)
 m['history'].append({'at': __import__('datetime').datetime.now().astimezone().isoformat(timespec='seconds'), 'by': 'claude (อ่านแบบขั้น 5)',
                      'sections': ['mep', 'slabs', 'finishes'], 'note': 'ไฟฟ้า E.2.01 + ประปา/น้ำเสีย SN.2.01 (แบบ A) + ถังบำบัด SN.3.01'})
-# แนวท่อร้อยสาย: คำนวณครั้งเดียวด้วยวิธีเดียวกับถอดปริมาณ (ระดับฝ้า มุมฉาก จุดใกล้สุด) แล้วเก็บในโมเดล — 3D เห็นแนว และแก้แนวเองได้
-tk0 = T.Takeoff(m, {}); tk0.run()
-def _lift(p):   # ท่อร้อยสายวิ่งเหนือฝ้า: ช่วงที่อยู่ระดับเดินท่อ ยกตามฝ้าเอียง + 0.03
-    return [p[0], p[1], zc(p[1]) + 0.03] if abs(p[2] - CEIL) < 1e-6 else p
-el['conduits'] = [{'id': r['id'], 'circuit': r['circuit'], 'pts': [[r2(c) for c in _lift(p)] for p in r['pts']], 'status': AS,
-                   'note': 'แนวประมาณ (แบบไม่เขียนแนวเดินท่อครบ) — แก้แนวได้'} for r in tk0.routes if r['kind'] == 'conduit']
+# ---------------------------------------------------------------- แนวท่อร้อยสายตาม E.2.01
+# เส้นสายไฟในแบบ (ชั้น EL_wire) = สายจากสวิตช์ไปโคมแต่ละกลุ่ม (เส้นโค้ง = โยงโคมในกลุ่มเดียวกัน) → ใช้เป็นแนวท่อจริง
+# แบบไม่เขียนสายจากตู้ LC ไปกลุ่มสวิตช์ และไปเต้ารับ → ประมาณแนวมุมฉากเหนือฝ้า (สถานะคิดเอง)
+PT = {p['id']: p for p in el['points']}
+def ends_of(pid):   # จุดปลายที่เส้นสายไฟในแบบอาจมาจับ: ศูนย์กลางโคม + ปลายหลอดทั้งสอง / ตำแหน่งสวิตช์
+    p = PT[pid]
+    if pid in RAW and len(RAW[pid]) == 2:
+        return [RAW[pid], tuple(p['xyz'][:2])]
+    if pid in RAW:
+        x, y, rt, sx, L = RAW[pid]; a = math.radians(rt); d = (1 if sx > 0 else -1)
+        return [(x, y), (x + d * math.cos(a) * L, y + d * math.sin(a) * L), tuple(p['xyz'][:2])]
+    return [tuple(p['xyz'][:2])]
+def nearest(pt, kinds):
+    best = min(((math.dist(pt, e), pid) for pid in PT if PT[pid]['type'] in kinds for e in ends_of(pid)), default=(9, None))
+    return best[1] if best[0] < 0.45 else None
+LAMPS, SWS = ('L18', 'L9', 'WL'), ('SW',)
+wires, links = [], []          # (pts2d, a_id, b_id)
+X0, Y0 = EX0, EY0
+for q in ESH['prims']:
+    if q.get('layer') != 'EL_wire':
+        continue
+    if q['kind'] in ('poly', 'line'):
+        xy = [(a[0] - X0, a[1] - Y0) for a in q['p']]
+    elif q['kind'] == 'arc':
+        c, rr, a0, a1 = (q['c'][0] - X0, q['c'][1] - Y0), q['r'], math.radians(q['a0']), math.radians(q['a1'])
+        if a1 < a0: a1 += 2 * math.pi
+        xy = [(c[0] + rr * math.cos(a0 + (a1 - a0) * k / 12), c[1] + rr * math.sin(a0 + (a1 - a0) * k / 12)) for k in range(13)]
+    else:
+        continue
+    if max(x for x, _ in xy) > 11.6:
+        continue
+    A, B = nearest(xy[0], LAMPS + SWS), nearest(xy[-1], LAMPS + SWS)
+    wires.append((xy, A, B))
+# กลุ่มสวิตช์: union โคม–สวิตช์ ตามเส้นในแบบ
+par = {pid: pid for pid in PT}
+def fnd(a):
+    while par[a] != a: par[a] = par[par[a]]; a = par[a]
+    return a
+for xy, A, B in wires:
+    if A and B: par[fnd(A)] = fnd(B)
+grp = collections.defaultdict(list)
+for pid in PT:
+    if PT[pid]['type'] in LAMPS + SWS: grp[fnd(pid)].append(pid)
+EXTRA = {'L18-09': 'SW-10'}    # แบบไม่ลากสายถึงโคม L18-09 (หน้าทางเข้าขวา) → ใช้สวิตช์ SW-10 ข้างประตูฝั่งขวา (คิดเอง)
+for lamp, sw in EXTRA.items():
+    par[fnd(lamp)] = fnd(sw)
+grp = collections.defaultdict(list)
+for pid in PT:
+    if PT[pid]['type'] in LAMPS + SWS: grp[fnd(pid)].append(pid)
+switch_of = {}
+for g in grp.values():
+    sws = sorted(p for p in g if PT[p]['type'] == 'SW')
+    for p in g:
+        if PT[p]['type'] in LAMPS:
+            switch_of[p] = sws[0] if sws else None
+for pid, sw in switch_of.items():
+    PT[pid]['switch'] = sw
+    if sw: PT[pid]['circuit'] = PT[sw]['circuit']          # โคมอยู่วงจรเดียวกับสวิตช์ที่คุม
+spare = sorted(p for p in PT if PT[p]['type'] == 'SW' and not any(v == p for v in switch_of.values()))
+for p in spare:
+    PT[p]['note'] = 'แบบไม่ลากสายจากสวิตช์นี้ไปโคม — สวิตช์สำรอง (คิดเอง)'
+zt = lambda x, y: r2(zc(y) + 0.03)      # ระดับท่อเหนือฝ้าเอียง
+cond = []
+def C(cid, circ, pts3, st, note):
+    cond.append({'id': cid, 'circuit': circ, 'pts': [[r2(a) for a in p] for p in pts3], 'status': st, 'note': note})
+for k, (xy, A, B) in enumerate(wires, 1):
+    pts3 = [[x, y, zt(x, y)] for x, y in xy]
+    for end, pid in ((0, A), (-1, B)):
+        if pid:
+            p = PT[pid]
+            drop = [p['xyz'][0], p['xyz'][1], p['xyz'][2]]
+            if p['type'] == 'SW':   # ลงสวิตช์: เดินเหนือฝ้าถึงแนวผนัง แล้วลงในผนัง
+                hop = [[p['xyz'][0], p['xyz'][1], zt(*p['xyz'][:2])], drop]
+            else:
+                hop = [[p['xyz'][0], p['xyz'][1], zt(*p['xyz'][:2])], drop]
+            if end == 0: pts3 = hop[::-1] + pts3
+            else: pts3 = pts3 + hop
+    circ = PT[A]['circuit'] if A else (PT[B]['circuit'] if B else None)
+    C(f'EW-{k:02d}', circ, pts3, FD, 'แนวสายไฟตาม E.2.01 (สวิตช์ → โคม)')
+# โคมที่แบบไม่ลากเส้นถึง (EXTRA) → ต่อจากสวิตช์มุมฉากเหนือฝ้า
+for lamp, sw in EXTRA.items():
+    a, b = PT[sw]['xyz'], PT[lamp]['xyz']
+    C(f'EX-{lamp}', PT[sw]['circuit'], [a, [a[0], a[1], zt(a[0], a[1])], [b[0], a[1], zt(b[0], a[1])], [b[0], b[1], zt(b[0], b[1])], b], AS,
+      f'แบบไม่ลากสายถึง {lamp} — ต่อจาก {sw} (คิดเอง)')
+# สายป้อนจากตู้ LC ไปกลุ่มสวิตช์ / เต้ารับ: มุมฉากเหนือฝ้า จุดใกล้สุดทีละจุด (แบบไม่เขียน)
+pn = el['panels'][0]['xyz']
+for circ in ('L1', 'L2', 'P1'):
+    if circ == 'P1':
+        tg = [p['xyz'] for p in el['points'] if p['circuit'] == 'P1']
+    else:   # หัวกลุ่มสวิตช์ (สวิตช์ติดกันถือเป็นกล่องเดียว)
+        sw = [PT[p]['xyz'] for p in PT if PT[p]['type'] == 'SW' and PT[p]['circuit'] == circ]
+        tg = []
+        for q in sorted(sw, key=lambda q: -q[1]):
+            if not any(math.dist(q[:2], t[:2]) < 0.45 for t in tg): tg.append(q)
+    cur = [pn[0], pn[1]]; first = True; k = 0
+    while tg:
+        nx = min(tg, key=lambda q: abs(q[0] - cur[0]) + abs(q[1] - cur[1])); tg.remove(nx); k += 1
+        pts3 = ([[pn[0], pn[1], pn[2]]] if first else []) + [[cur[0], cur[1], zt(*cur)], [nx[0], cur[1], zt(nx[0], cur[1])], [nx[0], nx[1], zt(nx[0], nx[1])], [nx[0], nx[1], nx[2]]]
+        C(f'EF-{circ}-{k:02d}', circ, pts3, AS, 'สายป้อนจากตู้ LC — แบบไม่เขียนแนว ประมาณมุมฉากเหนือฝ้า')
+        cur = [nx[0], nx[1]]; first = False
+el['conduits'] = cond
+row('ไฟฟ้า', 'กลุ่มสวิตช์ (E.2.01)', ' · '.join(f"{sw}: {', '.join(sorted(l for l, s_ in switch_of.items() if s_ == sw))}" for sw in sorted({v for v in switch_of.values() if v})), 'E.2.01', FD,
+    'L18-09 แบบไม่ลากสาย → ผมใช้ SW-10 · ' + (', '.join(spare) + ' ไม่มีสายไปโคม (สำรอง)' if spare else ''))
 json.dump(m, open('stage5.bm.json', 'w'), ensure_ascii=False, indent=1)
 
 tk = T.Takeoff(m, {}); tk.run()

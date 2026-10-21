@@ -1299,7 +1299,8 @@ function elemSpec(id) {
     lines.push(t.desc || '', `ระดับ ${lvlOf(e.xyz[2])}${e.wall ? ' · ติดผนัง ' + e.wall : ''}`); }
   else if (set === 'equipment') { title = EQ_TH[e.kind] || 'อุปกรณ์'; lines.push(e.size || '', `ระดับศูนย์กลาง ${lvlOf(e.xyz[2])}${e.dims ? ` · ขนาด ${e.dims.join('×')} ม.` : ''}`); }
   else if (set === 'points') { const el = (m.mep || {}).electrical || {}, t = (el.point_types || {})[e.type] || {}, cc = (el.circuits || []).find(x => x.id === e.circuit) || {};
-    title = PT_TH[t.kind] || 'จุดไฟฟ้า'; mark = e.type; lines.push(t.desc || '', `ระดับ ${lvlOf(e.xyz[2])}`, `วงจร ${e.circuit || '-'}${cc.desc ? ' · ' + cc.desc : ''}`); }
+    title = PT_TH[t.kind] || 'จุดไฟฟ้า'; mark = e.type; lines.push(t.desc || '', `ระดับ ${lvlOf(e.xyz[2])}`, `วงจร ${e.circuit || '-'}${cc.desc ? ' · ' + cc.desc : ''}`, e.switch ? `เปิดปิดด้วย ${e.switch}` : '');
+    if (t.kind === 'switch') { const ls = (el.points || []).filter(q => q.switch === e.id).map(q => q.id); lines.push(ls.length ? 'คุมโคม: ' + ls.join(', ') : 'ไม่มีโคม (สำรอง)'); } }
   else if (set === 'panels') { title = 'ตู้ไฟฟ้า'; lines.push(`${e.ways || ''} ช่อง · เมน ${e.main || '-'}`, `ระดับ ${lvlOf(e.xyz[2])}`); }
   else if (set === 'finishes') { title = { counter: 'เคาน์เตอร์', ceiling: 'ฝ้า', floor: 'ผิวพื้น', wall: 'ผิวผนัง', other: 'งานผิว/อุปกรณ์' }[e.kind] || 'งานผิว';
     lines.push(e.spec || '', e.qty ? `${f2(e.qty)} ${e.unit || ''}` : ''); }
