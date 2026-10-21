@@ -353,6 +353,31 @@ def nearest(pt, kinds):
 LAMPS, SWS = ('L18', 'L9', 'WL'), ('SW',)
 wires, links = [], []          # (pts2d, a_id, b_id)
 X0, Y0 = EX0, EY0
+WL_ = [w['path'] for w in m['walls'] if len(w['path']) == 2] + \
+      [[[N_[x['i']]['x'], N_[x['i']]['y']], [N_[x['j']]['x'], N_[x['j']]['y']]] for N_ in [{n['id']: n for n in m['nodes']}] for x in m['members'] if x['type'] in ('tie_beam', 'steel_beam')]
+def off_wall(a, b, n=8):   # ระยะเฉลี่ยของช่วงท่อจากแนวผนัง/คานที่ใกล้สุด (ใช้เลือกทางเลี้ยว)
+    tot = 0
+    for k in range(n + 1):
+        px, py = a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n
+        tot += min(math.hypot(*(lambda t: (px - (w[0][0] + t * (w[1][0] - w[0][0])), py - (w[0][1] + t * (w[1][1] - w[0][1]))))(
+            max(0, min(1, ((px - w[0][0]) * (w[1][0] - w[0][0]) + (py - w[0][1]) * (w[1][1] - w[0][1])) / (((w[1][0] - w[0][0]) ** 2 + (w[1][1] - w[0][1]) ** 2) or 1)))))
+                   for w in WL_)
+    return tot / (n + 1) * math.dist(a, b)
+def L_path(a, b):
+    c1, c2 = (b[0], a[1]), (a[0], b[1])
+    s1 = off_wall(a, c1) + off_wall(c1, b); s2 = off_wall(a, c2) + off_wall(c2, b)
+    return [a, c1, b] if s1 <= s2 else [a, c2, b]
+def ortho(xy, is_arc):
+    if is_arc:
+        return L_path(xy[0], xy[-1])
+    out = [xy[0]]
+    for b in xy[1:]:
+        a = out[-1]
+        if abs(a[0] - b[0]) < 0.02 or abs(a[1] - b[1]) < 0.02:
+            out.append(b)
+        else:
+            out += L_path(a, b)[1:]
+    return out
 for q in ESH['prims']:
     if q.get('layer') != 'EL_wire':
         continue
@@ -367,6 +392,8 @@ for q in ESH['prims']:
     if max(x for x, _ in xy) > 11.6:
         continue
     A, B = nearest(xy[0], LAMPS + SWS), nearest(xy[-1], LAMPS + SWS)
+    # เส้นโค้ง/เฉียงในแบบ = สัญลักษณ์โยงจุด ไม่ใช่แนวท่อจริง → เดินท่อมุมฉากเลียบแนวผนัง/คาน (เลือกทางเลี้ยวที่ชิดแนวผนังกว่า)
+    xy = ortho(xy, q['kind'] == 'arc')
     wires.append((xy, A, B))
 # กลุ่มสวิตช์: union โคม–สวิตช์ ตามเส้นในแบบ
 par = {pid: pid for pid in PT}
