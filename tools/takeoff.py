@@ -676,7 +676,7 @@ class Takeoff:
                     it.setdefault("spec", {"t": "lintel", "wall": w["kind"], "wt": w["t"]})
         for o in self.m.get("openings", []):
             t = ot.get(o["type"])
-            if t:
+            if t and t.get("kind") != "opening":   # ช่องโล่งไม่มีบาน ไม่เป็นรายการ
                 it = self.add("1.2.6", f"open_{o['type']}", f"{t.get('desc', o['type'])} ({o['type']} {t['w']:g}×{t['h']:g} ม.)",
                          "ชุด", 1, o["id"], count=True, task="opening")
                 it["spec"] = {"t": "opening", "kind": t.get("kind", ""), "w": t["w"], "h": t["h"], "desc": t.get("desc", "")}
