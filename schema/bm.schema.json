@@ -2343,6 +2343,25 @@
           "minItems": 3,
           "maxItems": 3,
           "description": "ฐานราก: เหล็กเดือย [จำนวน, ขนาด มม., ยาวต่อเส้น ม.]"
+        },
+        "bend_up": {
+          "type": "number",
+          "description": "ฐานราก: ปลายเหล็กตะแกรงหักขึ้น ม. ต่อปลาย (หักสองด้าน)"
+        },
+        "bend": {
+          "type": "object",
+          "description": "พื้น: ปลายเหล็กงอลง {L: ม. ต่อปลาย, sides: [ด้านของ polygon]}",
+          "properties": {
+            "L": {
+              "type": "number"
+            },
+            "sides": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          }
         }
       }
     },

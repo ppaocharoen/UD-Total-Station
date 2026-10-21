@@ -260,6 +260,70 @@ for wid, ops in opsw.items():
             nst += 1
             mem(f'SA-{nst:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), c10, f'ข้าง {o["id"]} — ตกลงกับ Earth (แบบไม่ระบุ)', 'user')
             vert.append(xy)
+# ---- ข้อกำหนดเสาเอ็น/ทับหลัง (Earth 21 ต.ค. 2569):
+#  ก. ปลายผนังที่หยุดลอยไม่ติดเสา คสล. → เสาเอ็น   ข. ผนังยาวเกิน 3 ม. → เสาเอ็นแบ่งช่วงไม่เกิน 3 ม.   ค. ผนังสูงเกิน 3 ม. → คานเอ็นกลางความสูง
+ne = nsp = nh = 0
+def in_open(w, u, z=None):
+    for o in opsw.get(w['id'], []):
+        t = OTs[o['type']]
+        if o['at'] - t['w'] / 2 - 0.05 <= u <= o['at'] + t['w'] / 2 + 0.05:
+            if z is None:
+                return True
+            z0 = w['bottom'] + t.get('sill', 0); z1 = z0 + t['h'] + (t['w'] / 2 if t.get('shape') == 'arch' else 0)
+            if z0 - 0.05 <= z <= z1 + 0.05:
+                return True
+    return False
+for w in m['walls']:
+    if w['kind'] not in MAS or w.get('rise') or w['top'] - w['bottom'] < 0.5:   # ฐานก่อเตี้ย (ใต้แผงบล็อก/ระแนง) ไม่ต้องมีเสาเอ็น
+        continue
+    a, b = w['path']; L = math.dist(a, b); ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+    P = lambda u: (a[0] + ux * u, a[1] + uy * u)
+    def on_line():
+        us = []
+        for v in vert:
+            du = (v[0] - a[0]) * ux + (v[1] - a[1]) * uy; dp = abs((v[0] - a[0]) * uy - (v[1] - a[1]) * ux)
+            if dp <= 0.10 and -0.16 <= du <= L + 0.16:
+                us.append(min(max(du, 0), L))
+        return sorted(us)
+    # ก. ปลายลอย
+    for u in (0.05, L - 0.05):
+        xy = P(u)
+        if not any(math.dist(xy, v) <= 0.16 for v in vert):
+            ne += 1
+            mem(f'SE-{ne:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), c10, f'ปลายผนัง {w["id"]} ไม่ติดเสา — ข้อกำหนดเสาเอ็น', 'user')
+            vert.append(xy)
+    # ข. ช่วงยาวเกิน 3 ม.
+    us = on_line()
+    for u0, u1 in zip(us, us[1:]):
+        g = u1 - u0
+        if g > 3.0 + 1e-6:
+            n = math.ceil(g / 3.0)
+            for k in range(1, n):
+                u = u0 + g * k / n
+                if in_open(w, u):
+                    continue
+                nsp += 1; xy = P(u)
+                mem(f'SM-{nsp:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), c10, f'{w["id"]} ช่วงยาว {g:.2f} ม. > 3 ม. — ข้อกำหนดเสาเอ็น', 'user')
+                vert.append(xy)
+    # ค. สูงเกิน 3 ม. → คานเอ็นกลางความสูง (เว้นช่วงที่ผ่านช่องเปิด)
+    H = w['top'] - w['bottom']
+    if H > 3.0 + 1e-6:
+        z = round((w['bottom'] + H / 2) * 20) / 20
+        cuts = [0.0, L]
+        for o in opsw.get(w['id'], []):
+            t = OTs[o['type']]
+            if in_open(w, o['at'], z):
+                cuts += [max(0, o['at'] - t['w'] / 2), min(L, o['at'] + t['w'] / 2)]
+        cuts = sorted(cuts)
+        for u0, u1 in zip(cuts[0::2], cuts[1::2]):
+            if u1 - u0 >= 0.20:
+                nh += 1
+                mem(f'LH-{nh:02d}', 'คานเอ็น', 'lintel', (*P(u0), z), (*P(u1), z), c10, f'{w["id"]} สูง {H:.2f} ม. > 3 ม. — คานเอ็นกลางความสูง', 'user')
+row('เสาเอ็น', f'SE-01…SE-{ne:02d}' if ne else 'SE (ไม่มี)', f'ปลายผนังที่หยุดลอยไม่ติดเสา คสล. → เสาเอ็น {ne} ต้น (ที่เหลือมีเสาเอ็นจากแปลนอยู่แล้ว)', 'ข้อกำหนด Earth 21 ต.ค.', 'user')
+row('เสาเอ็น', f'SM-01…SM-{nsp:02d}' if nsp else 'SM (ไม่มี)', f'ผนังช่วงยาวเกิน 3 ม. ระหว่างเสา/เสาเอ็น → เสาเอ็นแบ่งช่วงเท่ากัน ≤ 3 ม. {nsp} ต้น', 'ข้อกำหนด Earth 21 ต.ค.', 'user')
+row('ทับหลัง', f'LH-01…LH-{nh:02d}' if nh else 'LH (ไม่มี)', f'ผนังสูงเกิน 3 ม. (+0.20→+3.30 สูง 3.10) → คานเอ็นกลางความสูง {nh} ท่อน เว้นช่วงที่ผ่านช่องเปิด', 'ข้อกำหนด Earth 21 ต.ค.', 'user')
+row('เสาเอ็น/ทับหลัง', 'เหล็กฝัง', 'เสาเอ็น/ทับหลังฝังเหล็กลงพื้น คาน หรือเสาด้านบน/ล่าง (เหล็กเตรียมไว้)', 'ข้อกำหนด Earth 21 ต.ค.', 'user', 'รวมในราคาต่อเมตร "เสาเอ็น-ทับหลัง คสล." — ไม่แยกปริมาณ')
+print('free-end', ne, 'span', nsp, 'mid-height', nh)
 for x in members:   # เหล็กเสริมเสาเอ็น/ทับหลังรวมในราคาต่อเมตร (ว480) — เก็บเป็นหมายเหตุ ไม่ลง design (กันนับซ้ำ)
     if x['type'] in ('stiffener', 'lintel'):
         x['note'] = (x.get('note', '') + ' · เหล็ก RB6 2 เส้น ปลอก RB6@0.20 (ตกลงกับ Earth)').strip(' ·')

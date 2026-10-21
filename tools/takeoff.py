@@ -324,10 +324,12 @@ class Takeoff:
                      calc=f"รอบรูป 2×({b:g}+{d:g}) × หนา {h:g} = {2*(b+d)*h:.2f} ตร.ม.")
             rb = self.rebar_of("supports", f["id"])
             c = s["cover"]
+            bu = rb.get("bend_up", 0)   # ปลายเหล็กตะแกรงหักขึ้น (ม. ต่อปลาย) — หักขึ้นสองด้าน
+            bt = f" + หักขึ้น 2×{bu:g}" if bu else ""
             if rb.get("bars_x"):
-                n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c), f"แนว x {n} เส้น × {b - 2*c:.2f} ม.")
+                n, dia = rb["bars_x"]; self.rebar(f["id"], dia, n * (b - 2 * c + 2 * bu), f"แนว x {n} เส้น × ({b - 2*c:.2f}{bt}) ม.")
             if rb.get("bars_y"):
-                n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c), f"แนว y {n} เส้น × {d - 2*c:.2f} ม.")
+                n, dia = rb["bars_y"]; self.rebar(f["id"], dia, n * (d - 2 * c + 2 * bu), f"แนว y {n} เส้น × ({d - 2*c:.2f}{bt}) ม.")
             if rb.get("dowel"):   # เหล็กเดือย (Dowel) จากฐานรากต่อเข้าตอม่อ: [จำนวน, ขนาด, ยาวต่อเส้น ม.]
                 n, dia, ln = rb["dowel"]; self.rebar(f["id"], dia, n * ln, f"เหล็กเดือย {n:g} เส้น × {ln:.2f} ม.")
             if rb.get("rings"):   # ฐานเข็ม 1 ต้น: ปลอกรอบ / ฐานแผ่: เหล็กรัดรอบ
@@ -492,6 +494,11 @@ class Takeoff:
                 fill = A / (Lx * Ly) if Lx * Ly else 1
                 L = ((math.floor(Ly / sp) + 1) * Lx + (math.floor(Lx / sp) + 1) * Ly) * layers * fill
                 self.rebar(s["id"], dia, L, f"ตะแกรง @{sp:g} {layers} ชั้น ยาวรวม {L:.2f} ม.")
+                bd = rb.get("bend")   # ปลายเหล็กงอลง (ขอบพับ/คานล้อม): {L: ม. ต่อปลาย, sides: ด้านของ polygon}
+                if bd and bd.get("sides"):
+                    pg = s["polygon"]
+                    nb = sum(math.floor(dist2(pg[i], pg[(i + 1) % len(pg)]) / sp) + 1 for i in bd["sides"]) * layers
+                    self.rebar(s["id"], dia, nb * bd["L"], f"ปลายงอ {nb} ปลาย × {bd['L']:g} ม.")
             elif rb.get("mesh_xy"):   # เหล็กสองแนวต่างขนาด/ระยะ (ผลออกแบบพื้นจากเว็บ): x = เหล็กวางตามแนวแกน x
                 mx = rb["mesh_xy"]; layers = mx.get("layers", 1)
                 xs = [p[0] for p in s["polygon"]]; ys = [p[1] for p in s["polygon"]]
