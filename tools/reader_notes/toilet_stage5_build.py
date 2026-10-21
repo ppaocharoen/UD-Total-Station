@@ -18,7 +18,9 @@ def origin(i):   # จุด กริด 1/A ของแผ่น จากต
     return t1['at'][0] + 0.0216, ta['at'][1] + 0.0808
 
 FLOOR = 0.20          # ระดับผิวพื้นสำเร็จในห้องน้ำ (ความสูงติดตั้งวัดจากผิวพื้น)
-CEIL = next(f['z'] for f in m['finishes'] if f['id'] == 'CL1')
+_cl = next(f for f in m['finishes'] if f['id'] == 'CL1')
+CEIL = _cl['z']
+zc = lambda y: _cl['slope']['z'] + _cl['slope']['dz'] * (y - _cl['slope']['at'])   # ระดับฝ้าเอียงที่พิกัด y
 
 # ================================================================ ไฟฟ้า E.2.01
 X0, Y0 = origin(30)
@@ -70,9 +72,9 @@ def P(t, x, y, z, c, rot=None, wall=False):
         p['rot'] = rot
     el['points'].append(p)
 for x, y, rt in sorted(pts_by['A$C59DC7984']):
-    P('L18', x, y, CEIL, 'L1' if x < XL else 'L2', rot=round(rt) % 180)
+    P('L18', x, y, zc(y), 'L1' if x < XL else 'L2', rot=round(rt) % 180)
 for x, y, rt in sorted(pts_by['A$C1201696c']):
-    P('L9', x, y, CEIL, 'L1' if x < XL else 'L2', rot=round(rt) % 180)
+    P('L9', x, y, zc(y), 'L1' if x < XL else 'L2', rot=round(rt) % 180)
 for x, y, _ in sorted(pts_by['WALl WASHER LIGHT2']):
     P('WL', x, y, 2.40, 'L1' if x < XL else 'L2', wall=True)
 for x, y, _ in sorted(pts_by['SWICH']):
@@ -91,7 +93,7 @@ el['service'] = {'length': 10.0, 'wire_type': 'THW', 'wire_size': 16, 'conductor
                  'status': AS, 'note': 'ระยะมิเตอร์ → LC คิดเอง 10 ม. (แบบไม่ระบุ) · สาย THW 16 ตร.มม. ตามตาราง E.1.02 มิเตอร์ 15(45)A'}
 m.setdefault('mep', {})['electrical'] = el
 cnt = collections.Counter(p['type'] for p in el['points'])
-row('ไฟฟ้า', 'ดวงโคม', f'LED T8 18W {cnt["L18"]} · LED T8 9W {cnt["L9"]} · โคมกิ่งติดผนังภายนอก {cnt["WL"]} — ติดใต้ฝ้า +{CEIL:.2f} (โคมกิ่ง +2.40)', 'E.2.01', FD,
+row('ไฟฟ้า', 'ดวงโคม', f'LED T8 18W {cnt["L18"]} · LED T8 9W {cnt["L9"]} · โคมกิ่งติดผนังภายนอก {cnt["WL"]} — ติดใต้ฝ้าเอียง +{zc(5.8):.2f}…+{zc(0):.2f} (โคมกิ่ง +2.40)', 'E.2.01', FD,
     'ความสูงโคมกิ่งคิดเอง +2.40')
 row('ไฟฟ้า', 'สวิตช์ / เต้ารับ', f'สวิตช์ทางเดียว {cnt["SW"]} จุด (+1.20 จากพื้น) · เต้ารับคู่ {cnt["OUT"]} จุด (+0.90) · เต้ารับปั๊ม {cnt["OP"]} จุด (+0.60)', 'E.2.01, E.1.02', FD,
     'สวิตช์: E.2.01 เขียน +1.20 / E.1.02 เขียน +1.10 → ใช้ +1.20 ตามแปลน')
@@ -296,7 +298,9 @@ m['history'].append({'at': __import__('datetime').datetime.now().astimezone().is
                      'sections': ['mep', 'slabs', 'finishes'], 'note': 'ไฟฟ้า E.2.01 + ประปา/น้ำเสีย SN.2.01 (แบบ A) + ถังบำบัด SN.3.01'})
 # แนวท่อร้อยสาย: คำนวณครั้งเดียวด้วยวิธีเดียวกับถอดปริมาณ (ระดับฝ้า มุมฉาก จุดใกล้สุด) แล้วเก็บในโมเดล — 3D เห็นแนว และแก้แนวเองได้
 tk0 = T.Takeoff(m, {}); tk0.run()
-el['conduits'] = [{'id': r['id'], 'circuit': r['circuit'], 'pts': [[r2(c) for c in p] for p in r['pts']], 'status': AS,
+def _lift(p):   # ท่อร้อยสายวิ่งเหนือฝ้า: ช่วงที่อยู่ระดับเดินท่อ ยกตามฝ้าเอียง + 0.03
+    return [p[0], p[1], zc(p[1]) + 0.03] if abs(p[2] - CEIL) < 1e-6 else p
+el['conduits'] = [{'id': r['id'], 'circuit': r['circuit'], 'pts': [[r2(c) for c in _lift(p)] for p in r['pts']], 'status': AS,
                    'note': 'แนวประมาณ (แบบไม่เขียนแนวเดินท่อครบ) — แก้แนวได้'} for r in tk0.routes if r['kind'] == 'conduit']
 json.dump(m, open('stage5.bm.json', 'w'), ensure_ascii=False, indent=1)
 
