@@ -144,7 +144,28 @@ A_in = 10.8 * 5.8
 F('CL1', 'ceiling', 'ฝ้าสมาร์ทบอร์ด หนา 6 มม. ฉาบเรียบรอยต่อทาสี ติดตั้งระดับท้องจันทันเหล็ก', 'A.2.01 รายการวัสดุฝ้า CL1 + รูปตัด A.4.x',
   rects=[[0, 0, 10.8, 5.8]], z=3.55, qty=round(A_in / math.cos(math.radians(pitch)), 3), unit='ตร.ม.', slope=CL_SLOPE)
 row('ฝ้า', 'CL1', f'สมาร์ทบอร์ด 6 มม. ระดับท้องจันทัน (เอียง {pitch}° · +{CL_SLOPE["z"]:.2f} แนว A → +{CL_SLOPE["z"] + CL_SLOPE["dz"] * 5.8:.2f} แนว C) คลุมในอาคาร กริด 1–4 × A–C = {A_in / math.cos(math.radians(pitch)):.2f} ตร.ม. ตามแนวลาด', 'A.2.01, A.4.x', US,
-    'ไม่รวมชายคา · ไม่หักเสา/ผนัง — Earth ยืนยัน')
+    'ในอาคาร ไม่หักเสา/ผนัง — Earth ยืนยัน')
+# ---- ฝ้าชายคา + เชิงชาย + ครอบข้าง (รูปตัด A.4.01/A.4.05: CL1 ใต้ชายคา · เชิงชายสำเร็จรูป 6" ปิดหัวท้ายจันทัน · ครอบหลังคาเมทัลชีทด้านข้าง)
+RF = m['roofs'][0]
+_xs = [p_[0] for p_ in RF['outline']]; _ys = [p_[1] for p_ in RF['outline']]
+EX0, EX1, EY0, EY1 = min(_xs), max(_xs), min(_ys), max(_ys)
+eave_rects = [[EX0, EY0, EX1, 0.0], [EX0, 5.8, EX1, EY1], [EX0, 0.0, 0.0, 5.8], [10.8, 0.0, EX1, 5.8]]
+A_e = sum((r_[2] - r_[0]) * (r_[3] - r_[1]) for r_ in eave_rects)
+F('CL1-E', 'ceiling', 'ฝ้าชายคา สมาร์ทบอร์ด หนา 6 มม. ฉาบเรียบรอยต่อทาสี ติดตั้งระดับท้องจันทันเหล็ก', 'รูปตัด A.4.01, A.4.05 (CL1 ใต้ชายคา)',
+  rects=eave_rects, z=3.55, qty=round(A_e / math.cos(math.radians(pitch)), 3), unit='ตร.ม.', slope=CL_SLOPE, opacity=0.95)
+row('ฝ้า', 'CL1 ชายคา', f'ฝ้าใต้ชายคารอบอาคาร ยื่น {-EY0:.2f} ม. ทุกด้าน เอียงตามท้องจันทัน = {A_e / math.cos(math.radians(pitch)):.2f} ตร.ม. ตามแนวลาด', 'A.4.01, A.4.05', FD,
+    'รูปตัดมี CL1 ที่ชายคา (Earth ชี้)')
+_tz = math.tan(math.radians(pitch))
+roof_z = lambda y: RF['eave'] + (EY1 - y) * _tz if RF.get('low', 'y2') == 'y2' else RF['eave'] + (y - EY0) * _tz   # ผิวหลังคา (low = ฝั่ง y2)
+FASCIA_H = 0.15
+F('RF-FA', 'other', 'เชิงชายสำเร็จรูป ขนาด 6" ปิดหัว-ท้ายจันทัน', 'A.4.01, A.4.05, A.3.01', qty=round(2 * (EX1 - EX0), 2), unit='ม.',
+  place=[{'shape': 'strip', 'w': 0.012, 'h': FASCIA_H, 'color': '#f1efe8',
+          'segs': [[[EX0, y_ + sg * 0.006, round(roof_z(y_) - FASCIA_H / 2, 3)], [EX1, y_ + sg * 0.006, round(roof_z(y_) - FASCIA_H / 2, 3)]] for y_, sg in ((EY0, -1), (EY1, 1))]}])
+L_side = (EY1 - EY0) / math.cos(math.radians(pitch))
+F('RF-CAP', 'other', 'ครอบข้างหลังคาเมทัลชีท (ครอบหลังคาด้านข้าง)', 'A.4.01, A.3.01', qty=round(2 * L_side, 2), unit='ม.',
+  place=[{'shape': 'strip', 'w': 0.12, 'h': 0.10, 'color': '#2f7d55',
+          'segs': [[[x_, EY0, round(roof_z(EY0) - 0.03, 3)], [x_, EY1, round(roof_z(EY1) - 0.03, 3)]] for x_ in (EX0, EX1)]}])
+row('หลังคา', 'เชิงชาย / ครอบข้าง', f'เชิงชายสำเร็จรูป 6" หน้า-หลัง {2 * (EX1 - EX0):.2f} ม. · ครอบข้างเมทัลชีท ซ้าย-ขวา {2 * L_side:.2f} ม. (ตามแนวลาด)', 'A.4.01, A.4.05, A.3.01', FD)
 
 # ---------------------------------------------------------------- เคาน์เตอร์ (A.6.04): คสล. RB6@0.15 / RB9@0.15 กรุแกรนิตโต้
 CT = [('CT-1', 1.6, 4.1, 1.5, 2.1), ('CT-2', 2.4, 4.1, 0.9, 1.4), ('CT-3', 6.6, 9.1, 1.5, 2.1), ('CT-4', 6.6, 8.3, 0.9, 1.4)]   # ระยะผิวผนัง/ผิวเสา จากเส้นเคาน์เตอร์ใน DWG
