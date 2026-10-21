@@ -119,6 +119,11 @@ UPZ = 0.10      # ท่อช่วงถังเก็บน้ำ–ปั�
 valves = [((q['p'][0][0] + q['p'][1][0]) / 2 - X0, (q['p'][0][1] + q['p'][1][1]) / 2 - Y0)
           for q in sh['prims'] if q.get('parent') == 'hhhh' and q['kind'] == 'poly' and q.get('layer') == 'DEFPOINTS' and abs(q['p'][0][1] - q['p'][1][1]) < 1e-6]
 near_fx = lambda x, y: min(fx, key=lambda f: math.hypot(f['xyz'][0] - x, f['xyz'][1] - y))
+# ระดับจุดต่อน้ำดีของสุขภัณฑ์ (ผิวพื้นสำเร็จ +): โถส้วม +0.20 (วาล์วหม้อน้ำ) · โถปัสสาวะ +0.95 (ฟลัชวาล์ว) · อื่นๆ ตามระดับสุขภัณฑ์
+FT_ = m['mep']['plumbing']['fixture_types']
+def cw_z(f):
+    k = FT_[f['type']]['kind']
+    return {'wc': 0.20 + 0.20, 'urinal': 0.20 + 0.95}.get(k, f['xyz'][2])
 pipes = []
 def addpipe(sysn, dia, pts, src, st=FD, mat=None, note=None):
     p = {'id': f'{sysn.upper()}-{sum(1 for q in pipes if q["system"] == sysn) + 1:02d}', 'system': sysn, 'dia': dia,
@@ -145,12 +150,40 @@ for q in sh['prims']:
         for k in end_v:   # ยกขึ้นถึงระดับสุขภัณฑ์
             f = near_fx(*xy[k])
             if k == 0:
-                pts3.insert(0, [xy[0][0], xy[0][1], f['xyz'][2]])
+                pts3.insert(0, [xy[0][0], xy[0][1], cw_z(f)])
             else:
-                pts3.append([xy[-1][0], xy[-1][1], f['xyz'][2]])
+                pts3.append([xy[-1][0], xy[-1][1], cw_z(f)])
         dia = '1/2"' if end_v and L < 0.6 else '1"'
         addpipe('cw', dia, pts3, 'SN.2.01 น้ำดี (' + ('ต่อเข้าสุขภัณฑ์ ⌀1/2"' if dia == '1/2"' else 'ท่อ CW PVC 1"') + ')', mat='PVC ชั้น 13.5')
         L_cw[dia] += L
+# สุขภัณฑ์ที่ใช้น้ำดีแต่แบบไม่มีท่อย่อยมาถึง (แนวท่อเมนผ่านใกล้ ≤ 0.40) → ต่อแยก ⌀1/2" จากท่อเมนยกขึ้นถึงจุดต่อ
+def seg_near(px, py, a, b):
+    ax, ay, bx, by = a[0], a[1], b[0], b[1]; L2 = (bx - ax) ** 2 + (by - ay) ** 2
+    t = 0 if L2 == 0 else max(0, min(1, ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / L2))
+    return ax + t * (bx - ax), ay + t * (by - ay), a[2] + t * (b[2] - a[2])
+for f in fx:
+    if FT_[f['type']]['kind'] not in ('wc', 'urinal', 'faucet', 'spray'):
+        continue
+    x, y = f['xyz'][0], f['xyz'][1]
+    risers = [q for q in pipes if q['system'] == 'cw' and any(math.hypot(e[0] - x, e[1] - y) < 0.40 and e[2] > CWZ + 0.05 for e in (q['pts'][0], q['pts'][-1]))]
+    if risers:
+        continue
+    best = None
+    for q in pipes:
+        if q['system'] != 'cw':
+            continue
+        for i in range(len(q['pts']) - 1):
+            a, b = q['pts'][i], q['pts'][i + 1]
+            if abs(a[2] - CWZ) > 1e-6 or abs(b[2] - CWZ) > 1e-6:
+                continue
+            nx, ny, nz = seg_near(x, y, a, b); d = math.hypot(nx - x, ny - y)
+            if d <= 0.40 and (best is None or d < best[0]):
+                best = (d, nx, ny, nz)
+    if best:
+        _, nx, ny, nz = best
+        pp_ = [[nx, ny, nz]] + ([[x, y, nz]] if math.hypot(nx - x, ny - y) > 0.01 else []) + [[x, y, cw_z(f)]]
+        addpipe('cw', '1/2"', pp_, 'SN.2.01 น้ำดี (แยกจากท่อเมนเข้าสุขภัณฑ์ — แบบเขียนเส้นสั้นมาก)', mat='PVC ชั้น 13.5',
+                note=f'ต่อเข้า {f["id"]}')
 # วาล์วเปิดปิดท่อย่อย (สัญลักษณ์ในแปลนน้ำดี) — นับเป็นส่วนหนึ่งของชุดสุขภัณฑ์ ไม่แยกรายการ
 eq = pl.setdefault('equipment', [])
 tank = next(q for q in sh['prims'] if q.get('parent') == 'qeg4' and q['kind'] == 'circle' and abs(q['r'] - 0.585) < 0.01)
@@ -404,7 +437,7 @@ for circ in ('L1', 'L2', 'P1'):
         cur = [nx[0], nx[1]]; first = False
 el['conduits'] = cond
 row('ไฟฟ้า', 'กลุ่มสวิตช์ (E.2.01)', ' · '.join(f"{sw}: {', '.join(sorted(l for l, s_ in switch_of.items() if s_ == sw))}" for sw in sorted({v for v in switch_of.values() if v})), 'E.2.01', FD,
-    'L18-09 แบบไม่ลากสาย → ผมใช้ SW-10 · ' + (', '.join(spare) + ' ไม่มีสายไปโคม (สำรอง)' if spare else ''))
+    'L18-09 แบบไม่ลากสาย → ใช้ SW-10 (Earth ยืนยัน) · ' + (', '.join(spare) + ' ไม่มีสายไปโคม (สำรอง)' if spare else ''))
 json.dump(m, open('stage5.bm.json', 'w'), ensure_ascii=False, indent=1)
 
 tk = T.Takeoff(m, {}); tk.run()
