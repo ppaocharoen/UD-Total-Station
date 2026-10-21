@@ -1179,15 +1179,18 @@ function tlSet(day) {
   if (day >= p.calDays) { tlDone(); return; }
   const date = day === 0 ? Schedule.iso(Schedule.addDays(Schedule.parse(p.start), -1)) : Schedule.iso(Schedule.addDays(Schedule.parse(p.start), day - 1));
   const prog = {}; p.tasks.forEach(t => { prog[t.id] = tlProg(t, date); });
-  const step = (tid, id) => { const n = M.count[tid] || 1, k = (M.rank[tid] || {})[id] || 0; return prog[tid] * n - k; };   // >0 = เริ่มชิ้นนี้แล้ว
+  // งานคอนกรีต (ฐานราก/โครงสร้างตามระดับ): ช่วงแรกผูกเหล็ก ช่วงหลังเทคอนกรีต → เหล็กเสริมโผล่นำหน้าคอนกรีต
+  const RC = tid => M.task[tid] && (M.task[tid].kind === 'footing' || M.task[tid].kind === 'lift');
+  const pr = (tid, phase) => { const g = prog[tid] || 0; if (!RC(tid)) return g; return phase === 'rebar' ? Math.min(1, g / 0.6) : Math.max(0, (g - 0.3) / 0.7); };
+  const step = (tid, id, phase) => { const n = M.count[tid] || 1, k = (M.rank[tid] || {})[id] || 0; return pr(tid, phase) * n - k; };   // >0 = เริ่มชิ้นนี้แล้ว
   const BRICK = 0xb5654a, PLASTER = 0xd9d4ca, PAINT = 0xf3efe6;
   if (v.groups['เหล็กเสริม']) v.groups['เหล็กเสริม'].visible = true;
   v.setState(u => {
     if (!u.id) return BmViewer.CATS.slice(2).some(c => c[1].includes(u.group)) ? { visible: (prog.mep_fix ?? 1) >= 0.5 } : null;
     // แผ่นหลังคาโผล่ตอนงานมุง (id หลังคาอยู่ในงานโครงหลังคาด้วยเพราะคิดพื้นที่โครงหลังคา)
     const tid = (u.group === 'หลังคา' && M.task.roof_cover && M.task.roof_cover.from.includes(u.id)) ? 'roof_cover' : M.primary[u.id]; if (!tid) return null;
+    if (u.rebar) return { visible: RC(tid) && step(tid, u.id, 'rebar') > 0 };
     const s0 = step(tid, u.id);
-    if (u.rebar) return { visible: s0 > 0 && (M.task[tid].kind === 'footing' || M.task[tid].kind === 'lift') };
     if (s0 <= 0) return { visible: false };
     const st = {};
     if (u.growFrom) st.grow = Math.max(0, Math.min(1, (s0 - 0.4) / 0.6)); else if (s0 < 0.5) st.visible = false;
