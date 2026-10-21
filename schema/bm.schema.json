@@ -1227,6 +1227,20 @@
         "rise": {
           "type": "number",
           "description": "ผนังวางเอียง: ท้องและยอดผนังสูงขึ้นเชิงเส้นตามแนว path จากจุดเริ่มถึงจุดปลาย (ม.) — bottom/top คือค่าที่จุดเริ่ม"
+        },
+        "plaster_area": {
+          "type": "object",
+          "description": "พื้นที่ฉาบที่ระบุเอง (ตร.ม.) {int, ext} — ถอดปริมาณใช้แทน สุทธิ × finish_sides",
+          "properties": {
+            "int": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ext": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
         }
       }
     },
@@ -1727,7 +1741,57 @@
               }
             },
             "service": {
-              "type": "object"
+              "type": "object",
+              "description": "สายเมน มิเตอร์ → แผง",
+              "properties": {
+                "length": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "wire_type": {
+                  "type": "string"
+                },
+                "wire_size": {
+                  "type": "number"
+                },
+                "conductors": {
+                  "type": "integer"
+                },
+                "conduit": {
+                  "type": "string"
+                },
+                "meter": {
+                  "type": "string"
+                }
+              }
+            },
+            "conduits": {
+              "type": "array",
+              "description": "แนวท่อร้อยสายที่เก็บในโมเดล — ถ้ามี ถอดปริมาณใช้ความยาวตามแนวนี้แทนการประมาณ",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "pts"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "circuit": {
+                    "type": "string"
+                  },
+                  "pts": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/xyz"
+                    },
+                    "minItems": 2
+                  }
+                }
+              }
             }
           }
         },

@@ -1028,11 +1028,16 @@ function setCrt(on) {
 function buildLayers(groups) {
   const v = S.viewer;
   const ov = [['grid', 'เส้นกริด', '#18ffff', (S.model.grids || []).length], ['ground', 'พื้นดิน', '#00ff41', '']].filter(o => o[3] !== 0);
-  $('#layer-list').innerHTML = ov.map(([k, t, col, n]) => `<span class="chip ${v[k + 'On'] === false ? '' : 'on'}" data-ov="${k}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${t}</span><em>${n}</em></span>`).join('') + groups.map(g => {
+  const chip = g => {
     const kids = v.groups[g].children, n = new Set(kids.map(m => m.userData.id || m.uuid)).size;
     const col = '#' + ((kids[0] && kids[0].userData.baseColor) || 0x888888).toString(16).padStart(6, '0');
-    return `<span class="chip" data-layer="${esc(g)}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${esc(g)}</span><em>${n}</em></span>`;
-  }).join('');
+    return `<span class="chip" data-layer="${esc(g)}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${esc(BmViewer.LABEL[g] || g)}</span><em>${n}</em></span>`;
+  };
+  // ชั้นข้อมูลแบ่งหมวด: โครงสร้าง / สถาปัตย์ / สุขาภิบาล / ไฟฟ้า (กลุ่มที่ไม่อยู่ในหมวดไปท้ายสุด)
+  const known = new Set(BmViewer.CATS.flatMap(c => c[1]));
+  const cats = BmViewer.CATS.map(([cat, gs]) => [cat, gs.filter(g => groups.includes(g))]).concat([['อื่นๆ', groups.filter(g => !known.has(g))]]).filter(c => c[1].length);
+  $('#layer-list').innerHTML = ov.map(([k, t, col, n]) => `<span class="chip ${v[k + 'On'] === false ? '' : 'on'}" data-ov="${k}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${t}</span><em>${n}</em></span>`).join('') +
+    cats.map(([cat, gs]) => `<div class="layer-cat"><span class="hint">${esc(cat)}</span><div class="chips">${gs.map(chip).join('')}</div></div>`).join('');
   $$('#layer-list [data-ov]').forEach(ch => ch.onclick = () => { const k = ch.dataset.ov, on = v[k + 'On'] === false; v.setOverlay(k, on); ch.classList.toggle('on', on); });
   $$('#layer-list [data-layer]').forEach(ch => ch.onclick = () => {
     const g = ch.dataset.layer, on = !v.groups[g].visible;
@@ -1125,8 +1130,11 @@ function applyPreset(name) {
   const v = S.viewer; if (!v) return;
   v.highlight([]); $('#pick-info').innerHTML = ''; $('#pick-info').classList.remove('on');
   v.setXray(false);
+  const cat = c => (BmViewer.CATS.find(x => x[0] === c) || [0, []])[1], STRUCT = ['ฐานราก', 'เสา', 'คาน'];
   const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'เหล็กรูปพรรณ'].includes(g),
-    roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g) }[name];
+    roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g),
+    plumb: g => cat('สุขาภิบาล').includes(g) || STRUCT.includes(g) || g === 'เคาน์เตอร์-อุปกรณ์',   // ซ่อนพื้น ผนัง งานผิว หลังคา ฝ้า (ท่อใต้พื้นเห็นได้)
+    elec: g => cat('ไฟฟ้า').includes(g) || STRUCT.includes(g) }[name];
   if (name === 'rebar') v.setXray(true);
   else Object.keys(v.groups).forEach(g => v.setVisible(g, show(g)));
   $$('.preset').forEach(b => b.classList.toggle('on', b.dataset.preset === name));
@@ -1175,7 +1183,7 @@ function tlSet(day) {
   const BRICK = 0xb5654a, PLASTER = 0xd9d4ca, PAINT = 0xf3efe6;
   if (v.groups['เหล็กเสริม']) v.groups['เหล็กเสริม'].visible = true;
   v.setState(u => {
-    if (!u.id) return u.group === 'งานระบบ' ? { visible: (prog.mep_fix ?? 1) >= 0.5 } : null;
+    if (!u.id) return BmViewer.CATS.slice(2).some(c => c[1].includes(u.group)) ? { visible: (prog.mep_fix ?? 1) >= 0.5 } : null;
     // แผ่นหลังคาโผล่ตอนงานมุง (id หลังคาอยู่ในงานโครงหลังคาด้วยเพราะคิดพื้นที่โครงหลังคา)
     const tid = (u.group === 'หลังคา' && M.task.roof_cover && M.task.roof_cover.from.includes(u.id)) ? 'roof_cover' : M.primary[u.id]; if (!tid) return null;
     const s0 = step(tid, u.id);
@@ -1227,6 +1235,11 @@ function initViewer() {
 const TYPE_TH = { column: 'เสา', beam: 'คาน', tie_beam: 'คานคอดิน', lintel: 'ทับหลัง', rafter: 'จันทัน', purlin: 'แป', truss: 'โครงถัก', brace: 'ค้ำยัน',
   spread: 'ฐานราก', pile_cap: 'ฐานรากบนเข็ม', cast: 'พื้นหล่อในที่', ground: 'พื้นวางบนดิน', precast: 'พื้นสำเร็จรูป' };
 const WALL_TH = { brick_mon: 'ผนังก่ออิฐมอญครึ่งแผ่น', brick_mon_full: 'ผนังก่ออิฐมอญเต็มแผ่น', aac: 'ผนังก่ออิฐมวลเบา', block: 'ผนังก่อคอนกรีตบล็อก', block_07: 'ผนังก่อคอนกรีตบล็อก 7 ซม.', gypsum: 'ผนังเบา', glass: 'ผนังกระจก' };
+const SYS_TH = { cw: 'ประปา', hw: 'น้ำร้อน', waste: 'น้ำทิ้ง', soil: 'โสโครก', vent: 'ระบายอากาศ', rain: 'น้ำฝน', drain: 'ระบายน้ำ' };
+const FIX_TH = { wc: 'โถส้วม', urinal: 'โถปัสสาวะชาย', lavatory: 'อ่างล้างหน้า', sink: 'ซิงค์', shower: 'ฝักบัว', floor_drain: 'ตะแกรงระบายน้ำพื้น', faucet: 'ก๊อกน้ำ', spray: 'สายฉีดชำระ', water_heater: 'เครื่องทำน้ำอุ่น', washer: 'จุดเครื่องซักผ้า' };
+const EQ_TH = { septic_tank: 'ถังบำบัดน้ำเสีย', grease_trap: 'ถังดักไขมัน', water_tank: 'ถังเก็บน้ำ', pump: 'ปั๊มน้ำ', meter: 'มาตรวัดน้ำ', manhole: 'บ่อพัก', gate_valve: 'ประตูน้ำ', check_valve: 'เช็ควาล์ว', soak_pit: 'บ่อซึม' };
+const PT_TH = { light: 'ดวงโคม', lamp: 'โคมไฟ', switch: 'สวิตช์', outlet: 'เต้ารับ', ac: 'จุดแอร์', heater: 'จุดเครื่องทำน้ำอุ่น', fan: 'พัดลมระบายอากาศ', tv: 'เต้ารับทีวี', data: 'เต้ารับสื่อสาร', bell: 'กริ่ง', pump: 'จุดปั๊มน้ำ' };
+const plen = pts => (pts || []).slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - pts[i][0], q[1] - pts[i][1], q[2] - pts[i][2]), 0);
 const f2 = x => (+x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const lvlOf = z => { const L = (S.model.levels || []).filter(l => Math.abs(l.z - z) < 0.02)[0]; return (L ? L.name + ' ' : '') + (z >= 0 ? '+' : '') + (+z).toFixed(2); };
 function elemIndex() {
@@ -1236,7 +1249,7 @@ function elemIndex() {
   put('members', m.members); put('supports', m.supports); put('slabs', m.slabs); put('walls', m.walls); put('openings', m.openings);
   put('roofs', m.roofs); put('finishes', m.finishes);
   const mep = m.mep || {}, pl = mep.plumbing || {}, el = mep.electrical || {};
-  put('pipes', pl.pipes); put('fixtures', pl.fixtures); put('equipment', pl.equipment); put('points', el.points); put('panels', el.panels);
+  put('pipes', pl.pipes); put('fixtures', pl.fixtures); put('equipment', pl.equipment); put('points', el.points); put('panels', el.panels); put('conduits', el.conduits);
   put('routes', (m.quantities || {}).routes);
   S._elIdx = { m, map }; return map;
 }
@@ -1277,10 +1290,19 @@ function elemSpec(id) {
     const t = (m.opening_types || {})[e.type] || {}; title = 'ช่องเปิด'; mark = e.type;
     lines.push(`${t.desc || ''} ${t.w || ''}×${t.h || ''} ม.${t.sill ? ` ขอบล่าง +${t.sill}` : ''}`.trim());
   } else if (set === 'roofs') { title = 'หลังคา'; lines.push(`${e.cover || ''} · ลาด ${e.pitch || 0}°`); }
-  else if (set === 'pipes') { title = 'ท่อ'; lines.push(`ระบบ ${e.system} ⌀${e.dia}${e.material ? ' ' + e.material : ''}`); }
+  else if (set === 'pipes') { title = 'ท่อ' + (SYS_TH[e.system] || e.system); lines.push(`⌀${e.dia}${e.material ? ' · ' + e.material : ''} · ยาว ${f2(plen(e.pts))} ม.`);
+    if (e.serves && e.serves.length) lines.push('ต่อเข้า: ' + e.serves.join(', ')); }
+  else if (set === 'conduits') { title = 'ท่อร้อยสาย'; const c = ((m.mep || {}).electrical || {}).circuits || [], cc = c.find(x => x.id === e.circuit) || {};
+    lines.push(`วงจร ${e.circuit || '-'}${cc.desc ? ' · ' + cc.desc : ''}`, `${((m.mep || {}).electrical || {}).conduit || ''} · ยาว ${f2(plen(e.pts))} ม.`, cc.wire_size ? `สาย ${cc.conductors || 2} × ${cc.wire_size} ตร.มม.` : ''); }
   else if (set === 'routes') { title = e.kind === 'pipe' ? 'ท่อ (แนวประมาณ)' : 'ท่อร้อยสาย (แนวประมาณ)'; lines.push(e.kind === 'pipe' ? `ระบบ ${e.system} ⌀${e.dia}` : `วงจร ${e.circuit}`, 'แนวนี้ระบบประมาณให้ ตรวจกับแบบ'); }
-  else if (set === 'fixtures') { title = 'สุขภัณฑ์'; mark = e.type; }
-  else if (set === 'equipment') { title = 'อุปกรณ์'; lines.push(`${e.kind} ${e.size || ''}`); }
+  else if (set === 'fixtures') { const t = (((m.mep || {}).plumbing || {}).fixture_types || {})[e.type] || {}; title = FIX_TH[t.kind] || 'สุขภัณฑ์'; mark = e.type;
+    lines.push(t.desc || '', `ระดับ ${lvlOf(e.xyz[2])}${e.wall ? ' · ติดผนัง ' + e.wall : ''}`); }
+  else if (set === 'equipment') { title = EQ_TH[e.kind] || 'อุปกรณ์'; lines.push(e.size || '', `ระดับศูนย์กลาง ${lvlOf(e.xyz[2])}${e.dims ? ` · ขนาด ${e.dims.join('×')} ม.` : ''}`); }
+  else if (set === 'points') { const el = (m.mep || {}).electrical || {}, t = (el.point_types || {})[e.type] || {}, cc = (el.circuits || []).find(x => x.id === e.circuit) || {};
+    title = PT_TH[t.kind] || 'จุดไฟฟ้า'; mark = e.type; lines.push(t.desc || '', `ระดับ ${lvlOf(e.xyz[2])}`, `วงจร ${e.circuit || '-'}${cc.desc ? ' · ' + cc.desc : ''}`); }
+  else if (set === 'panels') { title = 'ตู้ไฟฟ้า'; lines.push(`${e.ways || ''} ช่อง · เมน ${e.main || '-'}`, `ระดับ ${lvlOf(e.xyz[2])}`); }
+  else if (set === 'finishes') { title = { counter: 'เคาน์เตอร์', ceiling: 'ฝ้า', floor: 'ผิวพื้น', wall: 'ผิวผนัง', other: 'งานผิว/อุปกรณ์' }[e.kind] || 'งานผิว';
+    lines.push(e.spec || '', e.qty ? `${f2(e.qty)} ${e.unit || ''}` : ''); }
   else title = set;
   const rb = design && design.rebar; if (rb) lines.push(rebarTxt(rb));
   return { set, e, title, mark, lines: lines.filter(Boolean), note: e.note, src: e.src, status: e.status };

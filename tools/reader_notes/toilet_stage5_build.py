@@ -32,36 +32,63 @@ for q in sh['prims']:
             pts_by[q['name']].append((round(x, 2), round(y, 2), q['rot']))
 el = {'route_height': CEIL, 'conduit': 'PVC สีเหลือง (ท่อร้อยสาย)', 'wire_type': 'THW',
       'point_types': {
-          'L18': {'kind': 'light', 'desc': 'โคมหลอด LED T8 18W พร้อมอุปกรณ์ครบชุด'},
-          'L9': {'kind': 'light', 'desc': 'โคมหลอด LED T8 9W พร้อมอุปกรณ์ครบชุด'},
-          'WL': {'kind': 'lamp', 'desc': 'โคมไฟกิ่งติดผนังภายนอก LED พร้อมอุปกรณ์ครบชุด'},
-          'SW': {'kind': 'switch', 'desc': 'สวิตช์ทางเดียว ฝาครอบกันน้ำ +1.20'},
-          'OUT': {'kind': 'outlet', 'desc': 'เต้ารับคู่มีสายดิน ฝาครอบกันน้ำ +0.90'},
-          'OP': {'kind': 'outlet', 'desc': 'เต้ารับปั๊มน้ำ กล่อง ABS ฝาทึบ +0.60'}},
+          'L18': {'kind': 'light', 'desc': 'โคมหลอด LED T8 18W พร้อมอุปกรณ์ครบชุด', 'dims': [1.20, 0.08, 0.05]},
+          'L9': {'kind': 'light', 'desc': 'โคมหลอด LED T8 9W พร้อมอุปกรณ์ครบชุด', 'dims': [0.60, 0.08, 0.05]},
+          'WL': {'kind': 'lamp', 'desc': 'โคมไฟกิ่งติดผนังภายนอก LED พร้อมอุปกรณ์ครบชุด', 'dims': [0.15, 0.25, 0.25]},
+          'SW': {'kind': 'switch', 'desc': 'สวิตช์ทางเดียว ฝาครอบกันน้ำ +1.20', 'dims': [0.08, 0.03, 0.12]},
+          'OUT': {'kind': 'outlet', 'desc': 'เต้ารับคู่มีสายดิน ฝาครอบกันน้ำ +0.90', 'dims': [0.08, 0.03, 0.12]},
+          'OP': {'kind': 'outlet', 'desc': 'เต้ารับปั๊มน้ำ กล่อง ABS ฝาทึบ +0.60', 'dims': [0.10, 0.04, 0.10]}},
       'panels': [], 'circuits': [], 'points': []}
 LC = pts_by['LOADCENTER'][0]
-el['panels'].append({'id': 'LC-1', 'xyz': [LC[0], LC[1], FLOOR + 1.80], 'ways': 4, 'main': 'MCB 2P 32A',
+el['panels'].append({'id': 'LC-1', 'xyz': [LC[0], LC[1], FLOOR + 1.80], 'ways': 4, 'main': 'MCB 2P 32A', 'dims': [0.30, 0.10, 0.40],
                      'status': AS, 'src': 'E.2.01 ตำแหน่ง · ขนาดแผง/เมนไม่มีในแบบ'})
 el['circuits'] = [
     {'id': 'L1', 'panel': 'LC-1', 'desc': 'แสงสว่างฝั่งซ้าย (ห้องชาย + ทางเข้า + โคมกิ่งมุม 1/A)', 'breaker': '1P 16A', 'wire_size': 2.5, 'conductors': 2},
     {'id': 'L2', 'panel': 'LC-1', 'desc': 'แสงสว่างฝั่งขวา (ห้องหญิง + ห้องคนพิการ + โคมกิ่งมุม 4/A)', 'breaker': '1P 16A', 'wire_size': 2.5, 'conductors': 2},
     {'id': 'P1', 'panel': 'LC-1', 'desc': 'เต้ารับ + ปั๊มน้ำ', 'breaker': '1P 20A', 'wire_size': 4, 'conductors': 3}]
 XL = 5.40     # เส้นแบ่งวงจรแสงสว่าง ซ้าย/ขวา
-def P(t, x, y, z, c):
-    el['points'].append({'id': f'{t}-{sum(1 for p in el["points"] if p["type"] == t) + 1:02d}', 'type': t, 'xyz': [x, y, r2(z)], 'circuit': c})
-for x, y, _ in sorted(pts_by['A$C59DC7984']):
-    P('L18', x, y, CEIL, 'L1' if x < XL else 'L2')
-for x, y, _ in sorted(pts_by['A$C1201696c']):
-    P('L9', x, y, CEIL, 'L1' if x < XL else 'L2')
+MASW = [w for w in m['walls'] if w['kind'] in ('brick_mon', 'brick_mon_full', 'aac', 'block') and len(w['path']) == 2]
+def snap(x, y, lim=0.45):   # ผิวผนังใกล้สุด + ทิศหันหน้า (เหมือนขั้น 4)
+    best = None
+    for w in MASW:
+        a, b = w['path']; L = math.dist(a, b); ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+        u = (x - a[0]) * ux + (y - a[1]) * uy
+        if not (-0.05 <= u <= L + 0.05):
+            continue
+        v = (x - a[0]) * -uy + (y - a[1]) * ux
+        if best is None or abs(v) < best[0]:
+            best = (abs(v), w, u, v, ux, uy)
+    if not best or best[0] > lim:
+        return x, y, None
+    _, w, u, v, ux, uy = best; sg = 1 if v >= 0 else -1; nx, ny = -uy * sg, ux * sg; a = w['path'][0]
+    return r2(a[0] + ux * u + nx * w['t'] / 2), r2(a[1] + uy * u + ny * w['t'] / 2), round(math.degrees(math.atan2(ny, nx))) % 360
+def P(t, x, y, z, c, rot=None, wall=False):
+    if wall:
+        x, y, rot = snap(x, y)
+    p = {'id': f'{t}-{sum(1 for p in el["points"] if p["type"] == t) + 1:02d}', 'type': t, 'xyz': [x, y, r2(z)], 'circuit': c}
+    if rot is not None:
+        p['rot'] = rot
+    el['points'].append(p)
+for x, y, rt in sorted(pts_by['A$C59DC7984']):
+    P('L18', x, y, CEIL, 'L1' if x < XL else 'L2', rot=round(rt) % 180)
+for x, y, rt in sorted(pts_by['A$C1201696c']):
+    P('L9', x, y, CEIL, 'L1' if x < XL else 'L2', rot=round(rt) % 180)
 for x, y, _ in sorted(pts_by['WALl WASHER LIGHT2']):
-    P('WL', x, y, 2.40, 'L1' if x < XL else 'L2')
+    P('WL', x, y, 2.40, 'L1' if x < XL else 'L2', wall=True)
 for x, y, _ in sorted(pts_by['SWICH']):
-    P('SW', x, y, FLOOR + 1.20, 'L1' if x < XL else 'L2')
+    P('SW', x, y, FLOOR + 1.20, 'L1' if x < XL else 'L2', wall=True)
 for x, y, _ in sorted(pts_by['SWICH-1']):
     if y > 5.0:
-        P('OP', x, y, 0.60, 'P1')       # เต้ารับปั๊ม นอกอาคารด้านหลัง (ข้างป้าย PUMP)
+        P('OP', x, y, 0.60, 'P1', wall=True)       # เต้ารับปั๊ม นอกอาคารด้านหลัง (ข้างป้าย PUMP)
     else:
-        P('OUT', x, y, FLOOR + 0.90, 'P1')
+        P('OUT', x, y, FLOOR + 0.90, 'P1', wall=True)
+px, py, prot = snap(LC[0], LC[1])
+el['panels'][0]['xyz'][:2] = [px, py]
+if prot is not None:
+    el['panels'][0]['rot'] = prot
+# สายเมน มิเตอร์ → ตู้ LC: แบบไม่บอกระยะ — Earth ให้ใส่ระยะเอง (แก้ค่า length ในไฟล์ได้) · ขนาดสายตามตาราง E.1.02 มิเตอร์ 15(45)A
+el['service'] = {'length': 10.0, 'wire_type': 'THW', 'wire_size': 16, 'conductors': 2, 'conduit': 'PVC สีเหลือง 1"', 'meter': '15(45)A',
+                 'status': AS, 'note': 'ระยะมิเตอร์ → LC คิดเอง 10 ม. (แบบไม่ระบุ) · สาย THW 16 ตร.มม. ตามตาราง E.1.02 มิเตอร์ 15(45)A'}
 m.setdefault('mep', {})['electrical'] = el
 cnt = collections.Counter(p['type'] for p in el['points'])
 row('ไฟฟ้า', 'ดวงโคม', f'LED T8 18W {cnt["L18"]} · LED T8 9W {cnt["L9"]} · โคมกิ่งติดผนังภายนอก {cnt["WL"]} — ติดใต้ฝ้า +{CEIL:.2f} (โคมกิ่ง +2.40)', 'E.2.01', FD,
@@ -72,7 +99,7 @@ row('ไฟฟ้า', 'แผงควบคุม LC', f'Load center 1 ชุ�
     'แบบไม่มีตารางโหลด/single line — จำนวนช่องและขนาดเมนคิดเอง · E.1.02 รูปความสูงเขียน 1.75')
 row('ไฟฟ้า', 'วงจรย่อย (จัดเอง)', 'L1 แสงสว่างซ้าย · L2 แสงสว่างขวา (THW 2.5 ตร.มม. 2 เส้น) · P1 เต้ารับ+ปั๊ม (THW 4 ตร.มม. 3 เส้นรวมดิน) · ท่อ PVC เหลือง เดินระดับฝ้า', 'E.1.02', US,
     'Earth ให้จัดเอง · ความยาวท่อ/สาย ประมาณจากตำแหน่งจุด (แบบเขียนเส้นสายเฉพาะกลุ่มสวิตช์ ~31 ม. ไม่ครบเส้นทาง)')
-row('ไฟฟ้า', 'สายเมน มิเตอร์ → LC', 'ยังไม่คิด (แบบไม่บอกตำแหน่งมิเตอร์/ระยะ)', 'E.1.02', AS, 'ขอระยะจากมิเตอร์ หรือให้คิดเป็นงานเหมา')
+row('ไฟฟ้า', 'สายเมน มิเตอร์ → LC', 'ใส่ระยะเอง 10 ม. · THW 16 ตร.มม. 2 เส้น ในท่อ PVC 1" (มิเตอร์ 15(45)A ตามตาราง E.1.02)', 'E.1.02', AS, 'Earth ให้ใส่ระยะเอง — แก้ได้ที่ mep.electrical.service.length')
 
 # ================================================================ ประปา SN.2.01 น้ำดี (DWG แผ่น 32)
 pl = m['mep']['plumbing']
@@ -130,7 +157,7 @@ for k, x in enumerate([4.12, 5.08, 7.40], 1):     # ประตูน้ำ 3 �
     eq.append({'id': f'GV-{k}', 'kind': 'gate_valve', 'xyz': [x, 6.58, UPZ], 'size': '1"', 'status': FD, 'src': 'SN.2.01 น้ำดี'})
 pl['cw_material'] = 'PVC ชั้น 13.5'
 ONE, HALF = '1"', '1/2"'
-row('ประปา', 'ท่อน้ำดี PVC', f'⌀1" {L_cw[ONE]:.2f} ม. · ⌀1/2" {L_cw[HALF]:.2f} ม. ในแปลน (รวมท่อยกขึ้นสุขภัณฑ์แล้ว: ⌀1" 34.55 · ⌀1/2" 32.26 ม.) — เดินใต้ดิน -0.30 (ใต้ท้องคานคอดิน), ช่วงถัง-ปั๊มบนดิน', 'SN.2.01 น้ำดี', FD,
+row('ประปา', 'ท่อน้ำดี PVC', f'⌀1" {L_cw[ONE]:.2f} ม. · ⌀1/2" {L_cw[HALF]:.2f} ม. ในแปลน (ยาวรวมท่อยกขึ้นสุขภัณฑ์ ดูตารางปริมาณด้านล่าง) — เดินใต้ดิน -0.30 (ใต้ท้องคานคอดิน), ช่วงถัง-ปั๊มบนดิน', 'SN.2.01 น้ำดี', FD,
     'ชั้นท่อไม่ระบุ → PVC ชั้น 13.5 · ความลึกฝังคิดเอง')
 row('ประปา', 'ถังเก็บน้ำ / ปั๊ม / ประตูน้ำ', 'ถังเก็บน้ำบนดิน 2,000 ลิตร 1 · ปั๊มอัตโนมัติ 300 W 1 · ประตูน้ำ 1" 3 ตัว', 'SN.2.01 น้ำดี', FD)
 row('ประปา', 'ท่อเมนเข้า', 'ต่อจากท่อเมนประปาในโครงการ — คิดถึงปลายเส้นที่เขียน (0.67 ม. จากถัง)', 'SN.2.01 น้ำดี', AS, 'ความยาวถึงจุดต่อจริงไม่ทราบ')
@@ -144,7 +171,7 @@ def polys(parent, layer):
     for q in sh['prims']:
         if q.get('parent') == parent and q['kind'] == 'poly' and q.get('layer') == layer:
             yield [(a[0] - X0, a[1] - Y0) for a in q['p']]
-FLZ = 0.17   # ผิวพื้นโครงสร้าง (หลังดรอป) — ท่อจากสุขภัณฑ์/FD ลงจากระดับนี้
+FLZ = 0.15   # ผิวพื้นโครงสร้าง (หลังดรอป 0.05) — ท่อจากสุขภัณฑ์/FD ลงจากระดับนี้
 def drop_pipe(sysn, dia, xy, src, z0=FLZ, st=FD, note=None, end=None):
     pts3 = [[xy[0][0], xy[0][1], z0]] + [[x, y, DZ] for x, y in xy]
     if end:
@@ -209,7 +236,7 @@ for k, x in enumerate(mh, 1):
 addpipe('drain', '8"', [[-4.11, 7.55, D8Z], [14.39, 7.55, D8Z]], 'SN.2.01 น้ำเสีย (ท่อระบายน้ำทิ้งซีเมนต์ใยหิน 8" SLOPE 1:200)', mat='ซีเมนต์ใยหิน',
         note='คิดตามเส้นที่เขียน (ปลายสองข้าง "ต่อเข้ากับระบบระบายน้ำภายในโครงการ") · ระดับ -0.60 คิดเอง')
 for k, (x, y) in enumerate([TL, TR], 1):
-    eq.append({'id': f'ST-{k}', 'kind': 'septic_tank', 'xyz': [x, y, -0.70], 'dims': [1.46, 1.46, 1.40], 'size': '2,000 ลิตร (AQUA, WAVE, COTTO, DOS หรือเทียบเท่า)',
+    eq.append({'id': f'ST-{k}', 'kind': 'septic_tank', 'xyz': [x, y, -0.80], 'dims': [1.46, 1.46, 1.40], 'size': '2,000 ลิตร (AQUA, WAVE, COTTO, DOS หรือเทียบเท่า)',
                'status': FD, 'src': 'SN.2.01 น้ำเสีย + SN.3.01 (KS-2000 Od 1.46 H 1.40)'})
 # สุขภัณฑ์ที่ท่อในแปลนต่อถึง (ระยะในแปลนจากสุขภัณฑ์ถึงแนวท่อ ≤ 0.40) → pipe.serves กันถอดปริมาณประมาณท่อซ้ำ
 NEED = {'wc': ('soil', 'cw'), 'urinal': ('waste', 'cw'), 'lavatory': ('waste',), 'floor_drain': ('waste',), 'faucet': ('cw',), 'spray': ('cw',)}
@@ -267,6 +294,10 @@ row('สุขาภิบาล', 'งานโยธาถังบำบั�
 m['meta'] = dict(m['meta'], name='ห้องสุขา รร.เทศบาล 4 — ขั้น 5 งานระบบ', stage=5)
 m['history'].append({'at': __import__('datetime').datetime.now().astimezone().isoformat(timespec='seconds'), 'by': 'claude (อ่านแบบขั้น 5)',
                      'sections': ['mep', 'slabs', 'finishes'], 'note': 'ไฟฟ้า E.2.01 + ประปา/น้ำเสีย SN.2.01 (แบบ A) + ถังบำบัด SN.3.01'})
+# แนวท่อร้อยสาย: คำนวณครั้งเดียวด้วยวิธีเดียวกับถอดปริมาณ (ระดับฝ้า มุมฉาก จุดใกล้สุด) แล้วเก็บในโมเดล — 3D เห็นแนว และแก้แนวเองได้
+tk0 = T.Takeoff(m, {}); tk0.run()
+el['conduits'] = [{'id': r['id'], 'circuit': r['circuit'], 'pts': [[r2(c) for c in p] for p in r['pts']], 'status': AS,
+                   'note': 'แนวประมาณ (แบบไม่เขียนแนวเดินท่อครบ) — แก้แนวได้'} for r in tk0.routes if r['kind'] == 'conduit']
 json.dump(m, open('stage5.bm.json', 'w'), ensure_ascii=False, indent=1)
 
 tk = T.Takeoff(m, {}); tk.run()

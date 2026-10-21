@@ -650,7 +650,15 @@ class Takeoff:
                      net, w["id"], task="wall",
                      calc=f"ยาว {L:.2f}{f' − หักเสา {ded:.2f}' if ded else ''} × สูง {H:.2f} = {gross:.2f} ตร.ม." + (f" หักช่องเปิด {opens:.2f} → สุทธิ {net:.2f} ตร.ม." if opens else ""))
             sides = w.get("finish_sides", 2)
-            if w.get("plaster") and sides:
+            pa = w.get("plaster_area")   # พื้นที่ฉาบที่ระบุไว้ (เช่น ฉาบเฉพาะด้านทาสี ด้านกรุกระเบื้องไม่ฉาบ) — ใช้แทน สุทธิ × จำนวนด้าน
+            if w.get("plaster") and pa:
+                pk = "aac" if w["kind"] == "aac" else "brick"
+                for sd, nm in (("int", "ภายใน"), ("ext", "ภายนอก")):
+                    if pa.get(sd, 0) > 0:
+                        it = self.add("1.2.4", f"plaster_{sd}_{pk}", f"ฉาบปูนเรียบผนัง{nm}" + (" (อิฐมวลเบา)" if pk == "aac" else ""), "ตร.ม.", pa[sd], w["id"],
+                                      task="plaster", calc=f"ตามพื้นที่ฉาบที่ระบุ {pa[sd]:.2f} ตร.ม.")
+                        it["spec"] = {"t": "plaster", "side": sd, "wall": w["kind"]}
+            elif w.get("plaster") and sides:
                 ext = 1 if (w.get("exterior") and sides >= 1) else 0
                 pk = "aac" if w["kind"] == "aac" else "brick"
                 if sides - ext:
@@ -757,6 +765,36 @@ class Takeoff:
         conduit = el.get("conduit") or "ท่อร้อยสาย"
         wire_t = el.get("wire_type") or "สายไฟ"
         drop = lambda z: max(0.0, H - z)
+        svc = el.get("service") or {}
+        if svc.get("length"):   # สายเมน มิเตอร์ → แผง (ระยะที่ผู้ใช้ใส่)
+            Ls, pid = float(svc["length"]), (el.get("panels") or [{}])[0].get("id")
+            sc = svc.get("conduit") or conduit
+            it = self.add("1.4", f"conduit_{sc}", f"ท่อร้อยสายเมน {sc}", "ม.", Ls, pid, waste=self.s["branch_conduit_waste"], task="mep_rough",
+                          note="สายเมน มิเตอร์ → แผง ตามระยะที่ระบุ")
+            it["spec"] = {"t": "conduit", "conduit": sc}
+            ws, wt, n = svc.get("wire_size"), svc.get("wire_type") or wire_t, svc.get("conductors") or 2
+            it = self.add("1.4", f"wire_{wt}_{ws}", f"สายไฟฟ้า {wt} {ws or ''} ตร.มม.".replace("  ", " "), "ม.", Ls * n, pid,
+                          waste=self.s["branch_wire_waste"], task="mep_rough", note=f"สายเมน {n} เส้น × {Ls:g} ม.")
+            it["spec"] = {"t": "wire", "wire": wt, "size": ws}
+        if el.get("conduits"):   # แนวท่อร้อยสายที่เก็บไว้ในโมเดล → ใช้ความยาวจริงของแนว ไม่ประมาณใหม่
+            Lc = defaultdict(float)
+            for r in el["conduits"]:
+                Lc[r.get("circuit")] += sum(math.dist(r["pts"][i], r["pts"][i + 1]) for i in range(len(r["pts"]) - 1))
+            for cid, L in Lc.items():
+                c = circuits.get(cid)
+                if not c or c.get("panel") not in panels:
+                    self.note(f"ไฟฟ้า: แนวท่อวงจร {cid} ไม่มีวงจร/แผงที่อ้างถึง — ไม่ได้คิด")
+                    continue
+                it = self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, c["panel"],
+                              waste=self.s["branch_conduit_waste"], task="mep_rough", note="ตามแนวท่อร้อยสายในโมเดล; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
+                it["spec"] = {"t": "conduit", "conduit": conduit}
+                n, size = c.get("conductors") or 2, c.get("wire_size")
+                it = self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, c["panel"],
+                              waste=self.s["branch_wire_waste"], task="mep_rough", note="ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
+                it["spec"] = {"t": "wire", "wire": wire_t, "size": size}
+            if not svc.get("length"):
+                self.note("ไฟฟ้า: ยังไม่ได้ใส่ระยะสายเมน มิเตอร์ → แผง (mep.electrical.service.length)")
+            return
         for cid, pts in by_c.items():
             c = circuits.get(cid)
             if not c or c.get("panel") not in panels:
