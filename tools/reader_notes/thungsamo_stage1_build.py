@@ -4,7 +4,7 @@
 import json, datetime, math, sys
 from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
-sys.path.insert(0, '.')
+sys.path.insert(0, __import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(__file__)), '..'))   # tools/roofgen.py
 import roofgen
 
 FD, AS = 'from_drawing', 'assumed'
