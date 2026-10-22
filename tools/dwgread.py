@@ -13,7 +13,7 @@
 import argparse, json, math, os, re, shutil, subprocess, sys, tempfile
 from collections import Counter, defaultdict
 
-SHEET_RE = re.compile(r'^(A|S|E|SN|EE|ME|AC|L)\.\d{1,2}\.\d{2}$')
+SHEET_RE = re.compile(r'^(A|S|E|SN|EE|ME|AC|L)([.\-])\d{1,2}(\.\d{2})?$')   # A.2.01 / S-03 / E-1
 TITLE_RE = re.compile(r'(แปลน|รูปด้าน|รูปตัด|แบบขยาย|รายการ|ผัง|ตาราง|ขยาย)')
 PAPER = {'A4': (0.297, 0.210), 'A3': (0.420, 0.297), 'A2': (0.594, 0.420), 'A1': (0.841, 0.594)}
 
@@ -215,7 +215,7 @@ def find_sheets(doc, idx):
         if e.dxftype() != 'INSERT':
             continue
         w, h = x1 - x0, y1 - y0
-        if w <= 0 or h <= 0 or abs(w / h - math.sqrt(2)) > 0.03:
+        if w <= 0 or h <= 0 or not (1.2 <= w / h <= 1.5):   # กระดาษ A (√2) หรือกรอบหน่วยงานที่สั้นกว่า (เช่น A2 กรอบ 594×466)
             continue
         inside = [n for n, p in nums if x0 <= p.x <= x1 and y0 <= p.y <= y1]
         if len(inside) == 1:
@@ -227,11 +227,24 @@ def find_sheets(doc, idx):
                or (c['box'][0] <= s['box'][0] + 1e-6 and c['box'][2] >= s['box'][2] - 1e-6 and c['box'][1] <= s['box'][1] + 1e-6 and c['box'][3] >= s['box'][3] - 1e-6 and s['num'] == c['num']) for s in sheets):
             continue
         sheets.append(c)
+    scl = [(e.dxf.insert, text_of(e)) for e in msp.query('TEXT MTEXT') if re.match(r'^1\s*:\s*\d+$', text_of(e) or '')]
     for s in sheets:
-        s['paper'] = 'A3'   # แบบหน่วยงานใช้ A3 — สเกลคิดจากความกว้างกรอบ
-        s['scale'] = round(s['w'] / PAPER['A3'][0])
-    key = lambda s: (['A', 'S', 'E', 'EE', 'SN', 'ME', 'AC', 'L'].index(s['num'].split('.')[0]) if s['num'].split('.')[0] in ['A', 'S', 'E', 'EE', 'SN', 'ME', 'AC', 'L'] else 9,
-                     [int(x) for x in s['num'].split('.')[1:]], s['box'][1] * -1, s['box'][0])
+        x0, y0, x1, y1 = s['box']
+        sc = [int(t.split(':')[1]) for p, t in scl if x0 <= p.x <= x1 and y0 <= p.y <= y0 + (y1 - y0) * 0.3]
+        # สเกลจากข้อความ 1:N ในแถบชื่อ ถ้าไม่มี เดาจากกระดาษ A3 → A2 (หน่วยวาด = ม.)
+        if sc:
+            s['scale'] = sc[0]; s['paper'] = min(PAPER, key=lambda k: abs(PAPER[k][0] * sc[0] - s['w']))
+        else:
+            s['paper'] = 'A3'; s['scale'] = round(s['w'] / PAPER['A3'][0])
+    seen = Counter()
+    for s in sorted(sheets, key=lambda s: (s['box'][1] * -1, s['box'][0])):   # เลขแผ่นซ้ำ (สำเนาเก่า) → ต่อท้าย #2 #3
+        seen[s['num']] += 1
+        if seen[s['num']] > 1:
+            s['num'] += f"#{seen[s['num']]}"
+    split = lambda n: re.split(r'[.\-#]', n)
+    pref = ['A', 'S', 'E', 'EE', 'SN', 'ME', 'AC', 'L']
+    key = lambda s: (pref.index(split(s['num'])[0]) if split(s['num'])[0] in pref else 9,
+                     [int(x) for x in split(s['num'])[1:] if x.isdigit()], s['box'][1] * -1, s['box'][0])
     sheets.sort(key=key)
     return sheets
 

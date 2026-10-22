@@ -1430,6 +1430,22 @@
                   "$ref": "#/$defs/xyz"
                 },
                 "minItems": 3
+              },
+              "kind": {
+                "enum": [
+                  "cover",
+                  "gablet"
+                ],
+                "description": "cover = ผิวมุง (ค่าเริ่มต้น) · gablet = หน้าจั่วปั้นหยา (ระนาบตั้ง ไม่นับพื้นที่มุง)"
+              },
+              "face": {
+                "type": "string"
+              },
+              "wing": {
+                "type": "string"
+              },
+              "note": {
+                "type": "string"
               }
             }
           }

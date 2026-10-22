@@ -19,6 +19,44 @@ sys.path.insert(0, HERE)
 from validate import qty_hash, qty_base_hash, design_hash  # noqa: E402
 from roofgeom import roof_planes, plane_lines, poly_area3, v_len, v_sub  # noqa: E402
 
+
+def roof_edges(rf, planes):
+    """ความยาว สัน / ตะเข้สัน / ตะเข้ราง จากขอบที่ระนาบสองแผ่นต่างทิศใช้ร่วมกัน (พิกัด [x, สูง, y])
+    custom: ขอบภายในระนาบเดียวกัน (ชิ้นที่แตกเพื่อให้นูน) ไม่นับ · ตะเข้ราง = ขอบเว้า (ระนาบหนึ่งต่ำกว่าส่วนขยายของอีกระนาบ)"""
+    def nrm(p):
+        a, b, c = p[0], p[1], p[2]
+        u = [b[i] - a[i] for i in range(3)]; v = [c[i] - a[i] for i in range(3)]
+        n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+        L = math.sqrt(sum(x * x for x in n)) or 1
+        n = [x / L for x in n]
+        return [-x for x in n] if n[1] < 0 else n
+    def h_at(p, n, x, y):   # ความสูงของส่วนขยายระนาบ p ที่ (x, y)
+        a = p[0]
+        return a[1] - (n[0] * (x - a[0]) + n[2] * (y - a[2])) / n[1] if abs(n[1]) > 1e-9 else a[1]
+    ns = [nrm(p) for p in planes]
+    edges = defaultdict(list)
+    for k, p in enumerate(planes):
+        for i in range(len(p)):
+            a = tuple(round(v, 3) for v in p[i]); b = tuple(round(v, 3) for v in p[(i + 1) % len(p)])
+            edges[tuple(sorted([a, b]))].append(k)
+    ridge = hip = valley = 0.0
+    for (a, b), ks in edges.items():
+        if len(ks) < 2:
+            continue
+        i, j = ks[0], ks[1]
+        if sum(x * y for x, y in zip(ns[i], ns[j])) > 0.9999:
+            continue   # ระนาบเดียวกัน
+        L = v_len(v_sub(list(a), list(b)))
+        if abs(a[1] - b[1]) < 1e-3:
+            ridge += L; continue
+        cx = sum(q[0] for q in planes[i]) / len(planes[i]); cy = sum(q[2] for q in planes[i]) / len(planes[i])
+        hi = sum(q[1] for q in planes[i]) / len(planes[i])
+        if h_at(planes[j], ns[j], cx, cy) > hi + 1e-6:
+            hip += L
+        else:
+            valley += L
+    return ridge, hip, valley
+
 DEFAULTS = {
     "cover": 0.025,       # ระยะหุ้มสำหรับความยาวปลอก/เหล็กฐานราก (ม.)
     "lean_thk": 0.05,     # คอนกรีตหยาบใต้ฐานราก (ม.)
@@ -531,8 +569,8 @@ class Takeoff:
             r["ridge"] = "x" if rf["ridge"] == "X" else "z"
         if rf.get("low"):
             r["low"] = {"x1": "x1", "x2": "x2", "y1": "z1", "y2": "z2"}[rf["low"]]
-        if rf["form"] == "custom":
-            r["planes"] = [{"pts": [[p[0], p[2], p[1]] for p in pl["pts"]]} for pl in rf.get("planes", [])]
+        if rf["form"] == "custom":   # ระนาบตั้ง (หน้าจั่วปั้นหยา kind=gablet) ไม่ใช่ผิวมุง
+            r["planes"] = [{"pts": [[p[0], p[2], p[1]] for p in pl["pts"]]} for pl in rf.get("planes", []) if pl.get("kind", "cover") == "cover"]
         return r
 
     def _steel_and_roofs(self):
@@ -560,19 +598,16 @@ class Takeoff:
                               "ตร.ม.", area, rf["id"], waste=w, task="roof_cover",
                               note="พื้นที่ตามแนวลาด; ถ้าคิดเป็นแผ่นให้แปลงตามคู่มือผู้ผลิตแล้วเผื่อ 3%/5%")
                 it["spec"] = {"t": "cover", "cover": rf["cover"], "form": rf["form"]}
-                edges = defaultdict(int)
-                for p in planes:
-                    for i in range(len(p)):
-                        a = tuple(round(v, 3) for v in p[i]); b = tuple(round(v, 3) for v in p[(i + 1) % len(p)])
-                        edges[tuple(sorted([a, b]))] += 1
-                ridge = sum(v_len(v_sub(list(a), list(b))) for (a, b), n in edges.items() if n >= 2 and abs(a[1] - b[1]) < 1e-3)
-                hip = sum(v_len(v_sub(list(a), list(b))) for (a, b), n in edges.items() if n >= 2 and abs(a[1] - b[1]) >= 1e-3)
+                ridge, hip, valley = roof_edges(rf, planes)
                 if ridge:
                     it = self.add("1.2.1", "ridge_cap", "ครอบสันหลังคา", "ม.", ridge, rf["id"], waste=0.03, task="roof_cover")
                     it["spec"] = {"t": "ridge", "cover": rf["cover"]}
                 if hip:
                     it = self.add("1.2.1", "hip_cap", "ครอบตะเข้สัน", "ม.", hip, rf["id"], waste=0.03, task="roof_cover")
                     it["spec"] = {"t": "hip", "cover": rf["cover"]}
+                if valley:
+                    it = self.add("1.2.1", "valley", "ตะเข้ราง", "ม.", valley, rf["id"], waste=0.03, task="roof_cover")
+                    it["spec"] = {"t": "valley", "cover": rf["cover"]}
                 if rf.get("insulation"):
                     it = self.add("1.2.1", "insulation", f"ฉนวนใต้หลังคา {rf['insulation']}", "ตร.ม.", area, rf["id"], task="roof_cover")
                     it["spec"] = {"t": "insulation", "desc": rf["insulation"], "cover": rf["cover"]}
