@@ -25,23 +25,30 @@ def halfplane(a, b, c, bb):
 
 
 class Wing:
-    """r = (x0,y0,x1,y1) รวมชายคา · axis 'X' = สันขนานแกน X · g = ระยะหน้าจั่วจากขอบชายคาปลายสัน (None = ปั้นหยาธรรมดา)"""
-    def __init__(self, name, r, eave, t, axis, g=None):
-        self.name, self.r, self.e, self.t, self.axis, self.g = name, r, eave, t, axis, g
+    """r = (x0,y0,x1,y1) รวมชายคา · axis 'X' = สันขนานแกน X
+    จั่วปั้นหยา: gv = ระยะจากขอบชายคาปลายสันถึงขอบปั้นลมของหลังคาจั่ว (หลังคาจั่วยื่นคลุมปั้นหยา)
+                 gf = ระยะถึงหน้าจั่วตั้ง (ผนังช่องลม) — ระนาบปั้นหยาปลายสันวิ่งต่อใต้หลังคาจั่วจนชนหน้าจั่ว
+    gv = gf = None → ปั้นหยาธรรมดา"""
+    def __init__(self, name, r, eave, t, axis, gv=None, gf=None):
+        self.name, self.r, self.e, self.t, self.axis = name, r, eave, t, axis
+        self.gv = gv; self.gf = gf if gf is not None else gv
         x0, y0, x1, y1 = r; e = eave
         # ระนาบ z = A x + B y + C
         self.planes = {'S0': (0, t, e - t * y0), 'S1': (0, -t, e + t * y1), 'E0': (t, 0, e - t * x0), 'E1': (-t, 0, e + t * x1)} if axis == 'X' else \
                       {'S0': (t, 0, e - t * x0), 'S1': (-t, 0, e + t * x1), 'E0': (0, t, e - t * y0), 'E1': (0, -t, e + t * y1)}
         self.box = box(*r)
 
-    def end_zone(self, k, bb):
-        """โซนที่ระนาบปลาย Ek มีผล: ก่อนถึงหน้าจั่ว (ทั้งผืนถ้าไม่มี gablet)"""
+    def zone(self, k, d):
+        """แถบปลายสันด้าน k (E0/E1) ลึก d จากขอบชายคา"""
         x0, y0, x1, y1 = self.r
-        if self.g is None:
-            return self.box
         if self.axis == 'X':
-            return box(x0, y0, x0 + self.g, y1) if k == 'E0' else box(x1 - self.g, y0, x1, y1)
-        return box(x0, y0, x1, y0 + self.g) if k == 'E0' else box(x0, y1 - self.g, x1, y1)
+            return box(x0, y0, x0 + d, y1) if k == 'E0' else box(x1 - d, y0, x1, y1)
+        return box(x0, y0, x1, y0 + d) if k == 'E0' else box(x0, y1 - d, x1, y1)
+
+    def mid(self):
+        if self.gv is None:
+            return Polygon()
+        return self.box.difference(self.zone('E0', self.gv)).difference(self.zone('E1', self.gv))
 
     def z(self, k, x, y):
         A, B, C = self.planes[k]; return A * x + B * y + C
@@ -52,28 +59,25 @@ class Wing:
     def gt(self, P, Q, bb):   # {Q > P}
         return self.le(P, Q, bb)
 
-    def region(self, k, bb):
-        """โซนในผืนนี้ที่ระนาบ k เป็นผิวบนสุดของผืน"""
-        P = self.planes[k]
+    def region(self, k, bb, visible=True):
+        """โซนในผืนนี้ของระนาบ k · S = หลังคาจั่ว (ช่วงกลาง) + ปั้นหยา (ช่วงปลาย) · E = ปั้นหยาปลายสัน (visible=False รวมส่วนใต้หลังคาจั่วถึงหน้าจั่ว)"""
+        P = self.planes[k]; L = lambda q: self.le(P, self.planes[q], bb)
+        if k.startswith('S'):
+            q2 = 'S1' if k == 'S0' else 'S0'
+            hip = self.box.intersection(L('E0')).intersection(L('E1'))
+            if self.gv is not None:
+                hip = hip.difference(self.mid()).union(self.mid())
+            return self.box.intersection(L(q2)).intersection(hip)
         R = self.box
-        others = [q for q in self.planes if q != k]
-        if k.startswith('E'):
-            R = R.intersection(self.end_zone(k, bb))
-            for q in others:
-                if q.startswith('S'):
-                    R = R.intersection(self.le(P, self.planes[q], bb))
-                else:
-                    R = R.intersection(self.le(P, self.planes[q], bb).union(Polygon(self.box.exterior).difference(self.end_zone(q, bb))))
-            return R
-        q2 = 'S1' if k == 'S0' else 'S0'
-        R = R.intersection(self.le(P, self.planes[q2], bb))
-        for q in ('E0', 'E1'):   # ในโซนปลาย ต้องต่ำกว่าระนาบปลายด้วย
-            ez = self.end_zone(q, bb)
-            R = R.difference(ez.difference(self.le(P, self.planes[q], bb)))
+        for q in self.planes:
+            if q != k:
+                R = R.intersection(L(q))
+        if self.gv is not None:
+            R = R.intersection(self.zone(k, self.gv if visible else self.gf))
         return R
 
     def above(self, P, bb):
-        """โซนที่ผืนนี้สูงกว่าระนาบ P (ระนาบของผืนอื่น)"""
+        """โซนที่ผืนนี้ (ส่วนที่มองเห็น) สูงกว่าระนาบ P (ระนาบของผืนอื่น)"""
         acc = Polygon()
         for k in self.planes:
             acc = acc.union(self.region(k, bb).intersection(self.gt(P, self.planes[k], bb)))
@@ -122,30 +126,30 @@ def build(wings):
     planes = []
     for w in wings:
         for k in w.planes:
-            R = w.region(k, bb)
-            for o in wings:
-                if o is not w:
-                    R = R.difference(o.above(w.planes[k], bb))
-            if R.area < 1e-4:
-                continue
-            for pc in convex_pieces(R):
-                planes.append({'pts': [[round(x, 4), round(y, 4), round(w.z(k, x, y), 4)] for x, y in ring(pc)], 'wing': w.name, 'face': k})
-        # หน้าจั่ว gablet (แนวตั้ง)
-        if w.g is not None:
-            x0, y0, x1, y1 = w.r
+            parts = [(w.region(k, bb), None)]
+            if k.startswith('E') and w.gv is not None and w.gf > w.gv:   # ปั้นหยาส่วนใต้หลังคาจั่ว (มองไม่เห็น มีกระเบื้องจริง)
+                parts.append((w.region(k, bb, False).difference(w.zone(k, w.gv)), 'ใต้หลังคาจั่ว'))
+            for R, note in parts:
+                for o in wings:
+                    if o is not w:
+                        R = R.difference(o.above(w.planes[k], bb))
+                if R.area < 1e-4:
+                    continue
+                for pc in convex_pieces(R):
+                    pl = {'pts': [[round(x, 4), round(y, 4), round(w.z(k, x, y), 4)] for x, y in ring(pc)], 'wing': w.name, 'face': k}
+                    if note: pl['note'] = note
+                    planes.append(pl)
+        # หน้าจั่วตั้ง (ช่องลม) ที่ระยะ gf
+        if w.gv is not None:
+            x0, y0, x1, y1 = w.r; g = w.gf
             for k in ('E0', 'E1'):
                 if w.axis == 'X':
-                    xg = x0 + w.g if k == 'E0' else x1 - w.g
-                    zb = w.z(k, xg, (y0 + y1) / 2); d = w.g; ya, yb = y0 + d, y1 - d; zr = w.e + w.t * (y1 - y0) / 2
-                    tri = [[xg, ya, zb], [xg, yb, zb], [xg, (y0 + y1) / 2, zr]]
+                    xg = x0 + g if k == 'E0' else x1 - g
+                    zb = w.e + w.t * g; zr = w.e + w.t * (y1 - y0) / 2
+                    tri = [[xg, y0 + g, zb], [xg, y1 - g, zb], [xg, (y0 + y1) / 2, zr]]
                 else:
-                    yg = y0 + w.g if k == 'E0' else y1 - w.g
-                    zb = w.z(k, (x0 + x1) / 2, yg); d = w.g; xa, xb = x0 + d, x1 - d; zr = w.e + w.t * (x1 - x0) / 2
-                    tri = [[xa, yg, zb], [xb, yg, zb], [(x0 + x1) / 2, yg, zr]]
-                # ถ้าหน้าจั่วอยู่ใต้ผืนอื่นทั้งหมด ไม่ต้องวาด
-                mid = tri[2]
-                hidden = any(o is not w and o.box.covers(Point(mid[0], mid[1]))
-                             and max(o.z(q, mid[0], mid[1]) for q in o.planes) > mid[2] for o in wings)
-                if not hidden:
-                    planes.append({'pts': [[round(v, 4) for v in p] for p in tri], 'wing': w.name, 'face': 'G' + k[1], 'kind': 'gablet'})
+                    yg = y0 + g if k == 'E0' else y1 - g
+                    zb = w.e + w.t * g; zr = w.e + w.t * (x1 - x0) / 2
+                    tri = [[x0 + g, yg, zb], [x1 - g, yg, zb], [(x0 + x1) / 2, yg, zr]]
+                planes.append({'pts': [[round(v, 4) for v in p] for p in tri], 'wing': w.name, 'face': 'G' + k[1], 'kind': 'gablet'})
     return planes

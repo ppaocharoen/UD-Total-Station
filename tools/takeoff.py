@@ -616,7 +616,7 @@ class Takeoff:
                     spec = rf.get(part)
                     if not spec or typ in explicit:
                         continue
-                    L = sum(v_len(v_sub(a, b)) for p in planes if len(p) >= 3 for a, b in plane_lines(p, spec["spacing"], along))
+                    L = sum(v_len(v_sub(a, b)) for p in planes if len(p) >= 3 for a, b in plane_lines(p, spec["spacing"], along, r["eave"]))
                     steel_len[spec["section"]] += L
                     steel_src[spec["section"]].append(rf["id"])
                     steel_mem[spec["section"]][rf["id"]] = steel_mem[spec["section"]].get(rf["id"], 0) + L
