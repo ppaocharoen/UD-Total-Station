@@ -49,9 +49,11 @@ check('C3 ผนังกลางห้องวางบนพื้นวา�
 m.walls[m.walls.length - 1].bottom = 1.0;
 check('C3 ผนังลอย (ไม่มีอะไรรับ) = error', has(C.check(m), 'C3', 'error', 'W-MID'));
 // C2 ปลายคานลอย
-m = clone(); m.nodes.push({ id: 'N-X', x: -2.0, y: 0.0, z: 3.3 });
+m = clone(); m.nodes.push({ id: 'N-X', x: -3.0, y: 0.0, z: 3.3 });
 m.members.push({ id: 'B9', mark: 'B9', type: 'beam', i: 'N-1A-R', j: 'N-X', section: 'RC-20x40', material: 'C240' });
-check('C2 คาน B9 ปลายลอย', has(C.check(m), 'C2', 'error', 'B9'));
+check('C2 คาน B9 ปลายลอย (ยาว > 2 ม.) = error', has(C.check(m), 'C2', 'error', 'B9'));
+m.nodes.find(n => n.id === 'N-X').x = -1.5;
+check('C2 คานยื่นสั้นจากเสา ปลายอิสระ = info', has(C.check(m), 'C2', 'info', 'B9'));
 // A1 ท่อที่เขียนไว้ลอดเสา = error
 m = clone(); m.mep.plumbing.pipes.push({ id: 'P-X', system: 'cw', dia: '1/2"', pts: [[-0.5, 0.0, 1.0], [0.5, 0.0, 1.0]] });
 check('A1 ท่อ P-X ลอดเสา C1-1A-2 = error', has(C.check(m), 'A1', 'error', 'P-X', 'C1-1A-2'));

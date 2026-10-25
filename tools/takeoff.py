@@ -512,54 +512,60 @@ class Takeoff:
                 self.add("1.1.16", "precast_slab", "พื้นคอนกรีตสำเร็จรูป", "ตร.ม.", A, s["id"], task=lt)
                 tp = s.get("topping", t)   # ความหนา Topping (t = หนารวมแผ่น+Topping ถ้าระบุ topping)
                 self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {tp*100:g} ซม.", "ตร.ม.", A, s["id"], task=lt)
-                continue
-            self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {t:g} = {A*t:.3f} ลบ.ม.")
-            et = s.get("edge_thicken")
-            if et and et.get("sides"):   # ขอบพื้นพับลง (คางหมู กว้างบน/ล่าง ลึกเพิ่ม d) ตามด้านของ polygon ที่ระบุ
-                pg = s["polygon"]
-                Le = sum(dist2(pg[i], pg[(i + 1) % len(pg)]) for i in et["sides"])
-                ae = (et.get("w_top", 0) + et.get("w_bot", 0)) / 2 * et.get("d", 0)
-                self.add("1.1.12", key, name, "ลบ.ม.", Le * ae, s["id"], task=lt,
-                         calc=f"ขอบพับลง ยาว {Le:.2f} × ({et.get('w_top', 0):g}+{et.get('w_bot', 0):g})/2 × ลึก {et.get('d', 0):g} = {Le*ae:.3f} ลบ.ม.")
-            if s["kind"] == "cast":
-                self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task=lt,
-                         calc=f"ท้องพื้น {A:.2f} + ขอบ {P:.2f}×{t:g} = {A+P*t:.2f} ตร.ม.")
-                self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m2_slab"] * A,
-                         s["id"], count=True, task=lt)
-            else:   # ground
-                self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * self.s["sand_thk"], s["id"],
-                         waste=self.s["sand_waste"], task=lt)
-                if s.get("pe_sheet", True):   # แผ่นพลาสติกรองใต้พื้น ไม่คิดเผื่อทับซ้อน (ตกลงกับ Earth 19 ต.ค. 2569)
-                    self.add("1.1.4", "pe_sheet", "แผ่นพลาสติกรองใต้พื้น (Polyethylene)", "ตร.ม.", A, s["id"], task=lt,
-                             calc=f"พื้นที่ {A:.2f} ตร.ม. (ไม่คิดเผื่อทับซ้อน)")
-            rb = self.rebar_of("slabs", s["id"])
-            if rb.get("mesh"):
-                mh = rb["mesh"]; dia, sp = mh[0], mh[1]; layers = mh[2] if len(mh) > 2 else 1
-                xs = [p[0] for p in s["polygon"]]; ys = [p[1] for p in s["polygon"]]
-                Lx, Ly = max(xs) - min(xs), max(ys) - min(ys)
-                fill = A / (Lx * Ly) if Lx * Ly else 1
-                L = ((math.floor(Ly / sp) + 1) * Lx + (math.floor(Lx / sp) + 1) * Ly) * layers * fill
-                self.rebar(s["id"], dia, L, f"ตะแกรง @{sp:g} {layers} ชั้น ยาวรวม {L:.2f} ม.")
-                bd = rb.get("bend")   # ปลายเหล็กงอลง (ขอบพับ/คานล้อม): {L: ม. ต่อปลาย, sides: ด้านของ polygon}
-                if bd and bd.get("sides"):
-                    pg = s["polygon"]
-                    nb = sum(math.floor(dist2(pg[i], pg[(i + 1) % len(pg)]) / sp) + 1 for i in bd["sides"]) * layers
-                    self.rebar(s["id"], dia, nb * bd["L"], f"ปลายงอ {nb} ปลาย × {bd['L']:g} ม.")
-            elif rb.get("mesh_xy"):   # เหล็กสองแนวต่างขนาด/ระยะ (ผลออกแบบพื้นจากเว็บ): x = เหล็กวางตามแนวแกน x
-                mx = rb["mesh_xy"]; layers = mx.get("layers", 1)
-                xs = [p[0] for p in s["polygon"]]; ys = [p[1] for p in s["polygon"]]
-                Lx, Ly = max(xs) - min(xs), max(ys) - min(ys)
-                fill = A / (Lx * Ly) if Lx * Ly else 1
-                if mx.get("x"):
-                    dia, sp = mx["x"]; L = (math.floor(Ly / sp) + 1) * Lx * layers * fill
-                    self.rebar(s["id"], dia, L, f"แนว x @{sp:g} {math.floor(Ly / sp) + 1} เส้น × {Lx:.2f} ม. = {L:.2f} ม.")
-                if mx.get("y"):
-                    dia, sp = mx["y"]; L = (math.floor(Lx / sp) + 1) * Ly * layers * fill
-                    self.rebar(s["id"], dia, L, f"แนว y @{sp:g} {math.floor(Lx / sp) + 1} เส้น × {Ly:.2f} ม. = {L:.2f} ม.")
-            elif rb.get("wire_mesh"):
-                self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task=lt)
             else:
-                self.note(f"พื้น {s['id']}: ยังไม่มีเหล็กเสริม")
+                self._slab_cast(s, A, P, t, lt, name, key)
+            self._slab_rebar(s, A, lt)   # พื้นสำเร็จรูป: ตะแกรงใน Topping
+
+    def _slab_cast(self, s, A, P, t, lt, name, key):
+        self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {t:g} = {A*t:.3f} ลบ.ม.")
+        et = s.get("edge_thicken")
+        if et and et.get("sides"):   # ขอบพื้นพับลง (คางหมู กว้างบน/ล่าง ลึกเพิ่ม d) ตามด้านของ polygon ที่ระบุ
+            pg = s["polygon"]
+            Le = sum(dist2(pg[i], pg[(i + 1) % len(pg)]) for i in et["sides"])
+            ae = (et.get("w_top", 0) + et.get("w_bot", 0)) / 2 * et.get("d", 0)
+            self.add("1.1.12", key, name, "ลบ.ม.", Le * ae, s["id"], task=lt,
+                     calc=f"ขอบพับลง ยาว {Le:.2f} × ({et.get('w_top', 0):g}+{et.get('w_bot', 0):g})/2 × ลึก {et.get('d', 0):g} = {Le*ae:.3f} ลบ.ม.")
+        if s["kind"] == "cast":
+            self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", A + P * t, s["id"], task=lt,
+                     calc=f"ท้องพื้น {A:.2f} + ขอบ {P:.2f}×{t:g} = {A+P*t:.2f} ตร.ม.")
+            self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m2_slab"] * A,
+                     s["id"], count=True, task=lt)
+        else:   # ground
+            self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * self.s["sand_thk"], s["id"],
+                     waste=self.s["sand_waste"], task=lt)
+            if s.get("pe_sheet", True):   # แผ่นพลาสติกรองใต้พื้น ไม่คิดเผื่อทับซ้อน (ตกลงกับ Earth 19 ต.ค. 2569)
+                self.add("1.1.4", "pe_sheet", "แผ่นพลาสติกรองใต้พื้น (Polyethylene)", "ตร.ม.", A, s["id"], task=lt,
+                         calc=f"พื้นที่ {A:.2f} ตร.ม. (ไม่คิดเผื่อทับซ้อน)")
+
+    def _slab_rebar(self, s, A, lt):
+        rb = self.rebar_of("slabs", s["id"])
+        if rb.get("mesh"):
+            mh = rb["mesh"]; dia, sp = mh[0], mh[1]; layers = mh[2] if len(mh) > 2 else 1
+            xs = [p[0] for p in s["polygon"]]; ys = [p[1] for p in s["polygon"]]
+            Lx, Ly = max(xs) - min(xs), max(ys) - min(ys)
+            fill = A / (Lx * Ly) if Lx * Ly else 1
+            L = ((math.floor(Ly / sp) + 1) * Lx + (math.floor(Lx / sp) + 1) * Ly) * layers * fill
+            self.rebar(s["id"], dia, L, f"ตะแกรง @{sp:g} {layers} ชั้น ยาวรวม {L:.2f} ม.")
+            bd = rb.get("bend")   # ปลายเหล็กงอลง (ขอบพับ/คานล้อม): {L: ม. ต่อปลาย, sides: ด้านของ polygon}
+            if bd and bd.get("sides"):
+                pg = s["polygon"]
+                nb = sum(math.floor(dist2(pg[i], pg[(i + 1) % len(pg)]) / sp) + 1 for i in bd["sides"]) * layers
+                self.rebar(s["id"], dia, nb * bd["L"], f"ปลายงอ {nb} ปลาย × {bd['L']:g} ม.")
+        elif rb.get("mesh_xy"):   # เหล็กสองแนวต่างขนาด/ระยะ (ผลออกแบบพื้นจากเว็บ): x = เหล็กวางตามแนวแกน x
+            mx = rb["mesh_xy"]; layers = mx.get("layers", 1)
+            xs = [p[0] for p in s["polygon"]]; ys = [p[1] for p in s["polygon"]]
+            Lx, Ly = max(xs) - min(xs), max(ys) - min(ys)
+            fill = A / (Lx * Ly) if Lx * Ly else 1
+            if mx.get("x"):
+                dia, sp = mx["x"]; L = (math.floor(Ly / sp) + 1) * Lx * layers * fill
+                self.rebar(s["id"], dia, L, f"แนว x @{sp:g} {math.floor(Ly / sp) + 1} เส้น × {Lx:.2f} ม. = {L:.2f} ม.")
+            if mx.get("y"):
+                dia, sp = mx["y"]; L = (math.floor(Lx / sp) + 1) * Ly * layers * fill
+                self.rebar(s["id"], dia, L, f"แนว y @{sp:g} {math.floor(Lx / sp) + 1} เส้น × {Ly:.2f} ม. = {L:.2f} ม.")
+        elif rb.get("wire_mesh"):
+            self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task=lt)
+        else:
+            self.note(f"พื้น {s['id']}: ยังไม่มีเหล็กเสริม")
 
     # ------------------------------------------------------------ เหล็กรูปพรรณ + หลังคา
     def _roof_r(self, rf):
