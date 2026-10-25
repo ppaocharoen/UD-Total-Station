@@ -217,7 +217,12 @@ def find_sheets(doc, idx):
         w, h = x1 - x0, y1 - y0
         if w <= 0 or h <= 0 or not (1.2 <= w / h <= 1.5):   # กระดาษ A (√2) หรือกรอบหน่วยงานที่สั้นกว่า (เช่น A2 กรอบ 594×466)
             continue
-        inside = [n for n, p in nums if x0 <= p.x <= x1 and y0 <= p.y <= y1]
+        att = [a.dxf.text.strip() for a in getattr(e, 'attribs', []) if SHEET_RE.match((a.dxf.text or '').strip())]
+        inside = att[:1] or [n for n, p in nums if x0 <= p.x <= x1 and y0 <= p.y <= y1]   # เลขแผ่นเป็น Attribute ของบล็อกกรอบแผ่น
+        if len(set(inside)) > 1:   # มีเลขอ้างอิงแผ่นอื่นในแบบ (วงรูปตัด A-01 ฯลฯ) → ใช้เลขในแถบชื่อมุมขวาล่าง
+            inside = [n for n, p in nums if x0 + w * 0.75 <= p.x <= x1 and y0 <= p.y <= y0 + h * 0.15]
+        if len(set(inside)) == 1:
+            inside = inside[:1]
         if len(inside) == 1:
             cand.append({'num': inside[0], 'box': (x0, y0, x1, y1), 'block': e.dxf.name, 'w': w, 'h': h})
     # เลือกกรอบที่เล็กที่สุดต่อเลขแผ่นแต่ละจุด (กรอบซ้อนกัน)
