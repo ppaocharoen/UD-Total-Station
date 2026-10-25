@@ -510,7 +510,8 @@ class Takeoff:
             name, key = self.conc_name(s.get("material"))
             if s["kind"] == "precast":
                 self.add("1.1.16", "precast_slab", "พื้นคอนกรีตสำเร็จรูป", "ตร.ม.", A, s["id"], task=lt)
-                self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {t*100:g} ซม.", "ตร.ม.", A, s["id"], task=lt)
+                tp = s.get("topping", t)   # ความหนา Topping (t = หนารวมแผ่น+Topping ถ้าระบุ topping)
+                self.add("1.1.16", "topping", f"คอนกรีตทับหน้าพื้นสำเร็จรูป หนา {tp*100:g} ซม.", "ตร.ม.", A, s["id"], task=lt)
                 continue
             self.add("1.1.12", key, name, "ลบ.ม.", A * t, s["id"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {t:g} = {A*t:.3f} ลบ.ม.")
             et = s.get("edge_thicken")
@@ -971,10 +972,10 @@ class Takeoff:
                 t = d.get("waist") or f.get("waist") or 0.15
                 lt = "lift:" + self.level_of(f["top"])
                 self.src_task.setdefault(st["id"], lt)
-                side = Li * t + Lh * H / 2
+                side = Li * t + Lh * H / (2 * f["risers"])   # ท้องบันได + ฟันเลื่อย (สามเหลี่ยมขั้นละ ลูกตั้ง×ลูกนอน/2)
                 vol, fw = W * side, W * Li + H * W + 2 * side
                 self.add("1.1.12", key + "_stair", name + " (บันได)", "ลบ.ม.", vol, st["id"], task=lt,
-                         calc=f"{fid} กว้าง {W:g} × (ท้อง {Li:.2f}×{t:g} + ขั้น {Lh:.2f}×{H:.2f}/2) = {vol:.3f} ลบ.ม.")
+                         calc=f"{fid} กว้าง {W:g} × (ท้อง {Li:.2f}×{t:g} + ขั้น {Lh:.2f}×{H:.2f}/(2×{f['risers']})) = {vol:.3f} ลบ.ม.")
                 self.add("1.1.7", "formwork_stair", "ไม้แบบหล่อคอนกรีต (บันได)", "ตร.ม.", fw, st["id"], task=lt,
                          calc=f"{fid} ท้อง {W:g}×{Li:.2f} + ลูกตั้ง {H:.2f}×{W:g} + ข้าง 2×{side:.3f} = {fw:.2f} ตร.ม.")
                 if d.get("main_bar"):

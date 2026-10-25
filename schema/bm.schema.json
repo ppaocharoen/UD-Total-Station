@@ -1027,6 +1027,22 @@
               },
               "minItems": 3,
               "maxItems": 3
+            },
+            "at": {
+              "type": "array",
+              "description": "ตำแหน่งเข็มเทียบศูนย์ฐาน [[dx, dy], ...] ม.",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              }
+            },
+            "top": {
+              "type": "number",
+              "description": "ระดับหัวเข็ม ม. (ไม่ระบุ = ท้องฐานราก)"
             }
           }
         },
@@ -1155,6 +1171,10 @@
         "task": {
           "type": "string",
           "description": "งานในแผน (เช่น mep_ext สำหรับพื้นรับถังบำบัด) — ไม่ระบุ = ไปกับงานโครงสร้างตามระดับ"
+        },
+        "topping": {
+          "type": "number",
+          "description": "พื้นสำเร็จรูป: ความหนาคอนกรีตทับหน้า ม. (t = หนารวม)"
         }
       }
     },

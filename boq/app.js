@@ -1131,7 +1131,7 @@ function applyPreset(name) {
   v.highlight([]); $('#pick-info').innerHTML = ''; $('#pick-info').classList.remove('on');
   v.setXray(false);
   const cat = c => (BmViewer.CATS.find(x => x[0] === c) || [0, []])[1], STRUCT = ['ฐานราก', 'เสา', 'คาน'];
-  const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'เหล็กรูปพรรณ'].includes(g),
+  const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'บันได', 'เหล็กรูปพรรณ'].includes(g),
     roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g),
     plumb: g => cat('สุขาภิบาล').includes(g) || STRUCT.includes(g) || g === 'เคาน์เตอร์-อุปกรณ์',   // ซ่อนพื้น ผนัง งานผิว หลังคา ฝ้า (ท่อใต้พื้นเห็นได้)
     elec: g => cat('ไฟฟ้า').includes(g) || STRUCT.includes(g) }[name];
