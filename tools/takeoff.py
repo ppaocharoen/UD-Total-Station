@@ -319,6 +319,7 @@ class Takeoff:
         self._walls()
         self._finishes()
         self._mep()
+        self._extra_bars()
         self._rebar_items()
         return self
 
@@ -434,10 +435,19 @@ class Takeoff:
             if rb.get("main"):
                 n, dia = rb["main"]; self.rebar(x["id"], dia, n * H, f"เหล็กยืน {n} เส้น × {H:.2f} ม.")
             if rb.get("stirrup"):
-                dia, sp = rb["stirrup"][0], rb["stirrup"][1]
-                cnt = math.floor(H / sp) + 1
+                st = rb["stirrup"]; dia, sp = st[0], st[1]
                 per = 2 * (b + h) - 8 * c
-                self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1), f"ปลอก @{sp:g} {cnt} วง × {per:.2f} ม.")
+                if len(st) > 3 and st[2]:   # ปลอกถี่ช่วงหัว-โคนเสา: [Ø, ระยะกลาง, ระยะถี่, lo] · lo = ตัวเลข (เท่ากันสองปลาย) หรือ [โคน, หัว] วัดจากปลายชิ้น
+                    se = st[2]; lb, lt = (st[3], st[3]) if not isinstance(st[3], (list, tuple)) else st[3]
+                    lb, lt = min(lb, H / 2), min(lt, H / 2)
+                    ce = math.floor(lb / se) + math.floor(lt / se)
+                    cm = max(math.ceil((H - lb - lt) / sp) - 1, 0) + 2
+                    cnt = ce + cm
+                    self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1),
+                               f"ปลอก @{se:g} ช่วงโคน {lb:.2f} + หัว {lt:.2f} ม. · @{sp:g} ช่วงกลาง รวม {cnt} วง × {per:.2f} ม.")
+                else:
+                    cnt = math.floor(H / sp) + 1
+                    self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1), f"ปลอก @{sp:g} {cnt} วง × {per:.2f} ม.")
             if not rb:
                 self.note(f"เสา {x['id']}: ยังไม่มีเหล็กเสริม")
 
@@ -498,6 +508,11 @@ class Takeoff:
                 cnt = math.ceil((Ln / 2) / s1) + math.ceil((Ln / 2) / s2) + 1
                 per = 2 * (b + h) - 8 * c
                 self.rebar(x["id"], dia, cnt * per * (2 if rb.get("double_stirrup") else 1), f"ปลอก @{s1:g}/{s2:g} {cnt} วง × {per:.2f} ม.")
+                de = rb.get("double_end")   # ปลอกคู่เฉพาะช่วงหัวเสา: ระยะจากศูนย์เสา (ม.) ทั้งสองปลาย
+                if de and not rb.get("double_stirrup"):
+                    z = max(min(de - (Lc - Ln) / 2, Ln / 2), 0)
+                    ne = 2 * (math.floor(z / s2) + 1)
+                    self.rebar(x["id"], dia, ne * per, f"ปลอกคู่ช่วงหัวเสา {de:g} ม. (ช่วงว่าง {z:.2f} ม.) 2 ปลาย {ne} วง × {per:.2f} ม.")
             if not rb:
                 self.note(f"คาน {x['id']}: ยังไม่มีเหล็กเสริม")
         self.note("เหล็กยืนคานวัดศูนย์ถึงศูนย์ ไม่รวมระยะทาบและงอขอ; ปลอกวัดเส้นรอบรูป 2(b+h) − 8×ระยะหุ้ม ไม่รวมขอ")
@@ -564,7 +579,7 @@ class Takeoff:
                 self.rebar(s["id"], dia, L, f"แนว y @{sp:g} {math.floor(Lx / sp) + 1} เส้น × {Ly:.2f} ม. = {L:.2f} ม.")
         elif rb.get("wire_mesh"):
             self.add("1.1.9", f"wiremesh_{rb['wire_mesh']}", f"ตะแกรงเหล็กสำเร็จรูป {rb['wire_mesh']}", "ตร.ม.", A, s["id"], task=lt)
-        else:
+        elif not rb.get("extra_bars"):
             self.note(f"พื้น {s['id']}: ยังไม่มีเหล็กเสริม")
 
     # ------------------------------------------------------------ เหล็กรูปพรรณ + หลังคา
@@ -1074,6 +1089,21 @@ class Takeoff:
                          int(n), pid, count=True, task="roof_frame")
 
     # ------------------------------------------------------------ เหล็กเสริมรวม
+    def _extra_bars(self):
+        """เหล็กเสริมรายการย่อย (design.<หมวด>[id].rebar.extra_bars หรือ design.stairs[fid].extra_bars)
+        แต่ละรายการ {label, dia, a:[x,y,z], b:[x,y,z], n: จำนวนเส้น (1), step: [dx,dy,dz] ระยะเลื่อนเส้นถัดไป} → ยาว n × |b − a|"""
+        dz = self.m.get("design", {}) or {}
+        for sec in ("supports", "members", "slabs", "stairs"):
+            for key, e in (dz.get(sec) or {}).items():
+                if not isinstance(e, dict):
+                    continue
+                lst = e.get("extra_bars") or (e.get("rebar") or {}).get("extra_bars") or []
+                sid = key.split("#")[0] if sec == "stairs" else key
+                for it in lst:
+                    a, b = it["a"], it["b"]; n = int(it.get("n", 1))
+                    L = math.dist(a, b)
+                    self.rebar(sid, it["dia"], n * L, f"{it.get('label', 'เหล็กเสริมเพิ่ม')} {n} เส้น × {L:.2f} ม.")
+
     def _rebar_items(self):
         total_kg = 0.0
         all_parts = {}

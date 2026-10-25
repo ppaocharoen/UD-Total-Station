@@ -300,11 +300,28 @@
         {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        {
+          "oneOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0
+              },
+              "minItems": 2,
+              "maxItems": 2
+            }
+          ]
         }
       ],
       "minItems": 2,
-      "maxItems": 3,
-      "description": "[ขนาด มม., ระยะกลางช่วง ม., ระยะปลายช่วง ม.]"
+      "maxItems": 4,
+      "description": "[ขนาด มม., ระยะกลางช่วง ม., ระยะปลายช่วง ม.] · เสา: [ขนาด, ระยะกลาง, ระยะถี่, lo ม. หรือ [lo โคน, lo หัว]] วัดจากปลายชิ้น"
     },
     "mesh": {
       "type": "array",
@@ -2473,6 +2490,17 @@
               }
             }
           }
+        },
+        "double_end": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "คาน: ปลอกคู่เฉพาะช่วงหัวเสา ระยะจากศูนย์เสา ม. (สองปลาย)"
+        },
+        "extra_bars": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/extraBar"
+          }
         }
       }
     },
@@ -2544,7 +2572,7 @@
         },
         "stairs": {
           "type": "object",
-          "description": "บันได: {id ช่วงบันได: {main_bar:[ขนาด มม., ระยะ ม.], dist_bar:[…], waist}}",
+          "description": "บันได: {id ช่วงบันได: {main_bar:[ขนาด มม., ระยะ ม.], dist_bar:[…], waist, extra_bars:[…]}}",
           "additionalProperties": {
             "type": "object"
           }
@@ -2764,6 +2792,52 @@
         },
         "note": {
           "type": "string"
+        }
+      }
+    },
+    "extraBar": {
+      "type": "object",
+      "required": [
+        "dia",
+        "a",
+        "b"
+      ],
+      "description": "เหล็กเสริมรายการย่อย: n เส้น ยาว |b−a| เส้นถัดไปเลื่อน step (คิดปริมาณและวาด 3D)",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "dia": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "a": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "b": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "n": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "step": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3
         }
       }
     }

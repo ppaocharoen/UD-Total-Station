@@ -74,6 +74,14 @@ async function cmp(label, m) {
   await cmp('กำแพงมีระดับ + ชานพัก', m9);
   const m10 = clone(m9); m10.slabs.filter(s => s.kind !== 'cast').forEach(s => { s.pe_sheet = false; }); m10.stairs[0].material = m10.materials.find(x => x.kind === 'concrete').id;
   await cmp('ไม่เอาพลาสติก + บันไดระบุคอนกรีต', m10);
+  // ปลอกถี่หัว-โคนเสา · ปลอกคู่ช่วงหัวเสา · เหล็กเสริมรายการย่อย · ตะแกรง Topping พื้นสำเร็จรูป
+  const m11 = clone(m10), cols = m11.members.filter(x => x.type === 'column'), bms = m11.members.filter(x => x.type === 'beam');
+  m11.design.members[cols[0].id] = { rebar: { main: [4, 16], stirrup: [9, 0.2, 0.1, 0.5] } };
+  if (cols[1]) m11.design.members[cols[1].id] = { rebar: { main: [8, 20], stirrup: [9, 0.25, 0.125, [0.45, 0.85]], double_stirrup: true } };
+  m11.design.members[bms[0].id] = { rebar: { top: [3, 25], bot: [3, 25], stirrup: [9, 0.15], double_end: 1.5, extra_bars: [{ label: 'เสริมเหนือคาน', dia: 6, a: [0, 0, 3], b: [2, 0, 3], n: 12, step: [0, 0.2, 0] }] } };
+  m11.design.stairs['ST2'].extra_bars = [{ label: 'มุมขั้น', dia: 9, a: [5, 0, 0.1], b: [6, 0, 0.1], n: 8, step: [0, 0.27, 0.19] }];
+  m11.slabs[0].kind = 'precast'; m11.slabs[0].topping = 0.05; m11.design.slabs[m11.slabs[0].id] = { rebar: { mesh: [6, 0.2, 1] } };
+  await cmp('ปลอกถี่เสา + ปลอกคู่หัวเสา + เหล็กย่อย + Topping', m11);
   check('pyJson เลขยกกำลัง', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]) === '[1e-05,1.5e-07,0.0001,2.5]', T.pyJson([1e-5, 1.5e-7, 0.0001, 2.5]));
   console.log((ok ? 'PASS' : 'FAIL') + ` rebartk ${n} ข้อ`);
   process.exit(ok ? 0 : 1);
