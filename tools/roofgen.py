@@ -56,8 +56,8 @@ class Wing:
     def le(self, P, Q, bb):   # {P <= Q}
         return halfplane(Q[0] - P[0], Q[1] - P[1], Q[2] - P[2], bb)
 
-    def gt(self, P, Q, bb):   # {Q > P}
-        return self.le(P, Q, bb)
+    def gt(self, P, Q, bb, strict=True):   # {Q > P} · strict: ระนาบซ้อนทับกันพอดีไม่นับว่าสูงกว่า
+        return halfplane(Q[0] - P[0], Q[1] - P[1], Q[2] - P[2] - (1e-6 if strict else 0), bb)
 
     def region(self, k, bb, visible=True):
         """โซนในผืนนี้ของระนาบ k · S = หลังคาจั่ว (ช่วงกลาง) + ปั้นหยา (ช่วงปลาย) · E = ปั้นหยาปลายสัน (visible=False รวมส่วนใต้หลังคาจั่วถึงหน้าจั่ว)"""
@@ -76,11 +76,11 @@ class Wing:
             R = R.intersection(self.zone(k, self.gv if visible else self.gf))
         return R
 
-    def above(self, P, bb):
-        """โซนที่ผืนนี้ (ส่วนที่มองเห็น) สูงกว่าระนาบ P (ระนาบของผืนอื่น)"""
+    def above(self, P, bb, strict=True):
+        """โซนที่ผืนนี้ (ส่วนที่มองเห็น) สูงกว่าระนาบ P (ระนาบของผืนอื่น) · strict=False นับระนาบซ้อนพอดีด้วย (ผืนที่มาก่อนได้ส่วนซ้อน)"""
         acc = Polygon()
         for k in self.planes:
-            acc = acc.union(self.region(k, bb).intersection(self.gt(P, self.planes[k], bb)))
+            acc = acc.union(self.region(k, bb).intersection(self.gt(P, self.planes[k], bb, strict)))
         return acc
 
 
@@ -132,7 +132,7 @@ def build(wings):
             for R, note in parts:
                 for o in wings:
                     if o is not w:
-                        R = R.difference(o.above(w.planes[k], bb))
+                        R = R.difference(o.above(w.planes[k], bb, strict=wings.index(o) > wings.index(w)))
                 if R.area < 1e-4:
                     continue
                 for pc in convex_pieces(R):
