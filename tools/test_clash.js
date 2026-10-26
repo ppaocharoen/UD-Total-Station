@@ -15,7 +15,7 @@ check('ตัวอย่าง: ระยะดิ่งสำนักงา�
 check('แนวท่อประมาณไม่ขึ้นเป็น error/warn', r.filter(x => x.ids.some(i => /^(PP|EL)-/.test(i))).every(x => x.sev === 'info'));
 
 // C1 เสาไม่มีฐานราก
-let m = clone(); m.supports = m.supports.filter(s => s.id !== 'F1-1A');
+let m = clone(), m2; m.supports = m.supports.filter(s => s.id !== 'F1-1A');
 check('C1 ลบฐานราก F1-1A → เสา C1-1A-1 ไม่มีที่รองรับ', has(C.check(m), 'C1', 'error', 'C1-1A-1'));
 // B1 หน้าต่างสูงเกินท้องคาน
 m = clone(); m.opening_types.W1.h = 1.8;     // หัว = 0.3+0.9+1.8 = 3.0 > ท้องคาน 2.9
@@ -41,6 +41,9 @@ m = clone(); m.stairs = [{ id: 'ST1', flights: [{ start: [1.0, 1.0], dir: '+X', 
 r = C.check(m, { buildingType: 'public' });
 check('B4 บันไดกว้าง 0.90 / ลูกตั้ง 0.20 ไม่ผ่านข้อ 24', has(r, 'B4', 'error', 'ST1') && r.find(x => x.code === 'B4').detail.includes('ลูกตั้ง'));
 check('B4 ระยะดิ่งใต้คาน B1 < 2.10 ม.', r.some(x => x.code === 'B4' && x.title.includes('ระยะดิ่ง')));
+m2 = clone(); m2.stairs = [{ id: 'STX', flights: [{ start: [1.0, -0.5], dir: '+Y', width: 0.9, bottom: 0.0, top: 0.8, risers: 4, going: 0.25 }] }];
+r = C.check(m2); check('A5 ขั้นบันไดผ่านคาน/เสาแนว A ชั้นล่าง = error', r.some(x => x.code === 'A5' && x.ids.includes('STX')));
+m2.stairs[0].flights[0].start = [3.0, 1.5]; r = C.check(m2); check('A5 บันไดกลางห้องไม่ชน', !r.some(x => x.code === 'A5'));
 r = C.check(m, { buildingType: 'residential' });
 check('B4 อาคารอยู่อาศัย: กว้าง 0.90 ลูกตั้ง 0.20 ผ่านข้อ 23', !r.some(x => x.code === 'B4' && x.title.includes('ไม่ผ่าน')));
 // C3 ผนังวางบนพื้นวางบนดิน

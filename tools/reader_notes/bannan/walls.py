@@ -10,7 +10,8 @@ def cores(num):
     return out
 def cols(num):
     f = ext.P(num)
-    return [(round(f(q['at'])[0] + 0.125, 3), round(f(q['at'])[1] + 0.125, 3)) for q, _ in ext.prims(num, layers={'C'}, kinds={'insert'})]
+    # บล็อกเสา 0.25×0.25 จุดแทรกที่มุม · บล็อกกลับด้าน (sx = −1) ศูนย์อยู่ทาง −x
+    return [(round(f(q['at'])[0] + 0.125 * (q.get('sx') or 1), 3), round(f(q['at'])[1] + 0.125, 3)) for q, _ in ext.prims(num, layers={'C'}, kinds={'insert'})]
 def tags(num):
     f = ext.P(num)
     return [(q['text'].strip(), f(q['at'])) for q, _ in ext.prims(num, kinds={'text'}) if re.match(r'^[DW]\d{1,2}$', q['text'].strip())]
