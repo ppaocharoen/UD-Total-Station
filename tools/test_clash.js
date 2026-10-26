@@ -48,6 +48,16 @@ m = clone(); m.walls.push({ id: 'W-MID', kind: 'brick_mon', t: 0.1, path: [[0.5,
 check('C3 ผนังกลางห้องวางบนพื้นวางบนดิน (info)', has(C.check(m), 'C3', 'info', 'W-MID'));
 m.walls[m.walls.length - 1].bottom = 1.0;
 check('C3 ผนังลอย (ไม่มีอะไรรับ) = error', has(C.check(m), 'C3', 'error', 'W-MID'));
+m.walls[m.walls.length - 1].attached = true;
+r = C.check(m); check('C3 ส่วนตกแต่งยึดกับโครงสร้าง (attached) = info ไม่ใช่ error', has(r, 'C3', 'info', 'W-MID') && !has(r, 'C3', 'error', 'W-MID'));
+{ const w0 = base.walls.find(w => (base.members.some(x => x.type === 'beam'))); m = clone(); const w = m.walls.find(x => x.id === w0.id); const b0 = w.bottom;
+  w.bottom = b0 + 0.10; check('C3 ฐานผนังสูงกว่าหลังคาน 0.10 (ชั้นพื้น/ปรับระดับ) ยังถือว่าคานรับ', !has(C.check(m), 'C3', 'error', w.id) && !has(C.check(m), 'C3', 'warn', w.id));
+  w.bottom = b0 + 0.20; check('C3 ฐานผนังสูงกว่าหลังคาน 0.20 → ไม่ถือว่าคานรับ', has(C.check(m), 'C3', 'error', w.id) || has(C.check(m), 'C3', 'warn', w.id) || has(C.check(m), 'C3', 'info', w.id)); }
+// C4 ปลายจันทันฝังในตะเข้ (ไม่มีจุดต่อร่วม) = ต่อแล้ว · ปลายชายคาอีกข้างยื่นอิสระได้
+m = clone(); m.sections.push({ id: 'BX', kind: 'cold_formed', shape: 'box', name: 'BOX100x100', b: 0.1, h: 0.1, kg_m: 10 });
+m.nodes.push({ id: 'H1', x: 0, y: 0, z: 5 }, { id: 'H2', x: 4, y: 4, z: 5 }, { id: 'R1', x: 2, y: 2.02, z: 5 }, { id: 'R2', x: 2, y: 6, z: 4.6 });
+m.members.push({ id: 'HPX', type: 'hip', i: 'H1', j: 'H2', section: 'BX', material: 'C240' }, { id: 'RFX', type: 'rafter', i: 'R1', j: 'R2', section: 'BX', material: 'C240' });
+r = C.check(m); check('C4 จันทันชนตะเข้ (ปลายอยู่ในชิ้นตะเข้) ไม่ขึ้นเตือน', !has(r, 'C4', 'warn', 'RFX'));
 // C2 ปลายคานลอย
 m = clone(); m.nodes.push({ id: 'N-X', x: -3.0, y: 0.0, z: 3.3 });
 m.members.push({ id: 'B9', mark: 'B9', type: 'beam', i: 'N-1A-R', j: 'N-X', section: 'RC-20x40', material: 'C240' });
