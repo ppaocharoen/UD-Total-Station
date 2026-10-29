@@ -1029,8 +1029,8 @@ function buildLayers(groups) {
   const v = S.viewer;
   const ov = [['grid', 'เส้นกริด', '#18ffff', (S.model.grids || []).length], ['ground', 'พื้นดิน', '#00ff41', '']].filter(o => o[3] !== 0);
   const chip = g => {
-    const kids = v.groups[g].children, n = new Set(kids.map(m => m.userData.id || m.uuid)).size;
-    const col = '#' + ((kids[0] && kids[0].userData.baseColor) || 0x888888).toString(16).padStart(6, '0');
+    const kids = v.groups[g].children, rb = g === 'เหล็กเสริม', n = rb ? v.rebarIds().length : new Set(kids.map(m => m.userData.id || m.uuid)).size;
+    const col = rb ? '#39ff14' : '#' + ((kids[0] && kids[0].userData.baseColor) || 0x888888).toString(16).padStart(6, '0');
     return `<span class="chip" data-layer="${esc(g)}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${esc(BmViewer.LABEL[g] || g)}</span><em>${n}</em></span>`;
   };
   // ชั้นข้อมูลแบ่งหมวด: โครงสร้าง / สถาปัตย์ / สุขาภิบาล / ไฟฟ้า (กลุ่มที่ไม่อยู่ในหมวดไปท้ายสุด)
@@ -1041,11 +1041,11 @@ function buildLayers(groups) {
   $$('#layer-list [data-ov]').forEach(ch => ch.onclick = () => { const k = ch.dataset.ov, on = v[k + 'On'] === false; v.setOverlay(k, on); ch.classList.toggle('on', on); });
   $$('#layer-list [data-layer]').forEach(ch => ch.onclick = () => {
     const g = ch.dataset.layer, on = !v.groups[g].visible;
-    if (g === 'เหล็กเสริม') v.setXray(on); else v.setVisible(g, on);
+    if (g === 'เหล็กเสริม') { rbOneExit(true); rbView(on); } else v.setVisible(g, on);
     $$('.preset').forEach(b => b.classList.remove('on'));
     syncLayers();
   });
-  S.scopeKey = ''; S.typeSel = null; syncLayers(); buildClip(); buildScope(); buildTypes(); tlReset(); renderClash();
+  S.scopeKey = ''; S.typeSel = null; Object.assign(RB, { on: false, floors: null, types: null, one: null }); $('#rb-panel').hidden = true; syncLayers(); buildClip(); buildScope(); buildTypes(); tlReset(); renderClash();
 }
 function syncLayers() { $$('#layer-list [data-layer]').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
 // ตัดดูโมเดล: แนวระดับ (Z) หรือแนวตั้งตามแกน X / Y ของแบบ · เลือกระดับ/แนวกริด หรือเลื่อนอิสระ · กลับด้านได้
@@ -1128,15 +1128,15 @@ function buildScope() {
 }
 function applyPreset(name) {
   const v = S.viewer; if (!v) return;
-  v.highlight([]); $('#pick-info').innerHTML = ''; $('#pick-info').classList.remove('on');
+  rbOneExit(true); v.highlight([]); $('#pick-info').innerHTML = ''; $('#pick-info').classList.remove('on');
   v.setXray(false);
   const cat = c => (BmViewer.CATS.find(x => x[0] === c) || [0, []])[1], STRUCT = ['ฐานราก', 'เสา', 'คาน'];
   const show = { all: g => g !== 'เหล็กเสริม', struct: g => ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'บันได', 'เหล็กรูปพรรณ'].includes(g),
     roof: g => ['เสา', 'คาน', 'เหล็กรูปพรรณ'].includes(g),
     plumb: g => cat('สุขาภิบาล').includes(g) || STRUCT.includes(g) || g === 'เคาน์เตอร์-อุปกรณ์',   // ซ่อนพื้น ผนัง งานผิว หลังคา ฝ้า (ท่อใต้พื้นเห็นได้)
     elec: g => cat('ไฟฟ้า').includes(g) || STRUCT.includes(g) }[name];
-  if (name === 'rebar') v.setXray(true);
-  else Object.keys(v.groups).forEach(g => v.setVisible(g, show(g)));
+  if (name === 'rebar') rbView(true);
+  else { rbView(false); Object.keys(v.groups).forEach(g => v.setVisible(g, show(g))); }
   $$('.preset').forEach(b => b.classList.toggle('on', b.dataset.preset === name));
   syncLayers();
 }
@@ -1184,7 +1184,13 @@ function tlSet(day) {
   const pr = (tid, phase) => { const g = prog[tid] || 0; if (!RC(tid)) return g; return phase === 'rebar' ? Math.min(1, g / 0.6) : Math.max(0, (g - 0.3) / 0.7); };
   const step = (tid, id, phase) => { const n = M.count[tid] || 1, k = (M.rank[tid] || {})[id] || 0; return pr(tid, phase) * n - k; };   // >0 = เริ่มชิ้นนี้แล้ว
   const BRICK = 0xb5654a, PLASTER = 0xd9d4ca, PAINT = 0xf3efe6;
-  if (v.groups['เหล็กเสริม']) v.groups['เหล็กเสริม'].visible = true;
+  if (RB.one) rbOneExit(true);
+  if (v.groups['เหล็กเสริม']) {   // สร้างเหล็กเฉพาะชิ้นที่ถึงช่วงผูกเหล็กแล้วแต่คอนกรีตยังไม่เสร็จ · เทเสร็จแล้วปลดทิ้ง (คอนกรีตบังอยู่)
+    v.groups['เหล็กเสริม'].visible = true;
+    const want = [];
+    if ($('#tl-rebar').checked) v.rebarIds().forEach(id => { const tid = M.primary[id]; if (RC(tid) && step(tid, id, 'rebar') > 0 && step(tid, id) < 1) want.push(id); });
+    v.setRebar(want);
+  }
   v.setState(u => {
     if (!u.id) return BmViewer.CATS.slice(2).some(c => c[1].includes(u.group)) ? { visible: (prog.mep_fix ?? 1) >= 0.5 } : null;
     // แผ่นหลังคาโผล่ตอนงานมุง (id หลังคาอยู่ในงานโครงหลังคาด้วยเพราะคิดพื้นที่โครงหลังคา)
@@ -1211,7 +1217,7 @@ function tlSet(day) {
 }
 function tlDone() {
   tlStop(); TL.day = null;
-  if (S.viewer) { S.viewer.setState(null); if (S.viewer.groups['เหล็กเสริม']) S.viewer.groups['เหล็กเสริม'].visible = S.viewer.xray; }
+  if (S.viewer) { S.viewer.setState(null); if (S.viewer.groups['เหล็กเสริม']) S.viewer.groups['เหล็กเสริม'].visible = S.viewer.xray; S.viewer.setRebar(RB.on ? rbIds() : []); }
   $('#tl-fill').style.width = '100%';
   if (S.plan) { $('#tl-day').value = S.plan.calDays; $('#tl-label').textContent = `อาคารเสร็จ · ${S.plan.calDays} วัน (${thDate(S.plan.start)} – ${thDate(S.plan.finish)})`; }
 }
@@ -1232,6 +1238,109 @@ function initViewer() {
   if (S.model) buildLayers(S.viewer.load(S.model));
   const sel = S.selKey && (S.priced || []).find(r => r.key === S.selKey);
   if (sel) S.viewer.highlight(sel.from || []);
+}
+
+// ------------------------------------------------------------------ เหล็กเสริม: สร้างเฉพาะส่วนที่ดู (ชั้น × ชนิด) และดูทีละชิ้น
+const RB = { on: false, floors: null, types: null, one: null, hide: false };
+const RB_TYPES = ['ฐานราก', 'เสา', 'คาน', 'พื้น', 'บันได', 'อื่นๆ'];
+function rbMeta() {   // ชิ้นที่มีเหล็ก → ชนิด เครื่องหมาย ช่วงชั้น (ฐานราก / ชั้น 1 / ชั้น 2 / … / หลังคา) ตำแหน่ง
+  const v = S.viewer, m = S.model;
+  if (S._rbMeta && S._rbMeta.k === v.rbJobs) return S._rbMeta.map;
+  const typ = {}, mark = {};
+  (m.supports || []).forEach(x => { typ[x.id] = 'ฐานราก'; mark[x.id] = x.mark || x.kind; });
+  (m.members || []).forEach(x => { typ[x.id] = x.type === 'column' ? 'เสา' : ['beam', 'tie_beam'].includes(x.type) ? 'คาน' : 'อื่นๆ'; mark[x.id] = x.mark || x.section; });
+  (m.slabs || []).forEach(x => { typ[x.id] = 'พื้น'; mark[x.id] = x.mark || x.kind; });
+  (m.stairs || []).forEach(x => { typ[x.id] = 'บันได'; mark[x.id] = x.mark || x.id; });
+  // ระดับในแบบรวมเป็นช่วงชั้น: ระดับที่ห่างกันไม่เกิน 1.5 ม. อยู่ชั้นเดียวกัน (GL / ทางเดิน / 1F) · ต่ำกว่า GL − 0.30 = ฐานราก
+  const gl = ((m.levels || []).find(l => l.name === 'GL') || { z: 0 }).z;
+  const lv = (m.levels || []).filter(l => l.z >= gl - 0.3).slice().sort((a, b) => a.z - b.z), cl = [];
+  lv.forEach(l => { const c = cl[cl.length - 1]; if (c && l.z - c.top <= 1.5) { c.lv.push(l); c.top = l.z; } else cl.push({ lv: [l], top: l.z, n: 0, area: 0 }); });
+  const near = z => { let k = 0, bd = Infinity; cl.forEach((c, i) => c.lv.forEach(l => { const d = Math.abs(l.z - z); if (d < bd) { bd = d; k = i; } })); return k; };
+  const poly = P => Math.abs(P.reduce((a, p, i) => { const q = P[(i + 1) % P.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+  (m.slabs || []).forEach(x => { if (cl.length) cl[near(x.top)].area += poly(x.polygon || []); });
+  const map = {};
+  v.rebarIds().forEach(id => { const h = (v.byId[id] || [])[0], bb = h && h.userData.bb, t = typ[id] || 'อื่นๆ';
+    const lo = bb ? bb.min.y : 0, hi = bb ? bb.max.y : 0, zr = t === 'เสา' || t === 'บันได' ? lo + 0.01 : hi;   // แนวดิ่งตามระดับที่ตั้ง · แนวราบตามหลังชิ้น
+    const band = t === 'ฐานราก' || zr < gl - 0.3 || !cl.length ? -1 : near(zr);
+    if (band >= 0) cl[band].n++;
+    map[id] = { type: t, mark: mark[id] || id, band, z: lo, x: bb ? bb.min.x : 0, y: bb ? -bb.max.z : 0 }; });
+  // ช่วงที่มีชิ้นน้อย (ชานพักบันได ฯลฯ) รวมเข้าชั้นล่าง
+  const to = cl.map((c, i) => i);
+  cl.forEach((c, i) => { if (i && c.n < 5) to[i] = to[i - 1]; });
+  const keep = [...new Set(to)], lab = { F: 'ฐานราก' };
+  keep.forEach((i, k) => { const c = cl[i], main = c.lv.find(l => /^\d+F$/i.test(l.name)) || c.lv[0];   // ระดับหลักของช่วง (ชื่อแบบ 1F/2F ถ้ามี)
+    const last = k === keep.length - 1 && k > 0 && c.area < 0.3 * cl[keep[k - 1]].area;
+    lab['B' + i] = (last ? 'หลังคา' : `ชั้น ${k + 1}`) + ` (${main.z >= 0 ? '+' : ''}${(+main.z).toFixed(2)})`; });
+  Object.values(map).forEach(o => { o.floor = o.band < 0 ? 'F' : 'B' + to[o.band]; delete o.band; });
+  S._rbMeta = { k: v.rbJobs, map, lab, order: ['F'].concat(keep.map(i => 'B' + i)) }; return map;
+}
+const rbFloorName = k => (S._rbMeta && S._rbMeta.lab[k]) || k;
+function rbIds() { if (!RB.floors) return []; const M = rbMeta(); return Object.keys(M).filter(id => RB.floors.has(M[id].floor) && RB.types.has(M[id].type)); }
+function rbBuild() {
+  const M = rbMeta(), all = Object.values(M), fls = S._rbMeta.order.filter(f => all.some(o => o.floor === f));
+  const tys = RB_TYPES.filter(t => all.some(o => o.type === t));
+  if (!RB.floors) { RB.floors = new Set(fls.slice(0, 1)); RB.types = new Set(tys); }   // เริ่มที่ชั้นล่างสุด ทุกชนิด
+  const chip = (set, k, txt, n) => `<span class="chip ${set.has(k) ? 'on' : ''}" data-rb-${set === RB.floors ? 'f' : 't'}="${esc(k)}" style="color:#39ff14"><i style="background:#39ff14"></i><span style="color:var(--text)">${esc(txt)}</span><em>${n}</em></span>`;
+  $('#rb-floor').innerHTML = fls.map(f => chip(RB.floors, f, rbFloorName(f), all.filter(o => o.floor === f).length)).join('');
+  $('#rb-type').innerHTML = tys.map(t => chip(RB.types, t, t, all.filter(o => o.type === t).length)).join('');
+  const tog = (set, k) => { set.has(k) ? set.delete(k) : set.add(k); rbBuild(); rbApply(); };
+  $$('#rb-floor [data-rb-f]').forEach(c => c.onclick = () => tog(RB.floors, c.dataset.rbF));
+  $$('#rb-type [data-rb-t]').forEach(c => c.onclick = () => tog(RB.types, c.dataset.rbT));
+}
+function rbApply() {
+  const ids = rbIds(), n = S.viewer.setRebar(ids), tot = S.viewer.rebarIds().length;
+  $('#rb-label').textContent = `แสดงเหล็ก ${n} จาก ${tot} ชิ้น · ติ๊กเพิ่มได้ (ยิ่งมากยิ่งหนักเครื่อง) · กดชิ้นส่วนแล้วเลือก "ดูเหล็กชิ้นนี้" เพื่อดูทีละชิ้นพร้อมตาราง`;
+}
+function rbView(on) {
+  const v = S.viewer; RB.on = !!on && v.rebarIds().length > 0; $('#rb-panel').hidden = !RB.on;
+  v.setXray(on);
+  if (RB.on) { rbBuild(); rbApply(); } else v.setRebar([]);
+  syncLayers();
+}
+function rbSame(id) {   // ชิ้นเครื่องหมายเดียวกัน เรียงชั้นล่าง → บน แล้วตามแนว X, Y
+  const M = rbMeta(), o = M[id];
+  return Object.keys(M).filter(k => M[k].type === o.type && M[k].mark === o.mark).sort((a, b) => M[a].z - M[b].z || M[a].x - M[b].x || M[a].y - M[b].y);
+}
+function rbRows(id) {   // ถอดเหล็กรายชิ้นด้วย rebartk (วิธีเดียวกับ takeoff.py → ตัวเลขชุดเดียวกับ ปร.4)
+  const m = S.model, h = JSON.stringify(m.design || {}).length;
+  if (!S._rbtk || S._rbtk.m !== m || S._rbtk.h !== h) S._rbtk = { m, h, rows: RebarTk.compute(m) };
+  return S._rbtk.rows.filter(r => /^(rebar_|wiremesh)/.test(r.key) && r.by_src && r.by_src[id]);
+}
+function rbOne(id) {
+  const v = S.viewer; if (!v.hasRebar(id)) return;
+  if (TL.day !== null && TL.day !== undefined) tlDone();
+  RB.one = id; $('#rb-panel').hidden = true;
+  v.highlight([]); v.setXray(true); v.setIsolate([id], RB.hide ? 'hide' : 'fade'); v.setRebar([id]); v.frame([id]); syncLayers();
+  const M = rbMeta(), o = M[id], same = rbSame(id), k = same.indexOf(id), rows = rbRows(id), sp = elemSpec(id);
+  const fk = x => x.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let net = 0, gross = 0, tb = '';
+  rows.forEach(r => {
+    const q = r.by_src[id], w = r.waste || 0, mesh = r.unit !== 'กก.', lbl = mesh ? r.name : r.key.replace('rebar_', '');
+    if (!mesh) { net += q; gross += q * (1 + w); }
+    tb += `<tr><td><b>${esc(lbl)}</b></td><td class="r">${fk(q)}</td><td class="r">${fk(q * (1 + w))}${w ? ` <small class="hint">+${Math.round(w * 100)}%</small>` : ''}</td><td>${esc(r.unit)}</td></tr>`;
+    const cnt = new Map(); ((r.calc || {})[id] || []).filter(l => !/^รวม /.test(l)).forEach(l => cnt.set(l, (cnt.get(l) || 0) + 1));   // บรรทัดซ้ำ (เช่น 4 ด้านของฐาน) รวมเป็น ×n
+    cnt.forEach((n, l) => { tb += `<tr class="hint"><td colspan="4">· ${esc(l)}${n > 1 ? ` <b>(${n} ชุด)</b>` : ''}</td></tr>`; });
+  });
+  const box = $('#pick-info');
+  let h = `<div class="pk-head"><div><span class="pk-type">เหล็กเสริม${esc(o.type)}</span> <b class="mono">${esc(id)}</b> <span class="pk-mark">· ${esc(o.mark)} · ${esc(rbFloorName(o.floor))}</span></div><button class="btn small" data-rb="exit" title="ออกจากโหมดดูเหล็กทีละชิ้น">×</button></div>
+    <div class="btn-row" style="align-items:center;margin:4px 0"><button class="btn small" data-rb="prev" ${same.length < 2 ? 'disabled' : ''}>‹ ก่อนหน้า</button><span class="hint">${esc(o.mark)} ${k + 1}/${same.length}</span><button class="btn small" data-rb="next" ${same.length < 2 ? 'disabled' : ''}>ถัดไป ›</button>
+    <button class="btn small" data-rb="mode">${RB.hide ? 'แสดงชิ้นอื่นแบบจาง' : 'ซ่อนชิ้นอื่น'}</button></div>`;
+  if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+  h += rows.length ? `<div class="pk-sec"><div class="pk-lbl">เหล็กของชิ้นนี้ (ชุดเดียวกับ ปร.4)</div><table class="pk-q"><tr class="hint"><td>ขนาด / รายการ</td><td class="r">ตามแบบ</td><td class="r">รวมเผื่อ</td><td></td></tr>${tb}
+    ${net ? `<tr><td><b>รวมเหล็ก</b></td><td class="r"><b>${fk(net)}</b></td><td class="r"><b>${fk(gross)}</b></td><td>กก.</td></tr>` : ''}</table>
+    <div class="hint">ยาวตามแบบหักระยะหุ้ม ไม่รวมทาบ/งอ · % เผื่อตามหลักเกณฑ์กรมบัญชีกลาง</div></div>` : `<div class="pk-sec hint">ชิ้นนี้มีเหล็กในโมเดล 3D แต่ไม่มีรายการใน ปร.4 (ไม่ถอดปริมาณ)</div>`;
+  box.innerHTML = h; box.classList.add('on'); box.scrollTop = 0;
+  box.querySelector('[data-rb=exit]').onclick = () => rbOneExit();
+  box.querySelector('[data-rb=prev]').onclick = () => rbOne(same[(k - 1 + same.length) % same.length]);
+  box.querySelector('[data-rb=next]').onclick = () => rbOne(same[(k + 1) % same.length]);
+  box.querySelector('[data-rb=mode]').onclick = () => { RB.hide = !RB.hide; rbOne(id); };
+}
+function rbOneExit(quiet) {
+  if (!RB.one) return;
+  const v = S.viewer; RB.one = null; v.setIsolate(null);
+  if (RB.on) { $('#rb-panel').hidden = false; rbApply(); } else { v.setXray(false); v.setRebar([]); }
+  if (!quiet) { const box = $('#pick-info'); box.innerHTML = ''; box.classList.remove('on'); }
+  syncLayers();
 }
 
 // ------------------------------------------------------------------ กล่องข้อมูลชิ้นส่วน
@@ -1326,6 +1435,7 @@ function elemQty(id) {
 }
 function showPick(d) {
   const box = $('#pick-info');
+  if (RB.one) { if (d && d.id && S.viewer.hasRebar(d.id)) rbOne(d.id); return; }   // โหมดดูเหล็กทีละชิ้น: กดชิ้นอื่นที่มีเหล็ก = เปลี่ยนชิ้น
   if (!d || !d.id) { box.innerHTML = ''; box.classList.remove('on'); S.viewer.highlight([]); return; }
   S.viewer.highlight([d.id]);
   const sp = elemSpec(d.id), q = elemQty(d.id), id = d.id;
@@ -1336,6 +1446,7 @@ function showPick(d) {
   let h = `<div class="pk-grab"></div><div class="pk-head"><div><span class="pk-type">${esc(sp ? sp.title : d.group)}</span> <b class="mono">${esc(id)}</b>${sp && sp.mark ? ` <span class="pk-mark">· ${esc(sp.mark)}</span>` : ''} ${st}</div><button class="btn small" data-pk="close">×</button></div>`;
   if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
   else if (d.info) h += `<div class="pk-spec"><div>${esc(d.info)}</div></div>`;
+  if (S.viewer.hasRebar(id)) h += `<div class="pk-sec"><button class="btn small primary" data-pk="rebar">ดูเหล็กชิ้นนี้</button> <span class="hint">ซ่อนเหล็กชิ้นอื่น · ตารางเหล็ก · เลื่อนดูชิ้นเครื่องหมายเดียวกัน</span></div>`;
   if (q.rows.length) {
     h += `<div class="pk-sec"><div class="pk-lbl">ปริมาณของชิ้นนี้ (ไม่รวมเผื่อ) · กดรายการเพื่อไปที่ ปร.1</div><table class="pk-q">${q.rows.map(r => `<tr data-pk-row="${esc(r.key)}"><td>${esc(r.name)}${r.calc.map(c => `<div class="pk-calc">${esc(c)}</div>`).join('')}</td><td class="r">${f2(r.q)}</td><td>${esc(r.unit)}</td></tr>`).join('')}</table></div>`;
     const np = q.rows.filter(r => r.noPrice).length;
@@ -1353,6 +1464,7 @@ function showPick(d) {
   if (sp && sp.note) h += `<div class="pk-sec hint">หมายเหตุ: ${esc(sp.note)}</div>`;
   box.innerHTML = h; box.classList.add('on'); box.scrollTop = 0;
   box.querySelector('[data-pk=close]').onclick = () => showPick(null);
+  const rbb = box.querySelector('[data-pk=rebar]'); if (rbb) rbb.onclick = () => rbOne(id);
   box.querySelectorAll('[data-pk-task]').forEach(a => a.onclick = () => { setDock('gantt'); selectTask(a.dataset.pkTask); });
   box.querySelectorAll('[data-pk-row]').forEach(tr => tr.onclick = () => gotoRow(tr.dataset.pkRow));
   box.querySelectorAll('[data-pk-clash]').forEach(a => a.onclick = () => setDock('clash'));
@@ -1465,6 +1577,7 @@ function bind() {
   addEventListener('resize', fitStage); fitStage();
   $('#tl-play').onclick = tlPlay;
   $('#tl-speed').onchange = () => { if (TL.timer) { tlStop(); tlPlay(); } };
+  $('#tl-rebar').onchange = () => { if (TL.day !== null && TL.day !== undefined) tlSet(TL.day); };
   $('#b-tcol').onclick = () => { S.tcolOn = !S.tcolOn; if (S.viewer && S.types) S.viewer.setTypeColors(S.tcolOn ? S.types.col : null); $('#b-tcol').classList.toggle('primary', S.tcolOn); $('#b-tcol').textContent = S.tcolOn ? 'กลับเป็นสีวัสดุ' : 'ระบายสีตามชนิด'; };
   $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };
   $('#clash-info').onchange = renderClash; $('#clash-ack').onchange = renderClash;

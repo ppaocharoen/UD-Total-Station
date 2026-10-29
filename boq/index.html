@@ -132,6 +132,12 @@
         <button class="btn small preset" data-preset="rebar">เหล็กเสริม</button><button class="btn small preset" data-preset="roof">โครงหลังคา</button>
         <button class="btn small preset" data-preset="plumb">สุขาภิบาล</button><button class="btn small preset" data-preset="elec">ไฟฟ้า</button>
       </div>
+      <div id="rb-panel" hidden>
+        <h2>เหล็กเสริม · เลือกชั้น × ชนิด</h2>
+        <div class="chips" id="rb-floor"></div>
+        <div class="chips" id="rb-type" style="margin-top:6px"></div>
+        <div class="hint" id="rb-label"></div>
+      </div>
       <h2>มุมมอง</h2>
       <div class="btn-grid">
         <button class="btn small" data-view="iso">มุมเฉียง</button><button class="btn small" data-view="iso2">มุมเฉียงหลัง</button>
@@ -170,6 +176,7 @@
             <select id="tl-speed" title="ความเร็ว"><option value="0.5">ช้า</option><option value="1" selected>ปกติ</option><option value="2">เร็ว</option><option value="4">เร็วมาก</option></select>
             <input type="range" id="tl-day" min="0" max="1" step="1" value="1">
             <button class="btn small" id="tl-done">อาคารเสร็จ</button>
+            <label class="hint" title="แสดงเหล็กเสริมช่วงผูกเหล็ก (ปิดได้ถ้าเครื่องช้า)" style="white-space:nowrap"><input type="checkbox" id="tl-rebar" checked> เหล็ก</label>
           </div>
           <div class="tl-bar"><i id="tl-fill" style="width:100%"></i></div>
           <div class="hint" id="tl-label">เปิดโมเดลและโหลดราคาก่อน แผนงานจึงจะพร้อม</div>
