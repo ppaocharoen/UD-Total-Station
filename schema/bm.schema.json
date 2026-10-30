@@ -1286,6 +1286,20 @@
               "minimum": 0
             }
           }
+        },
+        "paint_area": {
+          "type": "object",
+          "description": "พื้นที่ทาสีที่ระบุเอง (ตร.ม.) {int, ext} — ถอดปริมาณใช้แทน สุทธิ × finish_sides (เช่น ด้านบุกระเบื้องบางส่วนไม่ทาสี)",
+          "properties": {
+            "int": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ext": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
         }
       }
     },

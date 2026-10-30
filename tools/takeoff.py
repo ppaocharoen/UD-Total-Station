@@ -733,7 +733,12 @@ class Takeoff:
                     it = self.add("1.2.4", f"plaster_ext_{pk}", "ฉาบปูนเรียบผนังภายนอก" + (" (อิฐมวลเบา)" if pk == "aac" else ""), "ตร.ม.", net, w["id"], task="plaster",
                                   calc=f"สุทธิ {net:.2f} × 1 ด้าน")
                     it["spec"] = {"t": "plaster", "side": "ext", "wall": w["kind"]}
-            if w.get("paint") and sides:
+            pna = w.get("paint_area")   # พื้นที่ทาสีที่ระบุไว้ (เช่น ด้านบุกระเบื้องบางส่วน/ทาสีชนิดอื่น) — ใช้แทน สุทธิ × จำนวนด้าน
+            if w.get("paint") and pna:
+                for sd, key, nm in (("int", "paint_int", "ทาสีน้ำอะคริลิกภายใน"), ("ext", "paint_ext", "ทาสีน้ำอะคริลิกภายนอก")):
+                    if pna.get(sd, 0) > 0:
+                        self.add("1.2.7", key, nm, "ตร.ม.", pna[sd], w["id"], task="paint", calc=f"ตามพื้นที่ทาสีที่ระบุ {pna[sd]:.2f} ตร.ม.")
+            elif w.get("paint") and sides:
                 if w.get("exterior") and sides == 2:
                     self.add("1.2.7", "paint_ext", "ทาสีน้ำอะคริลิกภายนอก", "ตร.ม.", net, w["id"], task="paint")
                     self.add("1.2.7", "paint_int", "ทาสีน้ำอะคริลิกภายใน", "ตร.ม.", net, w["id"], task="paint")
