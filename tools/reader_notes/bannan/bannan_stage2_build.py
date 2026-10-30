@@ -188,6 +188,18 @@ def emit(made, num, z, lv, prefix, defaults):
             zz = 0.35 if min(p0[0], p1[0]) > 17.5 and 18.9 < (p0[1] + p1[1]) / 2 < 20.7 else 0.25
         if lv == '1F' and ax == 'V' and abs(c) < 0.05 and 15.70 <= u0 and u1 <= 17.45:   # แนว A ช่วงห้องน้ำ 3 (พื้น +0.25) — Earth 26 ต.ค. ให้ลดระดับคาน
             zz = 0.25; note = (note + ' · ' if note else '') + 'ลดระดับหลังคานเป็น +0.25 เท่าพื้นห้องน้ำ 3 (Earth 26 ต.ค.) — แบบโครงสร้างไม่ได้ระบุ'; st = AS
+        if lv == '1F':   # Earth 30 ต.ค.: ลดระดับพื้นและคาน ห้องแม่บ้าน (+0.35) และโถงทางเข้าช่วงหน้า (+0.50)
+            maid = (ax == 'H' and abs(c - 19.8) < 0.05 and u0 > -0.05 and u1 < 2.9) or (ax == 'V' and abs(c) < 0.05 and u0 > 17.35 and u1 < 19.85) \
+                or (ax == 'H' and abs(c - 17.4) < 0.05 and u0 > -0.05 and u1 < 1.95)
+            foy = (ax == 'H' and abs(c - 5.204) < 0.05 and u0 > 7.0 and u1 < 10.4) or (ax == 'V' and (abs(c - 7.1) < 0.05 or abs(c - 10.3) < 0.05) and abs(u0 - 5.204) < 0.05 and abs(u1 - 6.0) < 0.05)
+            porch = ax == 'V' and (abs(c - 7.1) < 0.05 or abs(c - 10.3) < 0.05) and abs(u0 - 3.5) < 0.05 and abs(u1 - 5.204) < 0.05
+            ledge = (ax == 'V' and abs(c - 2.854) < 0.05 and u0 > 17.35 and u1 < 19.85) or (ax == 'H' and abs(c - 17.4) < 0.05 and u0 > 1.9 and u1 < 2.9)
+            ledge2 = ax == 'V' and (abs(c - 7.1) < 0.05 or abs(c - 10.3) < 0.05) and abs(u0 - 6.0) < 0.05 and abs(u1 - 8.7) < 0.05
+            if maid: zz = 0.25; note = (note + ' · ' if note else '') + 'ลดหลังคาน 0.20 → +0.25 รับพื้นห้องแม่บ้าน +0.35 (Earth 30 ต.ค.) — แบบโครงสร้างไม่ได้ระบุ'; st = AS
+            if foy: zz = 0.40; note = (note + ' · ' if note else '') + 'ลดหลังคาน 0.05 → +0.40 รับพื้นโถงทางเข้า +0.50 (Earth 30 ต.ค.) — แบบโครงสร้างไม่ได้ระบุ'; st = AS
+            if porch: zz = 0.40; note = (note + ' · ' if note else '') + 'ลดหลังคาน → +0.40 ตามคานขอบโถงทางเข้า (ต่อเนื่องกัน) · พื้นเฉลียงหล่อในที่ +0.45 หล่อคลุมคาน (Earth 30 ต.ค.)'; st = AS
+            if ledge: note = (note + ' · ' if note else '') + '**คงหลังคาน +0.45 (รับพื้น +0.55/+0.50 อีกฝั่ง) ทำบ่ารับพื้นห้องแม่บ้าน +0.35 ข้างคาน** (Earth 30 ต.ค.)'; st = AS
+            if ledge2: note = (note + ' · ' if note else '') + '**คงหลังคาน +0.45 ช่วง y 6.00–7.926 ทำบ่ารับพื้นโถงทางเข้า +0.50 ข้างคาน** (Earth 30 ต.ค.)'; st = AS
         k[mk] += 1
         x = {'id': f'{prefix}{mk.replace(chr(39), "p")}-{k[mk]:02d}', 'mark': mk, 'type': 'tie_beam' if lv == '1F' else 'beam',
              'i': node(*p0, zz, lv), 'j': node(*p1, zz, lv), 'section': rsec(b, h), 'material': 'C', 'status': st,
@@ -379,6 +391,25 @@ for lv, num, ztop in (('1F', 'S-05', Z1), ('2F', 'S-06', Z2), ('ROOF', 'S-07', Z
             addslab(sid, mk, 'cast', 0.125, top, p, {'S1': 'พื้นหล่อในที่', 'SR': 'หลังคา SLAB'}[mk], f'{num} ({mk}) + S-11 (หนา 0.125)',
                     note=('' if abs(top - ztop) < 0.005 else f'หลังพื้น +{top:.2f} ตามระดับห้อง (หลังคาน +{ztop:.2f})'))
 print('พื้นไม่มีป้าย', unl)
+# Earth 30 ต.ค.: ห้องแม่บ้าน +0.35 · โถงทางเข้าช่วงหน้า (y 5.204–7.926) +0.50 → พื้นสำเร็จรูปวางบนคาน/บ่าที่ลดระดับ
+for s_ in list(slabs):
+    P_ = Polygon(s_['polygon'])
+    if s_['kind'] == 'precast' and P_.contains(Point(1.4, 18.6)):
+        s_['top'] = 0.35; s_['status'] = AS; s_['note'] += ' · **ลดระดับ +0.35 ตามห้องแม่บ้าน (Earth 30 ต.ค.)** คานแนว 2/แนว A/แนว 3 (A–A2) ลดเป็น +0.25 · แนว x 2.854 และแนว 3 ช่วงสั้นคง +0.45 ทำบ่ารับ'
+    if s_['kind'] == 'precast' and P_.contains(Point(8.7, 7.0)):
+        cut = box(-50, -50, 50, 7.926)
+        front, rear = P_.intersection(cut), P_.difference(cut)
+        s_['polygon'] = [[round(x, 3), round(y, 3)] for x, y in list(rear.exterior.coords)[:-1]]
+        f_ = dict(s_); f_['id'] = s_['id'] + 'a'; f_['top'] = 0.50; f_['status'] = AS
+        f_['polygon'] = [[round(x, 3), round(y, 3)] for x, y in list(front.exterior.coords)[:-1]]
+        f_['note'] = s_['note'] + ' · **ช่วงหน้าโถงทางเข้า ลดระดับ +0.50 (Earth 30 ต.ค.)** คานขอบหน้าแนว 5.204 และคานสั้นแนว E/F ลดเป็น +0.40 · คานแนว E/F ช่วง 6.00–7.926 คง +0.45 ทำบ่ารับ'
+        slabs.append(f_)
+row('พื้น', 'ลดระดับ (Earth 30 ต.ค.)', 'ห้องแม่บ้าน ชั้น 1 (+0.35) GL A–A2 / 2–3: พื้นสำเร็จรูป +0.35 คานแนว 2 / แนว A / แนว 3 (A–A2) ลดเป็น +0.25 · คานแนว x 2.854 และแนว 3 (ช่วงห้องน้ำ 2) คง +0.45 ทำบ่ารับ · '
+    'โถงทางเข้าช่วงหน้า ชั้น 1 (+0.50) GL E–F / 8A–8 ถึง y 7.926: แบ่งแผ่นพื้นที่ y 7.926 ช่วงหน้า +0.50 คานแนว 5.204 และคานสั้นแนว E/F (5.204–6.00) ลดเป็น +0.40 · คานแนว E/F ช่วง 6.00–7.926 คง +0.45 ทำบ่ารับ', 'A-04', AS,
+    'แบบโครงสร้างไม่ได้ลดระดับ — ป้ายห้องในแบบสถาปัตย์ถูก (Earth 30 ต.ค.)')
+addslab('G-BKY', 'GS', 'ground', 0.15, 0.25, box(15.2, 17.9, 17.6, 20.5), 'ลานหลังบ้าน GL H–I / 2A–3 (พื้นวางบนดิน)', 'A-04 (ป้ายห้อง F3 +0.25) + S-11 (GS)', AS,
+        '**ไม่มีในแบบโครงสร้าง** — ใส่พื้นวางบนดิน GS หนา 0.15 ตาม S-11 (Earth 30 ต.ค.)')
+row('พื้น', 'G-BKY', 'ลานหลังบ้าน ชั้น 1 (+0.25) GL H–I / 2A–3 พื้นวางบนดิน GS หนา 0.15', 'A-04, S-11', AS, '**ไม่มีในแบบโครงสร้าง** — Earth 30 ต.ค. ให้ใส่พื้นวางบนดิน')
 g = st1['G-GAR']; addslab('G-GS', 'GS', 'ground', 0.15, 0.05, Polygon(g['polygon']), 'จอดรถ (พื้นวางบนดิน GS)', 'S-05 (GS) + S-11 (หนา 0.15 ทรายรอง 0.10)')
 for sid in ('G-FRT', 'G-SIDE-S1', 'G-SIDE-S2'):
     s = dict(st1[sid]); s['status'] = s.get('status', FD); s['note'] = (s.get('note', '') + ' · ไม่มีในแบบโครงสร้าง — ใช้ขอบเขตสถาปัตย์').strip(' ·'); slabs.append(s)
