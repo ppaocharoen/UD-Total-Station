@@ -1232,7 +1232,7 @@ function tlPlay() {
 }
 function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
-  S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: d => showPick(d) });
+  S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: (d, pt) => showPick(d, pt) });
   try { if (localStorage.getItem('udboq:proj') === 'para') $('#proj-seg [data-proj=para]').click(); } catch (e) { /* */ }
   if (curTheme() !== 'terminal') S.viewer.setTheme(curTheme());
   if (S.model) buildLayers(S.viewer.load(S.model));
@@ -1433,9 +1433,66 @@ function elemQty(id) {
   });
   return { rows: out, value, calc, partial };
 }
-function showPick(d) {
+// ---------------------------------------------------------------- ตำแหน่งตามกริด (บอกเป็นแนวกริด ไม่ใช่พิกัดดิบ)
+const GRID_TOL = 0.06;
+function gridsOf(ax) { return ((S.model && S.model.grids) || []).filter(g => g.axis === ax).sort((a, b) => a.coord - b.coord); }
+function sgn(v) { return (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(2); }
+/** จุดเดียวบนแกน → "แนว 4" / "แนว B +1.65" (อ้างแนวที่ใกล้สุด) */
+function gridPt(ax, c) {
+  const gs = gridsOf(ax); if (!gs.length) return (ax === 'X' ? 'x ' : 'y ') + c.toFixed(2);
+  const g = gs.reduce((a, b) => Math.abs(b.coord - c) < Math.abs(a.coord - c) ? b : a);
+  return Math.abs(g.coord - c) <= GRID_TOL ? `แนว ${g.name}` : `แนว ${g.name} ${sgn(c - g.coord)}`;
+}
+/** ช่วงบนแกน: ช่วงสั้น (≤0.30) = จุดกึ่งกลาง · ช่วงยาว = "จาก … ถึง …" */
+function gridSpan(ax, a, b) {
+  if (b - a <= 0.30) return gridPt(ax, (a + b) / 2);
+  const gs = gridsOf(ax), inside = gs.filter(g => g.coord > a + GRID_TOL && g.coord < b - GRID_TOL).map(g => g.name);
+  return `${gridPt(ax, a)} ถึง ${gridPt(ax, b)}${inside.length ? ` (ผ่านแนว ${inside.join(', ')})` : ''} · ยาว ${(b - a).toFixed(2)}`;
+}
+function inPoly(x, y, P) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, yi] = P[i], [xj, yj] = P[j]; if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c; } return c; }
+/** ห้องที่จุดนี้อยู่ (จากผิวพื้นที่มีชื่อห้อง) */
+function roomAt(x, y, z) {
+  const hit = ((S.model && S.model.finishes) || []).filter(f => f.kind === 'floor' && f.room && (f.z === undefined || z === undefined || (z >= f.z - 0.6 && z <= f.z + 4.5)) &&
+    ((f.rects || []).some(r => x >= Math.min(r[0], r[2]) && x <= Math.max(r[0], r[2]) && y >= Math.min(r[1], r[3]) && y <= Math.max(r[1], r[3])) || (f.polygon && inPoly(x, y, f.polygon))));
+  hit.sort((a, b) => (b.z || 0) - (a.z || 0));
+  return hit.length ? hit[0].room : '';
+}
+function zTxt(z) { return (z >= 0 ? '+' : '−') + Math.abs(z).toFixed(2); }
+/** ข้อความตำแหน่งของชิ้นส่วน + จุดที่คลิก */
+function locHtml(id, pt) {
+  const b = S.viewer.bounds([id]); if (!b) return '';
+  const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2, room = roomAt(cx, cy, b.z0);
+  const L = [];
+  if (room) L.push(`ห้อง: <b>${esc(room)}</b>`);
+  L.push(`แนวแกน X: ${esc(gridSpan('X', b.x0, b.x1))}`, `แนวแกน Y: ${esc(gridSpan('Y', b.y0, b.y1))}`, `ระดับ: ${zTxt(b.z0)} → ${zTxt(b.z1)}`);
+  if (pt) L.push(`<span class="hint">จุดที่คลิก: ${esc(gridPt('X', pt[0]))} · ${esc(gridPt('Y', pt[1]))} · ${zTxt(pt[2])} — (x ${pt[0].toFixed(2)}, y ${pt[1].toFixed(2)}, z ${pt[2].toFixed(2)})</span>`);
+  return `<div class="pk-sec"><div class="pk-lbl">ตำแหน่ง</div>${L.map(l => `<div>${l}</div>`).join('')}</div>`;
+}
+// ---------------------------------------------------------------- ค้นหาชิ้นส่วนด้วยรหัส
+function findIds(q) {
+  q = (q || '').trim().toUpperCase(); if (!q || !S.viewer) return [];
+  const ids = Object.keys(S.viewer.byId || {}).filter(k => (S.viewer.byId[k] || []).some(m => !m.userData.rebar));
+  const ex = ids.filter(k => k.toUpperCase() === q); if (ex.length) return ex;
+  return ids.filter(k => k.toUpperCase().includes(q)).sort((a, b) => a.length - b.length || a.localeCompare(b)).slice(0, 40);
+}
+function gotoId(id) {
+  const v = S.viewer; (v.byId[id] || []).forEach(m => { let g = m.parent; if (g && !g.visible) { const k = Object.keys(v.groups).find(n => v.groups[n] === g); if (k) v.setVisible(k, true); } });
+  syncLayers(); v.frame([id], 6);   // ถอยกล้องให้เห็นผนัง/กริดรอบ ๆ
+  S.findIso = id; v.setIsolate([id], 'fade');   // ชิ้นอื่นจาง — เห็นชิ้นที่ค้นแม้อยู่หลังผนัง
+  const m0 = (v.byId[id] || [])[0];
+  showPick({ id, group: m0 && m0.userData.group });
+}
+function runFind() {
+  const q = $('#find-q').value, r = findIds(q), box = $('#find-res');
+  if (!q.trim()) { box.innerHTML = ''; return; }
+  if (r.length === 1) { box.innerHTML = ''; gotoId(r[0]); return; }
+  box.innerHTML = r.length ? r.map(k => `<span class="chip" data-find="${esc(k)}">${esc(k)}</span>`).join('') : '<span class="hint">ไม่พบรหัสนี้ในโมเดล</span>';
+  box.querySelectorAll('[data-find]').forEach(c => c.onclick = () => gotoId(c.dataset.find));
+}
+function showPick(d, pt) {
   const box = $('#pick-info');
   if (RB.one) { if (d && d.id && S.viewer.hasRebar(d.id)) rbOne(d.id); return; }   // โหมดดูเหล็กทีละชิ้น: กดชิ้นอื่นที่มีเหล็ก = เปลี่ยนชิ้น
+  if (S.findIso && (!d || d.id !== S.findIso)) { S.findIso = null; S.viewer.setIsolate(null); }   // ออกจากโหมดชิ้นที่ค้นหา
   if (!d || !d.id) { box.innerHTML = ''; box.classList.remove('on'); S.viewer.highlight([]); return; }
   S.viewer.highlight([d.id]);
   const sp = elemSpec(d.id), q = elemQty(d.id), id = d.id;
@@ -1446,6 +1503,7 @@ function showPick(d) {
   let h = `<div class="pk-grab"></div><div class="pk-head"><div><span class="pk-type">${esc(sp ? sp.title : d.group)}</span> <b class="mono">${esc(id)}</b>${sp && sp.mark ? ` <span class="pk-mark">· ${esc(sp.mark)}</span>` : ''} ${st}</div><button class="btn small" data-pk="close">×</button></div>`;
   if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
   else if (d.info) h += `<div class="pk-spec"><div>${esc(d.info)}</div></div>`;
+  h += locHtml(id, pt);
   if (S.viewer.hasRebar(id)) h += `<div class="pk-sec"><button class="btn small primary" data-pk="rebar">ดูเหล็กชิ้นนี้</button> <span class="hint">ซ่อนเหล็กชิ้นอื่น · ตารางเหล็ก · เลื่อนดูชิ้นเครื่องหมายเดียวกัน</span></div>`;
   if (q.rows.length) {
     h += `<div class="pk-sec"><div class="pk-lbl">ปริมาณของชิ้นนี้ (ไม่รวมเผื่อ) · กดรายการเพื่อไปที่ ปร.1</div><table class="pk-q">${q.rows.map(r => `<tr data-pk-row="${esc(r.key)}"><td>${esc(r.name)}${r.calc.map(c => `<div class="pk-calc">${esc(c)}</div>`).join('')}</td><td class="r">${f2(r.q)}</td><td>${esc(r.unit)}</td></tr>`).join('')}</table></div>`;
@@ -1600,7 +1658,8 @@ function bind() {
   $('#tl-day').oninput = e => { tlStop(); tlSet(+e.target.value); };
   $('#tl-done').onclick = tlDone;
   $('#b-fit').onclick = () => S.viewer && S.viewer.fit();
-  $('#b-clear').onclick = () => S.viewer && S.viewer.highlight([]);
+  $('#find-go').onclick = runFind; $('#find-q').onkeydown = e => { if (e.key === 'Enter') runFind(); }; $('#find-q').oninput = e => { if (!e.target.value) $('#find-res').innerHTML = ''; };
+  $('#b-clear').onclick = () => S.viewer && showPick(null);
 }
 
 S.bootAt = Date.now(); S.stopRain = bootRain();

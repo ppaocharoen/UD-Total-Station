@@ -124,7 +124,10 @@
     <div class="hud glass" id="hud"><div class="t">ยังไม่ได้เปิดโครงการ</div><div class="s"></div></div>
     <button class="btn small side-open glass" id="b-side-open">≡ เมนู</button>
     <aside class="side glass" id="model-side">
-      <div class="side-top"><h2>ชั้นข้อมูล</h2><button class="btn small" id="b-side-close" title="พับเก็บเมนู">« พับ</button></div>
+      <div class="side-top"><h2>ค้นหาชิ้นส่วน</h2><button class="btn small" id="b-side-close" title="พับเก็บเมนู">« พับ</button></div>
+      <div class="btn-row" style="gap:6px"><input id="find-q" type="search" placeholder="รหัส เช่น W-F1, C-2B, ST-" style="flex:1;min-width:0" autocomplete="off"><button class="btn small" id="find-go">ค้นหา</button></div>
+      <div class="chips" id="find-res" style="margin-top:6px"></div>
+      <h2>ชั้นข้อมูล</h2>
       <div class="chips" id="layer-list"></div>
       <h2>ชุดแสดงผล</h2>
       <div class="btn-grid">
