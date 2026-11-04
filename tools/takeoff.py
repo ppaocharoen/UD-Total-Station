@@ -480,6 +480,26 @@ class Takeoff:
                 best = max(best, abs(along[0]) * sec["b"] / 2 + abs(along[1]) * sec["h"] / 2)
         return best
 
+    def _beam_free_ends(self, x, p, q):
+        """จำนวนปลายคาน (0–2) ที่ไม่มีคาน/คานคอดินแนวเดียวกันต่อออกไป — มุม ปลายตัว T ปลายยื่น"""
+        if not hasattr(self, "_bend_at"):
+            self._bend_at = defaultdict(list)
+            for y in self.m.get("members", []):
+                if y["type"] not in ("beam", "tie_beam"):
+                    continue
+                a, b = self.mem_geom(y); L = math.dist(a, b)
+                if L < 1e-6:
+                    continue
+                d = tuple((b[i] - a[i]) / L for i in range(3))
+                self._bend_at[tuple(round(v, 3) for v in a)].append((y["id"], d))
+                self._bend_at[tuple(round(v, 3) for v in b)].append((y["id"], tuple(-v for v in d)))
+        L = math.dist(p, q); d = tuple((q[i] - p[i]) / L for i in range(3)); cnt = 0
+        for pt, away in ((p, d), (q, tuple(-v for v in d))):   # away = ทิศจากปลายเข้าหาตัวคานนี้
+            others = [dd for mid, dd in self._bend_at.get(tuple(round(v, 3) for v in pt), []) if mid != x["id"]]
+            if not any(sum(away[i] * dd[i] for i in range(3)) < -0.99 for dd in others):
+                cnt += 1
+        return cnt
+
     def _beams(self):
         c = self.s["cover"]
         for x in self.m.get("members", []):
@@ -512,6 +532,12 @@ class Takeoff:
             for k in ("top", "bot", "side"):
                 if rb.get(k):
                     n, dia = rb[k]; self.rebar(x["id"], dia, n * Lc, f"{dict(top='บน', bot='ล่าง', side='ข้าง')[k]} {n} เส้น × {Lc:.2f} ม.")
+            ne_ = self._beam_free_ends(x, p, q)   # ปลายคานที่ไม่มีคานแนวเดียวกันต่อ: งอเหล็กบนลง/ล่างขึ้น มาชนกันกลางความลึก (Earth 4 พ.ย. 2569)
+            if ne_:
+                hk = max(h - 2 * c, 0) / 2
+                for k in ("top", "bot"):
+                    if rb.get(k):
+                        n, dia = rb[k]; self.rebar(x["id"], dia, n * ne_ * hk, f"งอปลาย{'บนลง' if k == 'top' else 'ล่างขึ้น'} {ne_} ปลาย × {n} เส้น × {hk:.3f} ม. (ชนกันกลางความลึก)")
             if rb.get("extra_top"):
                 n, dia = rb["extra_top"]; self.rebar(x["id"], dia, n * 2 * Lc / 3, f"เสริมบน {n} เส้น × 2/3 ช่วง")
             if rb.get("extra_bot"):
