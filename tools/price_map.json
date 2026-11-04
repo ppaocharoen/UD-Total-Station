@@ -67,6 +67,26 @@
    "code": "0401010101600000",
    "wage_code": "STR-1.10.1"
   },
+  "rebar_RB12": {
+   "kind": "mat",
+   "code": "0401010101700000",
+   "wage_code": "STR-1.10.1"
+  },
+  "rebar_RB15": {
+   "kind": "mat",
+   "code": "0401010101800000",
+   "wage_code": "STR-1.10.1"
+  },
+  "rebar_RB19": {
+   "kind": "mat",
+   "code": "0401010101900000",
+   "wage_code": "STR-1.10.1"
+  },
+  "rebar_RB25": {
+   "kind": "mat",
+   "code": "0401010102500000",
+   "wage_code": "STR-1.10.1"
+  },
   "rebar_DB10": {
    "kind": "mat",
    "code": "0401020203600000,0401020202900000",

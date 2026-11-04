@@ -94,6 +94,11 @@ PIPE_PCT = {"SN-3.7": {"name": "PVC ระบายน้ำ", "fit": 0.4, "sup"
             "SN-3.10": {"name": "PP-R/PB/HDPE ประปา", "fit": 0.5, "sup": 0.2, "test": 0.1}}
 PIPE_PCT_CODES = {"SN-3.7": ("g/h", "i/j", "k/l"), "SN-3.8": ("k/l", "m/n", "o/p"), "SN-3.10": ("k/l", "m/n", "o/p")}
 RB_SIZES = {6, 9}   # ปลอก/เหล็กกลม (SR24); ขนาดอื่นถือเป็นข้ออ้อย SD40 ตามข้อตกลง
+
+
+def rkey_dia(k):
+    """คีย์เหล็กใน rebar_len: ตัวเลข Ø (ชนิดตามค่าตั้งต้น) หรือ 'RB12' / 'DB9' (ชนิดที่แบบระบุ)"""
+    return int(k[2:]) if isinstance(k, str) else k
 WALL_NAME = {"brick_mon": "ผนังก่ออิฐมอญครึ่งแผ่น", "brick_mon_full": "ผนังก่ออิฐมอญเต็มแผ่น", "aac": "ผนังก่ออิฐมวลเบา",
              "block": "ผนังก่อคอนกรีตบล็อก", "block_07": "ผนังก่อคอนกรีตบล็อก 7 ซม.", "gypsum": "ผนังเบายิปซัมบอร์ด",
              "precast_panel": "ผนังสำเร็จรูป", "rc": "ผนัง คสล.", "other": "ผนัง"}
@@ -282,11 +287,14 @@ class Takeoff:
         if msg not in self.notes:
             self.notes.append(msg)
 
-    def rebar(self, mid, dia, length, calc=None):
+    def rebar(self, mid, dia, length, calc=None, kind=None):
+        """kind: 'RB' / 'DB' เมื่อแบบระบุชนิดต่างจากค่าตั้งต้น (Ø6/9 = RB · อื่น = DB) เช่น RB12 — เก็บแยกคีย์ 'RB12'"""
         if length > 0:
-            self.rebar_len[int(round(dia))][mid] += length
+            d = int(round(dia))
+            key = d if not kind or kind == ("RB" if d in RB_SIZES else "DB") else f"{kind}{d}"
+            self.rebar_len[key][mid] += length
             if calc:
-                self.rebar_calc[(int(round(dia)), mid)].append(calc)
+                self.rebar_calc[(key, mid)].append(calc)
 
     # ------------------------------------------------------------ helpers
     def mem_geom(self, x):
@@ -1130,23 +1138,24 @@ class Takeoff:
                 for it in lst:
                     a, b = it["a"], it["b"]; n = int(it.get("n", 1))
                     L = math.dist(a, b)
-                    self.rebar(sid, it["dia"], n * L, f"{it.get('label', 'เหล็กเสริมเพิ่ม')} {n} เส้น × {L:.2f} ม.")
+                    self.rebar(sid, it["dia"], n * L, f"{it.get('label', 'เหล็กเสริมเพิ่ม')} {n} เส้น × {L:.2f} ม.", kind=it.get("kind"))
 
     def _rebar_items(self):
         total_kg = 0.0
         all_parts = {}
-        for dia in sorted(self.rebar_len):
-            per = self.rebar_len[dia]
+        for rk in sorted(self.rebar_len, key=lambda k: (rkey_dia(k), str(k))):
+            per = self.rebar_len[rk]
+            dia = rkey_dia(rk)
             L = sum(per.values())
             kg = L * kg_per_m(dia)
             w = REBAR_WASTE.get(dia, 0.15)
-            kind = "RB" if dia in RB_SIZES else "DB"
+            kind = rk[:2] if isinstance(rk, str) else ("RB" if dia in RB_SIZES else "DB")
             grade = "SR24" if kind == "RB" else "SD40"
             it = self.add("1.1.9", f"rebar_{kind}{dia}", f"เหล็กเสริม {grade} ({kind}) Ø {dia} มม.", "กก.", kg, None,
                           waste=w, task="rebar", note=f"ยาวรวม {L:.2f} ม. × {kg_per_m(dia):.3f} กก./ม.")
             it["from"] = list(per.keys())
             it["by_src"] = {mid: ln * kg_per_m(dia) for mid, ln in per.items()}
-            it["calc"] = {mid: list(self.rebar_calc.get((dia, mid), [])) + [f"รวม {ln:.2f} ม. × {kg_per_m(dia):.3f} = {ln*kg_per_m(dia):.2f} กก."]
+            it["calc"] = {mid: list(self.rebar_calc.get((rk, mid), [])) + [f"รวม {ln:.2f} ม. × {kg_per_m(dia):.3f} = {ln*kg_per_m(dia):.2f} กก."]
                           for mid, ln in per.items()}
             it["parts"] = {}
             for mid, ln in per.items():
@@ -1163,7 +1172,8 @@ class Takeoff:
             f = self.s["tie_wire_per_ton"] / 1000.0
             it["parts"] = {t: {"q": v["q"] * f, "from": []} for t, v in all_parts.items()}
             wsum = {}
-            for dia, per in self.rebar_len.items():
+            for rk, per in self.rebar_len.items():
+                dia = rkey_dia(rk)
                 for mid, ln in per.items():
                     wsum[mid] = wsum.get(mid, 0) + ln * kg_per_m(dia) * (1 + REBAR_WASTE.get(dia, 0.15)) * f
             it["by_src"] = wsum; it["from"] = list(wsum)

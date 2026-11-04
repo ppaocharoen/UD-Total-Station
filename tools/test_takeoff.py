@@ -106,5 +106,15 @@ good = abs(sk.get("sand_slab", 0) - r2(0.30 * (1 + used["sand_waste"]))) < 0.011
 ok &= good
 print(("PASS" if good else "FAIL"), "พื้นระบุทราย 0.10 / คอนกรีตหยาบ 0.05", sk)
 
+# เหล็กกลม Ø12 ที่แบบระบุ (extra_bars kind RB) แยกเป็น rebar_RB12 ไม่ปนกับ DB12 (Earth 4 พ.ย. 2569)
+m4 = json.loads(json.dumps(m3))
+m4.setdefault("design", {})["slabs"] = {"S-T": {"rebar": {"extra_bars": [{"label": "t", "dia": 12, "kind": "RB", "a": [0, 0, 0], "b": [2, 0, 0], "n": 3},
+                                                                   {"label": "t", "dia": 12, "a": [0, 0, 0], "b": [1, 0, 0]}]}}}
+it4, _, _ = run(m4)
+k4 = {i["key"]: i for i in it4}
+good = "rebar_RB12" in k4 and "rebar_DB12" in k4 and abs(k4["rebar_RB12"]["qty_net"] - round(6 * 12 * 12 / 162.0, 2)) < 0.011 and "SR24" in k4["rebar_RB12"]["name"]
+ok &= good
+print(("PASS" if good else "FAIL"), "RB12 แยกจาก DB12", {k: v["qty_net"] for k, v in k4.items() if k.startswith("rebar")})
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)
