@@ -96,7 +96,7 @@ PIPE_PCT_CODES = {"SN-3.7": ("g/h", "i/j", "k/l"), "SN-3.8": ("k/l", "m/n", "o/p
 RB_SIZES = {6, 9}   # ปลอก/เหล็กกลม (SR24); ขนาดอื่นถือเป็นข้ออ้อย SD40 ตามข้อตกลง
 WALL_NAME = {"brick_mon": "ผนังก่ออิฐมอญครึ่งแผ่น", "brick_mon_full": "ผนังก่ออิฐมอญเต็มแผ่น", "aac": "ผนังก่ออิฐมวลเบา",
              "block": "ผนังก่อคอนกรีตบล็อก", "block_07": "ผนังก่อคอนกรีตบล็อก 7 ซม.", "gypsum": "ผนังเบายิปซัมบอร์ด",
-             "precast_panel": "ผนังสำเร็จรูป", "other": "ผนัง"}
+             "precast_panel": "ผนังสำเร็จรูป", "rc": "ผนัง คสล.", "other": "ผนัง"}
 COVER_NAME = {"metal_sheet": "เมทัลชีท", "cpac_tile": "กระเบื้องคอนกรีต", "ceramic_tile": "กระเบื้องเซรามิก",
               "fibre_cement": "กระเบื้องไฟเบอร์ซีเมนต์ลอนคู่", "shingle": "แผ่นชิงเกิ้ล", "upvc": "UPVC",
               "polycarbonate": "โพลีคาร์บอเนต", "concrete_deck": "พื้น คสล. (ดาดฟ้า)"}
@@ -546,8 +546,13 @@ class Takeoff:
             self.add("1.1.7", "props", "ไม้ค้ำยัน (ยูคาลิปตัส Ø3\" ยาว 3 ม.)", "ต้น", self.s["props_per_m2_slab"] * A,
                      s["id"], count=True, task=lt)
         else:   # ground
-            self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * self.s["sand_thk"], s["id"],
-                     waste=self.s["sand_waste"], task=lt)
+            st = s.get("sand", self.s["sand_thk"])   # ระบุเองได้ต่อผืน (เช่น ทรายอัดในกล่องทางลาด) · 0 = ไม่คิด
+            if st > 0:
+                self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * st, s["id"],
+                         waste=self.s["sand_waste"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {st:g} = {A*st:.3f} ลบ.ม.")
+            if s.get("lean"):
+                self.add("1.1.12", "lean_conc", "คอนกรีตหยาบรองใต้พื้น (1:3:5)", "ลบ.ม.", A * s["lean"], s["id"], task=lt,
+                         calc=f"พื้นที่ {A:.2f} × หนา {s['lean']:g} = {A*s['lean']:.3f} ลบ.ม.")
             if s.get("pe_sheet", True):   # แผ่นพลาสติกรองใต้พื้น ไม่คิดเผื่อทับซ้อน (ตกลงกับ Earth 19 ต.ค. 2569)
                 self.add("1.1.4", "pe_sheet", "แผ่นพลาสติกรองใต้พื้น (Polyethylene)", "ตร.ม.", A, s["id"], task=lt,
                          calc=f"พื้นที่ {A:.2f} ตร.ม. (ไม่คิดเผื่อทับซ้อน)")
@@ -710,6 +715,18 @@ class Takeoff:
             gross = max(L - ded, 0) * H
             opens = sum(open_area(ot[o["type"]]) for o in open_by_wall[w["id"]] if o["type"] in ot)
             net = max(gross - opens, 0)
+            if w["kind"] == "rc":   # ผนัง คสล. หล่อในที่: คอนกรีต + ไม้แบบ 2 ด้าน (ไม่ใช่งานก่อ) — ยาวตามแนวราบ (ผนังเอียงเป็นสี่เหลี่ยมด้านขนาน)
+                Lh = sum(dist2(pts[i], pts[i + 1]) for i in range(len(pts) - 1))
+                net = max(max(Lh - ded, 0) * H - opens, 0)
+                lt = self.slab_lift(w["bottom"])
+                name, key = self.conc_name(w.get("material"))
+                self.add("1.1.12", key, name, "ลบ.ม.", net * w["t"], w["id"], task=lt,
+                         calc=f"ยาว {Lh:.2f}{f' − หักเสา {ded:.2f}' if ded else ''} × สูง {H:.2f}" + (f" − ช่องเปิด {opens:.2f}" if opens else "") + f" × หนา {w['t']:g} = {net * w['t']:.3f} ลบ.ม.")
+                self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * net, w["id"], task=lt,
+                         calc=f"ผิวผนัง {net:.2f} × 2 ด้าน = {2 * net:.2f} ตร.ม.")
+                if not (self.rebar_of("walls", w["id"])):
+                    self.note(f"ผนัง คสล. {w['id']}: ยังไม่มีเหล็กเสริม")
+                continue
             self.add("1.2.3", f"wall_{w['kind']}", WALL_NAME.get(w["kind"], "ผนัง") + f" หนา {w['t']*100:g} ซม.", "ตร.ม.",
                      net, w["id"], task="wall",
                      calc=f"ยาว {L:.2f}{f' − หักเสา {ded:.2f}' if ded else ''} × สูง {H:.2f} = {gross:.2f} ตร.ม." + (f" หักช่องเปิด {opens:.2f} → สุทธิ {net:.2f} ตร.ม." if opens else ""))

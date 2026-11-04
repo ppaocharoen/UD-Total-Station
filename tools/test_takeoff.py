@@ -89,5 +89,22 @@ good = validate(m2)["stale"]["quantities"]
 ok &= good
 print(("PASS" if good else "FAIL"), "แก้ผนังแล้ว quantities ต้อง stale")
 
+# ผนัง คสล. (rc) → คอนกรีต + ไม้แบบ 2 ด้าน ไม่เป็นงานก่อ · พื้นวางบนดินระบุทราย/คอนกรีตหยาบเองได้ (ทางลาดกล่อง ท12, 4 พ.ย. 2569)
+m3 = json.loads(json.dumps(m))
+m3["walls"] = [{"id": "RW-T", "kind": "rc", "t": 0.10, "path": [[0, 0], [3, 0]], "bottom": 0.0, "top": 0.15, "status": "from_drawing", "src": "test"}]
+m3["openings"] = []; m3["supports"] = []; m3["members"] = []
+m3["slabs"] = [{"id": "S-T", "kind": "ground", "t": 0.10, "top": 0.0, "polygon": [[0, 0], [3, 0], [3, 1], [0, 1]], "sand": 0.10, "lean": 0.05, "pe_sheet": False, "status": "from_drawing", "src": "test"}]
+it3, nt3, _ = run(m3)
+rw = [i for i in it3 if any("RW-T" in str(v) for v in i.values())]
+keys = {i["key"] for i in rw}
+good = ("formwork" in keys and any(k.startswith("conc_") for k in keys) and not any(k.startswith("wall_") for k in keys)
+        and any(n.startswith("ผนัง คสล. RW-T") for n in nt3))
+ok &= good
+print(("PASS" if good else "FAIL"), "ผนัง rc ถอดเป็นคอนกรีต + ไม้แบบ", sorted(keys))
+sk = {i["key"]: i["qty"] for i in it3}
+good = abs(sk.get("sand_slab", 0) - r2(0.30 * (1 + used["sand_waste"]))) < 0.011 and abs(sk.get("lean_conc", 0) - 0.15) < 1e-6 and "pe_sheet" not in sk
+ok &= good
+print(("PASS" if good else "FAIL"), "พื้นระบุทราย 0.10 / คอนกรีตหยาบ 0.05", sk)
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

@@ -1346,7 +1346,7 @@ function rbOneExit(quiet) {
 // ------------------------------------------------------------------ กล่องข้อมูลชิ้นส่วน
 const TYPE_TH = { column: 'เสา', beam: 'คาน', tie_beam: 'คานคอดิน', lintel: 'ทับหลัง', rafter: 'จันทัน', purlin: 'แป', truss: 'โครงถัก', brace: 'ค้ำยัน',
   spread: 'ฐานราก', pile_cap: 'ฐานรากบนเข็ม', cast: 'พื้นหล่อในที่', ground: 'พื้นวางบนดิน', precast: 'พื้นสำเร็จรูป' };
-const WALL_TH = { brick_mon: 'ผนังก่ออิฐมอญครึ่งแผ่น', brick_mon_full: 'ผนังก่ออิฐมอญเต็มแผ่น', aac: 'ผนังก่ออิฐมวลเบา', block: 'ผนังก่อคอนกรีตบล็อก', block_07: 'ผนังก่อคอนกรีตบล็อก 7 ซม.', gypsum: 'ผนังเบา', glass: 'ผนังกระจก' };
+const WALL_TH = { brick_mon: 'ผนังก่ออิฐมอญครึ่งแผ่น', brick_mon_full: 'ผนังก่ออิฐมอญเต็มแผ่น', aac: 'ผนังก่ออิฐมวลเบา', block: 'ผนังก่อคอนกรีตบล็อก', block_07: 'ผนังก่อคอนกรีตบล็อก 7 ซม.', gypsum: 'ผนังเบา', glass: 'ผนังกระจก', rc: 'ผนัง คสล.' };
 const SYS_TH = { cw: 'ประปา', hw: 'น้ำร้อน', waste: 'น้ำทิ้ง', soil: 'โสโครก', vent: 'ระบายอากาศ', rain: 'น้ำฝน', drain: 'ระบายน้ำ' };
 const FIX_TH = { wc: 'โถส้วม', urinal: 'โถปัสสาวะชาย', lavatory: 'อ่างล้างหน้า', sink: 'ซิงค์', shower: 'ฝักบัว', floor_drain: 'ตะแกรงระบายน้ำพื้น', faucet: 'ก๊อกน้ำ', spray: 'สายฉีดชำระ', water_heater: 'เครื่องทำน้ำอุ่น', washer: 'จุดเครื่องซักผ้า' };
 const EQ_TH = { septic_tank: 'ถังบำบัดน้ำเสีย', grease_trap: 'ถังดักไขมัน', water_tank: 'ถังเก็บน้ำ', pump: 'ปั๊มน้ำ', meter: 'มาตรวัดน้ำ', manhole: 'บ่อพัก', gate_valve: 'ประตูน้ำ', check_valve: 'เช็ควาล์ว', soak_pit: 'บ่อซึม' };
