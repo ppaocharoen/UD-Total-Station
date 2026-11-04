@@ -16,7 +16,7 @@ const okTag = ok => ok ? '<b class="d-ok">[Ok.]</b>' : '<b class="d-ng">[Fail]</
 function dsgFcp(mid) {
   const m = S.model, ms = m.materials || [], x = (m.members || []).find(y => y.id === mid);
   const mt = x && ms.find(y => y.id === x.material && y.kind === 'concrete');
-  return (mt && +mt.fc) || ((ms.find(y => y.kind === 'concrete') || {}).fc) || 240;
+  return RcWsd.fcCyl(mt || ms.find(y => y.kind === 'concrete'));   // ลูกบาศก์ → ทรงกระบอก (Earth 4 พ.ย. 2569)
 }
 function dsgCrit(fcp) { const c = dsg().crit; return RcWsd.criteria({ fcp, F: +c.F, mode: +c.mode, fy: +c.fy, fyv: +c.fyv }); }
 
@@ -91,7 +91,7 @@ function renderDesign() {
   box.innerHTML = `
   <div class="card"><h2>เกณฑ์ออกแบบ (WSD)</h2>
     <div class="form-grid dsg-crit">
-      <label>f'c คอนกรีต (จากวัสดุในโมเดล)<input value="${fcp} ksc" disabled></label>
+      <label>f'c คอนกรีต ทรงกระบอก (จากวัสดุในโมเดล · ค่าลูกบาศก์แปลงตามบัญชีคอนกรีตผสมเสร็จ เช่น 240 → 210)<input value="${fcp} ksc" disabled></label>
       <label>หน่วยแรงอัดที่ยอมให้ fc<select data-dc="mode">${opt(1, c.mode, '0.45 f\'c ไม่เกิน 65 ksc (ตามกฎหมาย)')}${opt(2, c.mode, '0.45 f\'c (มีการควบคุมคุณภาพ)')}</select></label>
       <label>สัดส่วน fc / f'c<select data-dc="F">${opt(0.45, c.F, '0.45')}${opt(0.375, c.F, '0.375')}</select></label>
       <label>เหล็กหลัก<select data-dc="fy">${opt(3000, c.fy, 'SD30 (fy 3,000)')}${opt(4000, c.fy, 'SD40 (fy 4,000)')}${opt(5000, c.fy, 'SD50 (fy 5,000)')}</select></label>
@@ -425,7 +425,7 @@ function dsgSlabList() {
       if (k === 'live' || k === 'roof_live') ll = (ll || 0) + (+a.value || 0); else if (k && k !== 'wind' && k !== 'dead') sdl = (sdl || 0) + (+a.value || 0);
     });
     const rect = s.polygon.length === 4 && Math.abs(Lx * Ly - Math.abs(s.polygon.reduce((a, p, i) => { const q = s.polygon[(i + 1) % 4]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2) < 0.01;
-    return { id: s.id, mark: s.mark || '', kind: s.kind, level: s.level || '', t: +s.t, Lx, Ly, S: S0, L: L0, shortX, auto, cont, rect, unitW: +mt.unit_weight || 2400, fcp: +mt.fc || 240, sdl, ll, use: s.use || '' };
+    return { id: s.id, mark: s.mark || '', kind: s.kind, level: s.level || '', t: +s.t, Lx, Ly, S: S0, L: L0, shortX, auto, cont, rect, unitW: +mt.unit_weight || 2400, fcp: RcWsd.fcCyl(mt), sdl, ll, use: s.use || '' };
   });
 }
 function dsgSlabInput(sl) {
@@ -677,7 +677,7 @@ function dsgFootList() {
     let sap = null; const rr = reac[f.node];
     if (rr) { const best = Object.entries(rr).sort((a, b) => (+b[1][2] || 0) - (+a[1][2] || 0))[0]; if (best) sap = { P: Math.abs(+best[1][2] || 0), Mx: Math.abs(+best[1][3] || 0), My: Math.abs(+best[1][4] || 0), combo: best[0] }; }
     const mt = (m.materials || []).find(y => y.id === f.material && y.kind === 'concrete') || (m.materials || []).find(y => y.kind === 'concrete') || {};
-    return { id: f.id, mark: f.mark || '', kind: f.kind, Bx: +f.b, By: +f.d, t: +f.h, Df: GL - f.bottom, bx: cs ? cs.b : 0.2, by: cs ? cs.h : 0.2, sap, fcp: +mt.fc || 240, piles: f.piles || null };
+    return { id: f.id, mark: f.mark || '', kind: f.kind, Bx: +f.b, By: +f.d, t: +f.h, Df: GL - f.bottom, bx: cs ? cs.b : 0.2, by: cs ? cs.h : 0.2, sap, fcp: RcWsd.fcCyl(mt), piles: f.piles || null };
   });
 }
 function dsgFootInput(x) {
@@ -804,7 +804,7 @@ function strapReport(o) {
 // ------------------------------------------------------------------ กำแพงกันดิน (Neo ชีต Retain)
 function dsgRetainList() {
   const D = dsg(), mt = ((S.model || {}).materials || []).find(y => y.kind === 'concrete') || {};
-  return (D.retainsManual || []).map(x => Object.assign({ fcp: +mt.fc || 240, material: mt.id }, x));
+  return (D.retainsManual || []).map(x => Object.assign({ fcp: RcWsd.fcCyl(mt), material: mt.id }, x));
 }
 function dsgRetainInput(x) {
   const u = (dsg().retains || {})[x.id] || {}, c = dsg().crit, v = (k, d) => u[k] !== undefined && u[k] !== '' ? +u[k] : d;
@@ -1043,7 +1043,7 @@ function dsgPlateList() {
     const depth = nums[0] || 100, wide = type === 1 || type === 4 ? (nums[1] && type === 4 ? nums[1] : depth) : (nums[1] || depth);
     const mt = (m.materials || []).find(y => y.id === col.material && y.kind === 'concrete') || {};
     const cs = sec[col.section];
-    out.push({ id: nid, node: nid, mark: col.mark || '', col: col.id, rcB: Math.round(cs.b * 1000), rcL: Math.round(cs.h * 1000), members: st.map(x => x.id), section: name, type, depth, wide, fcp: +mt.fc || 240 });
+    out.push({ id: nid, node: nid, mark: col.mark || '', col: col.id, rcB: Math.round(cs.b * 1000), rcL: Math.round(cs.h * 1000), members: st.map(x => x.id), section: name, type, depth, wide, fcp: RcWsd.fcCyl(mt) });
   }
   return out;
 }
@@ -1123,7 +1123,7 @@ function dsgStairRun(x) {
   if (inp.LL === null) return { need: 'ใส่น้ำหนักบรรทุกจร (LL)', inp };
   if (!(inp.L > 0 && inp.t > 0 && inp.b > 0 && inp.h > 0)) return { need: 'ใส่ L, t, ลูกนอน, ลูกตั้ง', inp };
   const m = S.model, mt = (m.materials || []).find(y => y.kind === 'concrete') || {};
-  const crit = RcWsd.criteria({ fcp: +mt.fc || 240, F: +c.F, mode: +c.mode, fy: +c.slabFy, fyv: +c.fyv });
+  const crit = RcWsd.criteria({ fcp: RcWsd.fcCyl(mt), F: +c.F, mode: +c.mode, fy: +c.slabFy, fyv: +c.fyv });
   const p = { L: inp.L, t: inp.t, b: inp.b, h: inp.h, cov: +c.slabCov, unitW: +mt.unit_weight || 2400, SDL: inp.SDL, LL: inp.LL };
   const d = RcWsd.slabDesign('stair', p, crit, (c.slabDias || []).map(Number));
   return { r: d.r, ok: d.ok, error: d.error || '', d, crit, inp, p };

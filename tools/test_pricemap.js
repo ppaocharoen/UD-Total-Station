@@ -28,4 +28,10 @@ const db = { materials: [], wage: c => ({ 'ARC-2.5.2-a': { price: 103, unit: '�
 const U = { units: { convertPrice: (p) => ({ ok: true, price: p, how: '' }), normUnit: u => u } };
 const r = B.priceRows(db, U, [{ key: 'open_D1', unit: 'ชุด', qty: 1, price_ref: d1 }], {})[0];
 chk(Math.abs(r.lab_unit - (103 * 1.8 + 77 * 1.8 + 103)) < 0.01, `ค่าแรงประตู = 103×1.8 + 77×1.8 + 103 = ${r.lab_unit}`);
+// คอนกรีตผูกตามกำลัง: ค่าตั้งต้นลูกบาศก์ (Earth 4 พ.ย. 2569)
+const PMc = require('../lib/pricemap.js'), cb = (fc, sp) => PMc.bind({ key: 'conc_X', spec: Object.assign({ t: 'conc', fc }, sp ? { specimen: sp } : {}) }, null);
+chk(cb(240).code === '0101010100300000', 'ลูกบาศก์ 240 → ลบ. 240 / ทก. 210');
+chk(cb(240, 'cylinder').code === '0101010100400000', 'ทรงกระบอก 240 → ลบ. 280 / ทก. 240');
+chk(cb(250).code === '0101010100400000', 'ลูกบาศก์ 250 → แถวถัดไป ลบ. 280');
+chk(cb(500).kind === 'user', 'เกิน 400 → ราคาสืบ');
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน'); process.exit(ok ? 0 : 1);

@@ -243,6 +243,10 @@ class Takeoff:
             it = self.items[k] = {"key": key, "group_code": code, "group": GROUPS.get(code, ""), "name": name,
                                   "unit": unit, "qty_net": 0.0, "waste": waste, "count": count,
                                   "from": [], "task": task, "note": note}
+        if key.startswith("conc_") and "spec" not in it:   # ผูกราคาคอนกรีตตามกำลัง (ไม่ขึ้นกับชื่อวัสดุ)
+            mt = self.mats.get(re.sub(r"_(retain|stair)$", "", key[5:])) or {}
+            if mt.get("fc"):
+                it["spec"] = {"t": "conc", "fc": mt["fc"], "specimen": mt.get("specimen", "cube")}
         it["qty_net"] += qty
         if src and src not in it["from"]:
             it["from"].append(src)
@@ -292,7 +296,8 @@ class Takeoff:
     def conc_name(self, mat_id):
         mat = self.mats.get(mat_id) or {}
         fc = mat.get("fc")
-        return (f"คอนกรีตโครงสร้าง f'c {fc:g} ksc (ทรงกระบอก)" if fc else "คอนกรีตโครงสร้าง"), f"conc_{mat_id}"
+        cyl = mat.get("specimen") == "cylinder"   # ค่าตั้งต้น = รูปลูกบาศก์ตามที่แบบเขียน (Earth 4 พ.ย. 2569)
+        return (f"คอนกรีตโครงสร้าง f'c {fc:g} ksc ({'ทรงกระบอก' if cyl else 'ลูกบาศก์'})" if fc else "คอนกรีตโครงสร้าง"), f"conc_{mat_id}"
 
     def rebar_of(self, part, eid):
         d = (self.design.get(part) or {}).get(eid) or {}
@@ -551,7 +556,7 @@ class Takeoff:
                 self.add("1.1.4", "sand_slab", "ทรายรองพื้นวางบนดิน (บดอัดแรงคน)", "ลบ.ม.", A * st, s["id"],
                          waste=self.s["sand_waste"], task=lt, calc=f"พื้นที่ {A:.2f} × หนา {st:g} = {A*st:.3f} ลบ.ม.")
             if s.get("lean"):
-                self.add("1.1.12", "lean_conc", "คอนกรีตหยาบรองใต้พื้น (1:3:5)", "ลบ.ม.", A * s["lean"], s["id"], task=lt,
+                self.add("1.1.12", "lean_conc_slab", "คอนกรีตหยาบรองใต้พื้น (1:3:5)", "ลบ.ม.", A * s["lean"], s["id"], task=lt,
                          calc=f"พื้นที่ {A:.2f} × หนา {s['lean']:g} = {A*s['lean']:.3f} ลบ.ม.")
             if s.get("pe_sheet", True):   # แผ่นพลาสติกรองใต้พื้น ไม่คิดเผื่อทับซ้อน (ตกลงกับ Earth 19 ต.ค. 2569)
                 self.add("1.1.4", "pe_sheet", "แผ่นพลาสติกรองใต้พื้น (Polyethylene)", "ตร.ม.", A, s["id"], task=lt,

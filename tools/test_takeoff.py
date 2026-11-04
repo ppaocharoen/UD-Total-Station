@@ -102,7 +102,7 @@ good = ("formwork" in keys and any(k.startswith("conc_") for k in keys) and not 
 ok &= good
 print(("PASS" if good else "FAIL"), "ผนัง rc ถอดเป็นคอนกรีต + ไม้แบบ", sorted(keys))
 sk = {i["key"]: i["qty"] for i in it3}
-good = abs(sk.get("sand_slab", 0) - r2(0.30 * (1 + used["sand_waste"]))) < 0.011 and abs(sk.get("lean_conc", 0) - 0.15) < 1e-6 and "pe_sheet" not in sk
+good = abs(sk.get("sand_slab", 0) - r2(0.30 * (1 + used["sand_waste"]))) < 0.011 and abs(sk.get("lean_conc_slab", 0) - 0.15) < 1e-6 and "pe_sheet" not in sk
 ok &= good
 print(("PASS" if good else "FAIL"), "พื้นระบุทราย 0.10 / คอนกรีตหยาบ 0.05", sk)
 

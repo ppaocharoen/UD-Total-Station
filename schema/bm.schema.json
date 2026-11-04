@@ -678,7 +678,14 @@
         },
         "fc": {
           "$ref": "#/$defs/pos",
-          "description": "ksc (ทรงกระบอก)"
+          "description": "ksc ตามชนิดตัวอย่าง (specimen) — ค่าตั้งต้นเป็นรูปลูกบาศก์ตามที่แบบเขียน · แท็บออกแบบ/ส่งออก SAP แปลงเป็นทรงกระบอกเอง"
+        },
+        "specimen": {
+          "enum": [
+            "cube",
+            "cylinder"
+          ],
+          "description": "ชนิดตัวอย่างของ fc: cube = รูปลูกบาศก์ 15 ซม. (ค่าตั้งต้น) · cylinder = รูปทรงกระบอก"
         },
         "fy": {
           "$ref": "#/$defs/pos",

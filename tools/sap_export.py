@@ -29,6 +29,23 @@ KSC = 1e4         # ksc -> kgf/m2
 G = 9.80665
 
 
+
+CUBE_CYL = [(180, 140), (210, 180), (240, 210), (280, 240), (320, 280), (350, 300), (380, 320), (400, 350)]   # คู่ค่าในบัญชีราคาคอนกรีตผสมเสร็จ (เหมือน lib/rcwsd.js)
+
+
+def fc_cyl(mt):
+    """f'c ทรงกระบอก จากวัสดุคอนกรีต (specimen ไม่ระบุ = ลูกบาศก์)"""
+    fc = float(mt.get("fc") or 240)
+    if mt.get("specimen") == "cylinder":
+        return fc
+    T = CUBE_CYL
+    if fc <= T[0][0]:
+        return round(fc * T[0][1] / T[0][0])
+    for (a0, b0), (a1, b1) in zip(T, T[1:]):
+        if fc <= a1:
+            return round(b0 + (b1 - b0) * (fc - a0) / (a1 - a0))
+    return round(fc * T[-1][1] / T[-1][0])
+
 def q(s):
     """ครอบด้วย " ถ้ามีช่องว่าง (รูปแบบ s2k)"""
     s = str(s)
@@ -145,7 +162,7 @@ class Exporter:
                 continue
             k = mt["kind"]
             if k == "concrete":
-                fc = mt["fc"]
+                fc = fc_cyl(mt)   # SAP ใช้กำลังทรงกระบอก — วัสดุในโมเดลค่าตั้งต้นเป็นลูกบาศก์ (Earth 4 พ.ย. 2569)
                 E = mt.get("E") or 15100 * math.sqrt(fc)
                 w = mt.get("unit_weight", 2400)
                 gen.append(row(Material=mt["id"], Type="Concrete", Grade="fc %g ksc" % fc, SymType="Isotropic",

@@ -201,8 +201,8 @@ meta = {'name': 'ห้องน้ำ ท12 — Step 1 รูปทรงอา
         'source': 'แบบรวม_ห้องน้ำ ท12.pdf + DXF (สถาปัตย์ A.0.01–A.7.01) · โครงการก่อสร้างห้องสุขา พร้อมติดตั้งระบบบำบัดน้ำเสีย และปรับปรุงภูมิทัศน์ — เฉพาะตัวอาคาร',
         'stage': 1, 'building_type': 'public_toilet', 'work_group': 'building'}
 bm = {'schema_version': '0.1', 'meta': meta, 'grids': grids, 'levels': levels,
-      'materials': [{'id': 'C', 'kind': 'concrete', 'fc': 240, 'status': 'user', 'src': 'A.0.01 รายการประกอบแบบ หมวดคอนกรีตเสริมเหล็ก (ไม่น้อยกว่า 240 ลูกบาศก์ 0.15 ม.)',
-       'note': 'ใช้ 240 ตามค่าลูกบาศก์ตรง ๆ ไม่แปลงเป็นทรงกระบอก (Earth 1 พ.ย.) · **มาร์ก:** แบบพิมพ์หน่วย "กก./ตร.ม." (ควรเป็น กก./ตร.ซม.)'}],
+      'materials': [{'id': 'C', 'kind': 'concrete', 'fc': 240, 'specimen': 'cube', 'status': 'user', 'src': 'A.0.01 รายการประกอบแบบ หมวดคอนกรีตเสริมเหล็ก (ไม่น้อยกว่า 240 ลูกบาศก์ 0.15 ม.)',
+       'note': 'ลูกบาศก์ 240 (Earth 1 พ.ย. · ยืนยันกำลังเป็นลูกบาศก์ 4 พ.ย.) — ราคาใช้คอนกรีตผสมเสร็จ ลูกบาศก์ 240 · แท็บออกแบบ/SAP แปลงเป็นทรงกระบอก 210 · **มาร์ก:** แบบพิมพ์หน่วย "กก./ตร.ม." (ควรเป็น กก./ตร.ซม.)'}],
       'sections': [{'id': 'RC-20x20', 'kind': 'rc_rect', 'b': 0.20, 'h': 0.20, 'status': FD, 'src': 'A.2.01 บล็อกเสา 0.20'},
                    {'id': 'RC-10x10', 'kind': 'rc_rect', 'b': 0.10, 'h': 0.10, 'status': FD, 'src': 'A.2.01 บล็อกเสาเอ็น clom_n 0.10'}],
       'nodes': nodes, 'members': members, 'supports': [], 'slabs': slabs, 'walls': walls, 'opening_types': OT, 'openings': opens, 'roofs': [roof], 'design': {},
