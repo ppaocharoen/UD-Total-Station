@@ -222,47 +222,73 @@ row('หลังคา', 'แป', 'แปเหล็กกล่อง 50x25x
 row('หลังคา', 'R1', f'ระดับแผ่นหลังคาไล่จากโครง: ระนาบหลังอะเส/คอร์ดบน → จันทัน C-100 (+0.10) → แปกล่อง 50x25 วางแบน (+0.025) → แผ่นเมทัลชีทบนแป · ขอบชายคาต่ำ +{ROOF["eave"]:.3f}', 'S.2.03–S.2.05 + รูปขยายชายคา A.4.01', US,
     'Earth 1 พ.ย.: แผ่นหลังคาอยู่บนแป ต้องไล่ระดับจากจันทัน แป แล้วจึงเป็นแผ่น · รูปขยายชายคาเขียนแปกล่องวางแบนบนจันทัน')
 
-# ---------------------------------------------------------------- ทับหลัง / คานเอ็น / เสาเอ็นเพิ่ม (มาตรฐาน Earth 21 ต.ค. — ใช้กับ ท12 ตามที่ยืนยัน 1 พ.ย.)
-#  ทับหลัง/คานเอ็น คสล. 0.10 (หนาเท่าผนัง) × 0.10 · RB6 2 เส้น ปลอก RB6@0.20 · ยื่นเลยขอบช่องข้างละ 0.20 (ไม่เกินปลายผนัง)
-#  ก. ปลายผนังลอยไม่ติดเสา → เสาเอ็น  ข. ผนังยาวเกิน 3 ม. → เสาเอ็นแบ่งช่วง ≤ 3 ม.  ค. ผนังสูงเกิน 3 ม. → คานเอ็นกลางความสูง (เว้นช่วงช่องเปิด)
-SEC.append({'id': 'RC-10x10', 'kind': 'rc_rect', 'b': 0.10, 'h': 0.10, 'status': US, 'src': 'มาตรฐานเสาเอ็น/ทับหลังของ Earth (21 ต.ค.)'}) if not any(x['id'] == 'RC-10x10' for x in SEC) else None
+# ---------------------------------------------------------------- ทับหลัง / คานเอ็น / เสาเอ็นเพิ่ม — มาตรฐานใหม่ A-19 / A-20 (Earth 4 พ.ย. แทนมาตรฐาน 21 ต.ค.)
+#  ผนังบาง (≤ 0.10): เสาเอ็น 0.10×0.10 · ทับหลัง/คานเอ็น 0.10×0.15 · 2-RB9 ปลอกลูกโซ่ RB9@0.20 (ผนัง 0.20 ขึ้นไป 4-RB9) — เหล็ก = Step 3
+#  ทับหลัง/คานเอ็นใต้ช่อง ยาวตลอดผนัง (เสาถึงเสา) ที่ระดับหัวช่อง/ธรณี · เสาเอ็นข้างช่องเปิดทั้งสองข้าง
+#  ก. ปลายผนังลอย → เสาเอ็น  ข. ผนังยาวตั้งแต่ 3.00 ม. → เสาเอ็นห่างไม่เกิน 2.00  ค. ผนังสูงตั้งแต่ 3.00 ม. → คานเอ็นกลางความสูง (Earth 4 พ.ย.)
+#  หนวดกุ้ง RB6 ยาว 0.30 @0.40 / หลังอิฐ @0.50 · เหล็กกันร้าว RB9 ยาว 0.40 ที่มุมช่อง — ไม่ถอดแยก รวมในราคาต่อเมตร (Earth 4 พ.ย.)
+for sid, h in (('RC-10x10', 0.10), ('RC-10x15', 0.15)):
+    if not any(x['id'] == sid for x in SEC):
+        SEC.append({'id': sid, 'kind': 'rc_rect', 'b': 0.10, 'h': h, 'status': US, 'src': 'มาตรฐานเสาเอ็น-ทับหลัง A-19 / A-20 (Earth 4 พ.ย.)'})
 MAS = ('brick_mon', 'brick_mon_full', 'aac', 'block', 'block_07')
 OTs = m['opening_types']; opsw = collections.defaultdict(list)
 for o in m['openings']: opsw[o['wall']].append(o)
 vert = [(N[x['i']]['x'], N[x['i']]['y']) for x in m['members'] if x['type'] in ('stiffener', 'column') and abs(N[x['i']]['x'] - N[x['j']]['x']) < 1e-6 and N[x['j']]['z'] > 0.3]
-STD = 'มาตรฐาน Earth (21 ต.ค. · ใช้กับ ท12 1 พ.ย.)'
+STD = 'มาตรฐานเสาเอ็น-ทับหลัง A-19 / A-20 (Earth 4 พ.ย.)'
+REB = lambda t: '2-RB9 ปลอกลูกโซ่ RB9@0.20' if t <= 0.15 else '4-RB9 ปลอก RB9@0.20'
 nl = ns = nst = ne = nsp = nh = 0
 def wgeo(w):
     a_, b_ = w['path']; L = math.dist(a_, b_); ux, uy = (b_[0] - a_[0]) / L, (b_[1] - a_[1]) / L
     return a_, L, ux, uy, (lambda u: (round(a_[0] + ux * u, 3), round(a_[1] + uy * u, 3)))
-for w in m['walls']:
-    if w['kind'] not in MAS or w['id'] not in opsw: continue
-    a_, L, ux, uy, Pw = wgeo(w); ops = opsw[w['id']]
-    for o in ops:
-        t_ = OTs[o['type']]; u0, u1 = o['at'] - t_['w'] / 2, o['at'] + t_['w'] / 2
-        sill = t_.get('sill', 0); ztop = w['bottom'] + sill + t_['h'] + (t_['w'] / 2 if t_.get('shape') == 'arch' else 0)
-        e0, e1 = max(0, u0 - 0.20), min(L, u1 + 0.20)
-        if w['top'] - ztop >= 0.10 - 1e-6:
-            nl += 1; z = round(ztop + 0.10, 3)
-            mem(f'LT-{nl:02d}', 'ทับหลัง', 'lintel', (*Pw(e0), z), (*Pw(e1), z), 'RC-10x10', 'C', f'{STD} · เหนือ {o["id"]}', US, note='ทับหลัง 0.10×0.10 หลังทับหลังอยู่ที่ระดับนี้ · เหล็ก RB6 2 เส้น ปลอก RB6@0.20')
-        if sill > 1e-6:
-            ns += 1; z = round(w['bottom'] + sill, 3)
-            mem(f'LS-{ns:02d}', 'คานเอ็น', 'lintel', (*Pw(e0), z), (*Pw(e1), z), 'RC-10x10', 'C', f'{STD} · ใต้ {o["id"]}', US, note='คานเอ็นใต้ช่อง (ธรณี) 0.10×0.10 · เหล็ก RB6 2 เส้น ปลอก RB6@0.20')
-        for u in (u0 - 0.05, u1 + 0.05):
-            if u < 0.05 or u > L - 0.05: continue
-            xy = Pw(u)
-            if any(math.dist(xy, v) <= 0.15 for v in vert): continue
-            nst += 1
-            mem(f'SA-{nst:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), 'RC-10x10', 'C', f'{STD} · ข้าง {o["id"]}', US, note='เสาเอ็นข้างช่องเปิด (ไม่มีในแปลน)')
-            vert.append(xy)
+def oz(w, o):   # ระดับล่าง/บนของช่อง
+    t_ = OTs[o['type']]; z0 = w['bottom'] + t_.get('sill', 0)
+    return z0, z0 + t_['h'] + (t_['w'] / 2 if t_.get('shape') == 'arch' else 0)
 def in_open(w, u, z=None):
     for o in opsw.get(w['id'], []):
         t_ = OTs[o['type']]
         if o['at'] - t_['w'] / 2 - 0.05 <= u <= o['at'] + t_['w'] / 2 + 0.05:
             if z is None: return True
-            z0 = w['bottom'] + t_.get('sill', 0); z1 = z0 + t_['h'] + (t_['w'] / 2 if t_.get('shape') == 'arch' else 0)
+            z0, z1 = oz(w, o)
             if z0 - 0.05 <= z <= z1 + 0.05: return True
     return False
+def band(w, zb, zt):   # ช่วงตามแนวผนังที่แถบ zb–zt ไม่ผ่านช่องเปิด
+    _, L, *_r = wgeo(w); cuts = []
+    for o in opsw.get(w['id'], []):
+        t_ = OTs[o['type']]; z0, z1 = oz(w, o)
+        if z0 < zt - 1e-6 and z1 > zb + 1e-6: cuts.append((max(0, o['at'] - t_['w'] / 2), min(L, o['at'] + t_['w'] / 2)))
+    out, u = [], 0.0
+    for c0, c1 in sorted(cuts):
+        if c0 - u >= 0.20: out.append((u, c0))
+        u = max(u, c1)
+    if L - u >= 0.20: out.append((u, L))
+    return out
+for w in m['walls']:
+    if w['kind'] not in MAS or w['id'] not in opsw: continue
+    a_, L, ux, uy, Pw = wgeo(w); ops = opsw[w['id']]
+    heads = sorted({round(oz(w, o)[1], 2) for o in ops})
+    sills = sorted({round(oz(w, o)[0], 2) for o in ops if OTs[o['type']].get('sill', 0) > 1e-6})
+    for zh in heads:   # ทับหลังยาวตลอดผนังที่ระดับหัวช่อง
+        room = w['top'] - zh
+        if room < 0.10 - 1e-6: continue
+        d = 0.15 if room >= 0.15 - 1e-6 else 0.10; z = round(zh + d, 3)
+        for u0, u1 in band(w, zh, z):
+            nl += 1
+            mem(f'LT-{nl:02d}', 'ทับหลัง', 'lintel', (*Pw(u0), z), (*Pw(u1), z), f'RC-10x{int(round(d*100))}', 'C', f'{STD} · {w["id"]} หัวช่อง +{zh:.2f}', US,
+                note=f'ทับหลัง 0.10×{d:.2f} ยาวตลอดผนัง (เสาถึงเสา) หลังทับหลังที่ระดับนี้ · {REB(w["t"])}' + ('' if d == 0.15 else f' · เหนือหัวช่องเหลือผนัง {room:.2f} ใช้ลึก 0.10'))
+    for zs in sills:   # คานเอ็นใต้ช่อง (ธรณี) ยาวตลอดผนัง
+        for u0, u1 in band(w, zs - 0.15, zs):
+            ns += 1
+            mem(f'LS-{ns:02d}', 'คานเอ็น', 'lintel', (*Pw(u0), zs), (*Pw(u1), zs), 'RC-10x15', 'C', f'{STD} · {w["id"]} ใต้ช่อง +{zs:.2f}', US,
+                note=f'คานเอ็นใต้ช่อง (ธรณี) 0.10×0.15 ยาวตลอดผนัง หลังคานเอ็นที่ระดับนี้ · {REB(w["t"])}')
+    for o in ops:   # เสาเอ็นข้างช่องเปิดทั้งสองข้าง
+        t_ = OTs[o['type']]; u0, u1 = o['at'] - t_['w'] / 2, o['at'] + t_['w'] / 2
+        for u in (u0 - 0.05, u1 + 0.05):
+            if u < 0.05 or u > L - 0.05: continue
+            xy = Pw(u)
+            if any(math.dist(xy, v) <= 0.15 for v in vert): continue
+            nst += 1
+            mem(f'SA-{nst:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), 'RC-10x10', 'C', f'{STD} · ข้าง {o["id"]}', US, note=f'เสาเอ็นข้างช่องเปิด 0.10×0.10 · {REB(w["t"])}')
+            vert.append(xy)
 for w in m['walls']:
     if w['kind'] not in MAS or w.get('rise') or w['top'] - w['bottom'] < 0.5: continue
     a_, L, ux, uy, Pw = wgeo(w)
@@ -270,40 +296,35 @@ for w in m['walls']:
         xy = Pw(u)
         if not any(math.dist(xy, v) <= 0.16 for v in vert):
             ne += 1
-            mem(f'SE-{ne:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), 'RC-10x10', 'C', f'{STD} · ปลายผนัง {w["id"]} ไม่ติดเสา', US)
+            mem(f'SE-{ne:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), 'RC-10x10', 'C', f'{STD} · ปลายผนัง {w["id"]} ไม่ติดเสา', US, note=f'เสาเอ็นปลายผนัง 0.10×0.10 · {REB(w["t"])}')
             vert.append(xy)
-    us = sorted(min(max((v[0] - a_[0]) * ux + (v[1] - a_[1]) * uy, 0), L) for v in vert
-                if abs((v[0] - a_[0]) * uy - (v[1] - a_[1]) * ux) <= 0.10 and -0.16 <= (v[0] - a_[0]) * ux + (v[1] - a_[1]) * uy <= L + 0.16)
-    for u0, u1 in zip(us, us[1:]):   # ข. ช่วงยาวเกิน 3 ม.
-        g = u1 - u0
-        if g > 3.0 + 1e-6:
-            n = math.ceil(g / 3.0)
-            for k in range(1, n):
-                u = u0 + g * k / n
-                if in_open(w, u): continue
-                nsp += 1; xy = Pw(u)
-                mem(f'SM-{nsp:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), 'RC-10x10', 'C', f'{STD} · {w["id"]} ช่วงยาว {g:.2f} ม. > 3 ม.', US)
-                vert.append(xy)
+    if L >= 3.0 - 1e-6:   # ข. ผนังยาวตั้งแต่ 3.00 → เสาเอ็นห่างไม่เกิน 2.00
+        us = sorted(min(max((v[0] - a_[0]) * ux + (v[1] - a_[1]) * uy, 0), L) for v in vert
+                    if abs((v[0] - a_[0]) * uy - (v[1] - a_[1]) * ux) <= 0.10 and -0.16 <= (v[0] - a_[0]) * ux + (v[1] - a_[1]) * uy <= L + 0.16)
+        for u0, u1 in zip(us, us[1:]):
+            g = u1 - u0
+            if g > 2.0 + 1e-6 and not in_open(w, (u0 + u1) / 2):
+                n = math.ceil(g / 2.0)
+                for k in range(1, n):
+                    u = u0 + g * k / n
+                    if in_open(w, u): continue
+                    nsp += 1; xy = Pw(u)
+                    mem(f'SM-{nsp:02d}', 'เสาเอ็น', 'stiffener', (*xy, w['bottom']), (*xy, w['top']), 'RC-10x10', 'C', f'{STD} · {w["id"]} ยาว {L:.2f} ม. ช่วง {g:.2f} > 2.00', US, note=f'เสาเอ็นแบ่งช่วงผนัง 0.10×0.10 · {REB(w["t"])}')
+                    vert.append(xy)
     H = w['top'] - w['bottom']
-    if H > 3.0 + 1e-6:   # ค. สูงเกิน 3 ม.
+    if H >= 3.0 - 1e-6:   # ค. สูงตั้งแต่ 3.00 → คานเอ็นกลางความสูง (เว้นช่วงช่องเปิด)
         z = round((w['bottom'] + H / 2) * 20) / 20
-        cuts = [0.0, L]
-        for o in opsw.get(w['id'], []):
-            t_ = OTs[o['type']]
-            if in_open(w, o['at'], z): cuts += [max(0, o['at'] - t_['w'] / 2), min(L, o['at'] + t_['w'] / 2)]
-        cuts = sorted(cuts)
-        for u0, u1 in zip(cuts[0::2], cuts[1::2]):
-            if u1 - u0 >= 0.20:
-                nh += 1
-                mem(f'LH-{nh:02d}', 'คานเอ็น', 'lintel', (*Pw(u0), z), (*Pw(u1), z), 'RC-10x10', 'C', f'{STD} · {w["id"]} สูง {H:.2f} ม. > 3 ม.', US, note='คานเอ็นกลางความสูง')
-for x in m['members']:
-    if x['type'] in ('stiffener', 'lintel') and 'RB6' not in (x.get('note') or ''):
-        x['note'] = ((x.get('note') or '') + ' · เหล็ก RB6 2 เส้น ปลอก RB6@0.20 (มาตรฐาน Earth)').strip(' ·')
-row('ทับหลัง', f'LT-01…LT-{nl:02d}', f'ทับหลัง คสล. 0.10×0.10 เหนือช่องเปิดในผนังก่อ {nl} ท่อน ยื่นเลยขอบช่องข้างละ 0.20', STD, US)
-row('ทับหลัง', f'LS-01…LS-{ns:02d}', f'คานเอ็นใต้ช่องที่ยกจากพื้น (บล็อกช่องลม/บล็อกแก้ว) {ns} ท่อน', STD, US)
-row('ทับหลัง', f'LH-01…LH-{nh:02d}' if nh else 'LH (ไม่มี)', f'ผนังสูงเกิน 3 ม. → คานเอ็นกลางความสูง {nh} ท่อน (เว้นช่วงช่องเปิด)', STD, US)
-row('เสาเอ็น', 'SA / SE / SM', f'เสาเอ็นเพิ่ม: ข้างช่องเปิด {nst} · ปลายผนังลอย {ne} · แบ่งช่วงผนังยาวเกิน 3 ม. {nsp} ต้น — ทั้ง 4 ต้นตรงกับบล็อกเสาเอ็นแบบ dynamic ในแปลน (*U1149 ข้างช่องบล็อกกริด 1/4 · *U1150 ปลายผนังข้างเสา 1A/4A) ที่ Step 1 อ่านตกไป', STD, FD,
-    '**มาร์ก:** รายการประกอบแบบ ท12 เขียนปลอกเอ็น RB6@0.15 — ใช้ตามมาตรฐาน Earth @0.20')
+        for u0, u1 in band(w, z - 0.15, z):
+            nh += 1
+            mem(f'LH-{nh:02d}', 'คานเอ็น', 'lintel', (*Pw(u0), z), (*Pw(u1), z), 'RC-10x15', 'C', f'{STD} · {w["id"]} สูง {H:.2f} ม. ≥ 3.00', US, note=f'คานเอ็นกลางความสูง 0.10×0.15 · {REB(w["t"])}')
+for x in m['members']:   # เสาเอ็นจากแปลน (Step 1) ใช้หน้าตัด/เหล็กตามมาตรฐานเดียวกัน
+    if x['type'] == 'stiffener' and x['id'].startswith('ST-'):
+        x['note'] = (x.get('note') or '') + f' · {REB(0.10)} ({STD})'
+row('ทับหลัง', f'LT-01…LT-{nl:02d}', f'ทับหลัง คสล. 0.10×0.15 ยาวตลอดผนัง (เสาถึงเสา) ที่ระดับหัวช่อง {nl} ท่อน', STD, US)
+row('ทับหลัง', f'LS-01…LS-{ns:02d}', f'คานเอ็นใต้ช่องที่ยกจากพื้น 0.10×0.15 ยาวตลอดผนัง {ns} ท่อน', STD, US)
+row('ทับหลัง', f'LH-01…LH-{nh:02d}' if nh else 'LH (ไม่มี)', f'ผนังสูงตั้งแต่ 3.00 ม. → คานเอ็นกลางความสูง {nh} ท่อน (เว้นช่วงช่องเปิด)', STD, US)
+row('เสาเอ็น', 'SA / SE / SM', f'เสาเอ็นเพิ่ม 0.10×0.10: ข้างช่องเปิด {nst} · ปลายผนังลอย {ne} · แบ่งช่วงผนังยาวตั้งแต่ 3.00 ให้ห่างไม่เกิน 2.00 {nsp} ต้น', STD, US,
+    '**มาร์ก:** รายการประกอบแบบ ท12 เขียนเสาเอ็น/ทับหลัง 2-RB6 ปลอก RB6@0.15 — ใช้มาตรฐาน A-19/A-20 (2-RB9 ปลอก RB9@0.20) · หนวดกุ้ง/เหล็กกันร้าวรวมในราคาต่อเมตร')
 for x in m['members']:   # เสาเอ็นที่กฎเพิ่มให้ ตรงกับบล็อกเสาเอ็นแบบ dynamic ในแปลน (*U1149 / *U1150) ที่ Step 1 ไม่ได้นับ
     if x['id'] in ('SA-01', 'SA-02', 'SE-01', 'SE-02'):
         x['status'] = FD; x['src'] = 'A.2.01 (บล็อก clom_n แบบ dynamic *U1149 / *U1150) + ' + STD
