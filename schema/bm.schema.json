@@ -2617,6 +2617,13 @@
           "additionalProperties": {
             "type": "object"
           }
+        },
+        "walls": {
+          "type": "object",
+          "description": "ผนัง คสล. (kind rc): {id: designEntry} — rebar.extra_bars หรือ src บอกว่าเหล็กอยู่ในชิ้นอื่น (เช่น ปลอกกล่องทางลาดผูกกับพื้น)",
+          "additionalProperties": {
+            "$ref": "#/$defs/designEntry"
+          }
         }
       }
     },

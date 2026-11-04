@@ -729,7 +729,8 @@ class Takeoff:
                          calc=f"ยาว {Lh:.2f}{f' − หักเสา {ded:.2f}' if ded else ''} × สูง {H:.2f}" + (f" − ช่องเปิด {opens:.2f}" if opens else "") + f" × หนา {w['t']:g} = {net * w['t']:.3f} ลบ.ม.")
                 self.add("1.1.7", "formwork", "ไม้แบบหล่อคอนกรีต", "ตร.ม.", 2 * net, w["id"], task=lt,
                          calc=f"ผิวผนัง {net:.2f} × 2 ด้าน = {2 * net:.2f} ตร.ม.")
-                if not (self.rebar_of("walls", w["id"])):
+                wd = (self.design.get("walls") or {}).get(w["id"])   # มีรายการ = กำหนดเหล็กแล้ว (เช่น อยู่ในเหล็กปลอกของกล่องทางลาดที่ผูกกับพื้น)
+                if not wd:
                     self.note(f"ผนัง คสล. {w['id']}: ยังไม่มีเหล็กเสริม")
                 continue
             self.add("1.2.3", f"wall_{w['kind']}", WALL_NAME.get(w["kind"], "ผนัง") + f" หนา {w['t']*100:g} ซม.", "ตร.ม.",
