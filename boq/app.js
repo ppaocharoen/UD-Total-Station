@@ -1126,6 +1126,11 @@ function buildScope() {
     $('#scope-label').textContent = !o ? '' : o.l ? (o.l.z === null ? 'หลังคาและโครงหลังคาเหล็ก' : `ชั้น ${o.l.name}: พื้น/คานที่ระดับ ${o.l.z >= 0 ? '+' : ''}${(+o.l.z).toFixed(2)} กับเสา/ผนังที่ตั้งจากระดับนี้`) : `แนวกริด ${o.g.name} (${o.g.axis === 'X' ? 'x' : 'y'} = ${o.g.coord}) ระยะ ±0.30 ม. มองตั้งฉาก`;
   });
 }
+function solidApply() {   // โหมดแสดงผล โปร่ง / ทึบ + เส้นขอบ (จำค่าไว้ในเครื่อง)
+  let on = false; try { on = localStorage.getItem('ud.solid') === '1'; } catch (e) {}
+  $$('#solid-seg [data-solid]').forEach(b => b.classList.toggle('on', (b.dataset.solid === '1') === on));
+  if (S.viewer) S.viewer.setSolid(on);
+}
 function applyPreset(name) {
   const v = S.viewer; if (!v) return;
   rbOneExit(true); v.highlight([]); $('#pick-info').innerHTML = ''; $('#pick-info').classList.remove('on');
@@ -1233,6 +1238,7 @@ function tlPlay() {
 function initViewer() {
   if (S.viewer || typeof THREE === 'undefined') return;
   S.viewer = new BmViewer.Viewer($('#viewer'), { onPick: (d, pt) => showPick(d, pt) });
+  solidApply();
   try { if (localStorage.getItem('udboq:proj') === 'para') $('#proj-seg [data-proj=para]').click(); } catch (e) { /* */ }
   if (curTheme() !== 'terminal') S.viewer.setTheme(curTheme());
   if (S.model) buildLayers(S.viewer.load(S.model));
@@ -1636,6 +1642,7 @@ function bind() {
   $('#tl-play').onclick = tlPlay;
   $('#tl-speed').onchange = () => { if (TL.timer) { tlStop(); tlPlay(); } };
   $('#tl-rebar').onchange = () => { if (TL.day !== null && TL.day !== undefined) tlSet(TL.day); };
+  $$('#solid-seg [data-solid]').forEach(b => b.onclick = () => { try { localStorage.setItem('ud.solid', b.dataset.solid); } catch (e) {} solidApply(); });
   $('#b-tcol').onclick = () => { S.tcolOn = !S.tcolOn; if (S.viewer && S.types) S.viewer.setTypeColors(S.tcolOn ? S.types.col : null); $('#b-tcol').classList.toggle('primary', S.tcolOn); $('#b-tcol').textContent = S.tcolOn ? 'กลับเป็นสีวัสดุ' : 'ระบายสีตามชนิด'; };
   $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };
   $('#clash-info').onchange = renderClash; $('#clash-ack').onchange = renderClash;
