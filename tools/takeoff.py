@@ -835,7 +835,7 @@ class Takeoff:
             elif f.get("rects"):
                 q, unit = sum(abs(r[2] - r[0]) * abs(r[3] - r[1]) for r in f["rects"]), "ตร.ม."
             elif f.get("polygon"):
-                q, unit = poly_area(f["polygon"]), "ตร.ม."
+                q, unit = poly_area(f["polygon"]) - sum(poly_area(h) for h in f.get("holes", [])), "ตร.ม."   # หักช่อง (holes) เช่น รางน้ำที่คิดแยก
             elif f.get("wall") and f.get("height"):
                 w = next((w for w in self.m.get("walls", []) if w["id"] == f["wall"]), None)
                 pts = w["path"] if w else []
