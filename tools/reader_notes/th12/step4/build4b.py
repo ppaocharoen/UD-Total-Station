@@ -109,13 +109,15 @@ def cover(x, y, z0, z1):   # ผนังทุกชนิดที่ทับ
 CS = []; csum = collections.defaultdict(float)
 def exposed(cx, cy, hb, hh, z0, z1, tagf):   # ผิวที่โผล่ของชิ้นตั้ง (เสา/เสาเอ็น) ทีละหน้า → faces
     faces = []
+    wtop = max([t_ for (nx, ny) in ((1, 0), (-1, 0), (0, 1), (0, -1)) for k in range(5)
+                for _, t_ in cover(cx + nx * (hb + 0.005) + (0 if nx else (k - 2) * hb / 2.5), cy + ny * (hh + 0.005) + (0 if ny else (k - 2) * hh / 2.5), z0, z1)] or [z0])   # ยอดผนังสูงสุดที่ชนชิ้นนี้
     for (nx, ny) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         if nx: p0, p1 = (cx + nx * hb, cy - hh), (cx + nx * hb, cy + hh)
         else:  p0, p1 = (cx - hb, cy + ny * hh), (cx + hb, cy + ny * hh)
         n = 20; pts = [(p0[0] + (p1[0] - p0[0]) * (i + 0.5) / n + nx * 0.005, p0[1] + (p1[1] - p0[1]) * (i + 0.5) / n + ny * 0.005) for i in range(n)]
         cov = [cover(px, py, z0, z1) for px, py in pts]
         fz = {round(FZ.get(space(px + nx * 0.06, py + ny * 0.06), z0), 3) for px, py in pts}
-        zs = sorted({z0, z1} | {max(z0, min(z1, v)) for cc in cov for bt in cc for v in bt} | {max(z0, min(z1, v)) for v in fz})
+        zs = sorted({z0, z1, max(z0, min(z1, wtop))} | {max(z0, min(z1, v)) for cc in cov for bt in cc for v in bt} | {max(z0, min(z1, v)) for v in fz})
         for za, zb in zip(zs, zs[1:]):
             if zb - za < 0.01: continue
             zm = (za + zb) / 2; free = [not any(b_ <= zm <= t_ for b_, t_ in cc) for cc in cov]
@@ -127,7 +129,7 @@ def exposed(cx, cy, hb, hh, z0, z1, tagf):   # ผิวที่โผล่ข
                 q0 = (p0[0] + (p1[0] - p0[0]) * i / n, p0[1] + (p1[1] - p0[1]) * i / n); q1 = (p0[0] + (p1[0] - p0[0]) * j / n, p0[1] + (p1[1] - p0[1]) * j / n)
                 mx, my = (q0[0] + q1[0]) / 2 + nx * 0.06, (q0[1] + q1[1]) / 2 + ny * 0.06; rm = space(mx, my)
                 if za < FZ.get(rm, z0) - 1e-6: i = j; continue   # ต่ำกว่าผิวพื้นของพื้นที่นั้น = จมในพื้น
-                tg, ext = tagf(rm)
+                tg, ext = tagf(rm, za, wtop)
                 faces.append({'p': [[round(q0[0], 3), round(q0[1], 3)], [round(q1[0], 3), round(q1[1], 3)]], 'n': [nx, ny], 'z': [round(za, 3), round(zb, 3)], 'tag': tg, 'ext': ext,
                               'spec': SPEC[tg] if tg != '1' else None, 'room': rm})
                 i = j
@@ -141,11 +143,11 @@ def exposed(cx, cy, hb, hh, z0, z1, tagf):   # ผิวที่โผล่ข
 fa = lambda fc: math.dist(*fc['p']) * (fc['z'][1] - fc['z'][0])
 for (cx, cy), c in sorted(COL.items()):
     z0, z1, cid, s = c
-    mg = exposed(cx, cy, s['b'] / 2, s['h'] / 2, z0, z1, lambda rm: ('2', False) if ROOM(rm) else ('1', True))
+    mg = exposed(cx, cy, s['b'] / 2, s['h'] / 2, z0, z1, lambda rm, za, wt: (('2' if za < wt - 1e-6 else '1'), False) if ROOM(rm) else ('1', True))   # ในห้องน้ำ: กระเบื้องถึงยอดผนัง เหนือขึ้นไปฉาบทาสี (Earth 5 พ.ย.)
     for fc in mg: csum[(fc['tag'], 'ext' if fc['ext'] else 'int')] += fa(fc)
     F.append({'id': 'CS-' + cid[2:], 'kind': 'struct', 'spec': 'ฉาบปูนโครงสร้าง (เสา) ทาสีน้ำอะคริลิก', 'member': cid, 'faces': mg, 'status': FD,
               'src': 'A.2.01 ป้ายวัสดุผนัง + หลักเกณฑ์ 2569 (ฉาบโครงสร้างแยกจากฉาบผนัง)', 'level': '1F',
-              'note': f'เสา {cid} +{z0:.2f}…+{z1:.2f} ผิวที่โผล่พ้นผนัง {len(mg)} แถบ · ด้านในห้องน้ำบุกระเบื้องเต็มถึงหัวเสา (A.4.03 · Earth 5 พ.ย.) · ด้านนอก ฉาบโครงสร้าง + ทาสีภายนอก'})
+              'note': f'เสา {cid} +{z0:.2f}…+{z1:.2f} ผิวที่โผล่พ้นผนัง {len(mg)} แถบ · ด้านในห้องน้ำบุกระเบื้องถึงยอดผนัง เหนือขึ้นไปฉาบโครงสร้าง + ทาสีภายใน (Earth 5 พ.ย.) · ด้านนอก ฉาบโครงสร้าง + ทาสีภายนอก'})
     CS.append(cid)
 
 # ---------------------------------------------------------------- เสาเอ็นที่โผล่ทั้งต้น (หน้าห้องส้วม ไม่มีผนังก่อ) — ฉาบ + ทาสี (Earth 5 พ.ย.: ราคาเสาเอ็นต่อเมตรยังไม่รวมฉาบ)
@@ -162,7 +164,7 @@ for x in m['members']:
     a, b = N[x['i']], N[x['j']]
     if in_brick(a['x'], a['y']): continue
     s_ = SEC[x['section']]; z0, z1 = min(a['z'], b['z']), max(a['z'], b['z'])
-    mg = exposed(a['x'], a['y'], s_['b'] / 2, s_['h'] / 2, z0, z1, lambda rm: ('1', not ROOM(rm)))
+    mg = exposed(a['x'], a['y'], s_['b'] / 2, s_['h'] / 2, z0, z1, lambda rm, za, wt: ('1', not ROOM(rm)))
     if not mg: continue
     ssum += sum(fa(fc) for fc in mg)
     F.append({'id': 'SS-' + x['id'], 'kind': 'struct', 'spec': 'ฉาบปูนโครงสร้าง (เสาเอ็น) ทาสีน้ำอะคริลิก', 'member': x['id'], 'faces': mg, 'status': US,
