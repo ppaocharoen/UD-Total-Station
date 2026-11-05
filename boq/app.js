@@ -1126,10 +1126,15 @@ function buildScope() {
     $('#scope-label').textContent = !o ? '' : o.l ? (o.l.z === null ? 'หลังคาและโครงหลังคาเหล็ก' : `ชั้น ${o.l.name}: พื้น/คานที่ระดับ ${o.l.z >= 0 ? '+' : ''}${(+o.l.z).toFixed(2)} กับเสา/ผนังที่ตั้งจากระดับนี้`) : `แนวกริด ${o.g.name} (${o.g.axis === 'X' ? 'x' : 'y'} = ${o.g.coord}) ระยะ ±0.30 ม. มองตั้งฉาก`;
   });
 }
-function solidApply() {   // โหมดแสดงผล โปร่ง / ทึบ + เส้นขอบ (จำค่าไว้ในเครื่อง)
-  let on = false; try { on = localStorage.getItem('ud.solid') === '1'; } catch (e) {}
-  $$('#solid-seg [data-solid]').forEach(b => b.classList.toggle('on', (b.dataset.solid === '1') === on));
-  if (S.viewer) S.viewer.setSolid(on);
+function dispGet() {   // การแสดงผล 2 ปุ่มแยกกัน: ทึบ / เส้นขอบ (จำค่าไว้ในเครื่อง · ค่าตั้งต้น: โปร่ง + เส้นขอบ)
+  let solid = false, edge = true;
+  try { solid = localStorage.getItem('ud.solid') === '1'; const e = localStorage.getItem('ud.edge'); if (e !== null) edge = e === '1'; } catch (e) {}
+  return { solid, edge };
+}
+function solidApply() {
+  const d = dispGet();
+  $$('#solid-seg [data-disp]').forEach(b => b.classList.toggle('on', !!d[b.dataset.disp]));
+  if (S.viewer) { S.viewer.edgeOn = d.edge; S.viewer.setSolid(d.solid); }
 }
 function applyPreset(name) {
   const v = S.viewer; if (!v) return;
@@ -1644,7 +1649,8 @@ function bind() {
   $('#tl-play').onclick = tlPlay;
   $('#tl-speed').onchange = () => { if (TL.timer) { tlStop(); tlPlay(); } };
   $('#tl-rebar').onchange = () => { if (TL.day !== null && TL.day !== undefined) tlSet(TL.day); };
-  $$('#solid-seg [data-solid]').forEach(b => b.onclick = () => { try { localStorage.setItem('ud.solid', b.dataset.solid); } catch (e) {} solidApply(); });
+  $$('#solid-seg [data-disp]').forEach(b => b.onclick = () => { const d = dispGet(), k = b.dataset.disp;
+    try { localStorage.setItem(k === 'solid' ? 'ud.solid' : 'ud.edge', d[k] ? '0' : '1'); } catch (e) {} solidApply(); });
   $('#b-tcol').onclick = () => { S.tcolOn = !S.tcolOn; if (S.viewer && S.types) S.viewer.setTypeColors(S.tcolOn ? S.types.col : null); $('#b-tcol').classList.toggle('primary', S.tcolOn); $('#b-tcol').textContent = S.tcolOn ? 'กลับเป็นสีวัสดุ' : 'ระบายสีตามชนิด'; };
   $('#clash-bt').onchange = e => { S.boq.clash_bt = e.target.value; autosave(); renderClash(); };
   $('#clash-info').onchange = renderClash; $('#clash-ack').onchange = renderClash;
