@@ -43,6 +43,9 @@ VENEER = {'W-B1': (1.20, 2.30), 'W-B6': (0.00, 1.20)}   # ป้าย 4 ด้�
 
 # ---------------------------------------------------------------- ผิวผนังรายด้าน (ผนังก่ออิฐ)
 area = collections.defaultdict(lambda: {'int': 0.0, 'ext': 0.0})
+for wid in ('W-D0L', 'W-D0R'):   # Earth 5 พ.ย.: รูปตัด A.4.01 ด้านในห้องคนพิการเป็นป้าย 2 (แปลนเขียน 1|1)
+    w = WL[wid]; w['mark'] = '2|1'; w['status'] = US
+    w['note'] = w.get('note', '') + ' · ป้ายผนังแก้เป็น 2|1: ด้านในห้องน้ำคนพิการกระเบื้องตามรูปตัด A.4.01 (Earth 5 พ.ย. · แปลน A.2.01 เขียน 1|1 — **มาร์ก**)'
 SUM = collections.defaultdict(float); WT = []; k = 0; bad = []
 for w in m['walls']:
     if w['kind'] != 'brick_mon': continue
@@ -104,8 +107,7 @@ def cover(x, y, z0, z1):   # ผนังทุกชนิดที่ทับ
         if -1e-6 <= u <= L + 1e-6 and d <= w['t'] / 2 + 1e-6 and w['top'] > z0 and w['bottom'] < z1: out.append((w['bottom'], w['top']))
     return out
 CS = []; csum = collections.defaultdict(float)
-for (cx, cy), c in sorted(COL.items()):
-    z0, z1, cid, s = c; hb, hh = s['b'] / 2, s['h'] / 2
+def exposed(cx, cy, hb, hh, z0, z1, tagf):   # ผิวที่โผล่ของชิ้นตั้ง (เสา/เสาเอ็น) ทีละหน้า → faces
     faces = []
     for (nx, ny) in ((1, 0), (-1, 0), (0, 1), (0, -1)):
         if nx: p0, p1 = (cx + nx * hb, cy - hh), (cx + nx * hb, cy + hh)
@@ -123,32 +125,117 @@ for (cx, cy), c in sorted(COL.items()):
                 j = i
                 while j < n and free[j]: j += 1
                 q0 = (p0[0] + (p1[0] - p0[0]) * i / n, p0[1] + (p1[1] - p0[1]) * i / n); q1 = (p0[0] + (p1[0] - p0[0]) * j / n, p0[1] + (p1[1] - p0[1]) * j / n)
-                mx, my = (q0[0] + q1[0]) / 2 + nx * 0.06, (q0[1] + q1[1]) / 2 + ny * 0.06; rm = space(mx, my); isin = ROOM(rm)
+                mx, my = (q0[0] + q1[0]) / 2 + nx * 0.06, (q0[1] + q1[1]) / 2 + ny * 0.06; rm = space(mx, my)
                 if za < FZ.get(rm, z0) - 1e-6: i = j; continue   # ต่ำกว่าผิวพื้นของพื้นที่นั้น = จมในพื้น
-                tg = '2' if isin else '1'
-                faces.append({'p': [[round(q0[0], 3), round(q0[1], 3)], [round(q1[0], 3), round(q1[1], 3)]], 'n': [nx, ny], 'z': [round(za, 3), round(zb, 3)], 'tag': tg, 'ext': not isin,
-                              'spec': SPEC['2'] if isin else None, 'room': rm})
-                csum[(tg, 'int' if isin else 'ext')] += math.dist(q0, q1) * (zb - za)
+                tg, ext = tagf(rm)
+                faces.append({'p': [[round(q0[0], 3), round(q0[1], 3)], [round(q1[0], 3), round(q1[1], 3)]], 'n': [nx, ny], 'z': [round(za, 3), round(zb, 3)], 'tag': tg, 'ext': ext,
+                              'spec': SPEC[tg] if tg != '1' else None, 'room': rm})
                 i = j
-    # รวมแถบต่อเนื่องแนวตั้ง (หน้าเดียวกัน ความกว้างเดียวกัน ผิวเดียวกัน)
-    faces.sort(key=lambda f: (f['n'], f['p'], f['z'][0])); mg = []
+    faces.sort(key=lambda f: (f['n'], f['p'], f['z'][0])); mg = []   # รวมแถบต่อเนื่องแนวตั้ง (หน้าเดียวกัน ความกว้างเดียวกัน ผิวเดียวกัน)
     for f in faces:
         if mg and mg[-1]['n'] == f['n'] and mg[-1]['p'] == f['p'] and mg[-1]['tag'] == f['tag'] and abs(mg[-1]['z'][1] - f['z'][0]) < 1e-6: mg[-1]['z'][1] = f['z'][1]
         else: mg.append(f)
     for f in mg:
         if not f['spec']: f.pop('spec')
+    return mg
+fa = lambda fc: math.dist(*fc['p']) * (fc['z'][1] - fc['z'][0])
+for (cx, cy), c in sorted(COL.items()):
+    z0, z1, cid, s = c
+    mg = exposed(cx, cy, s['b'] / 2, s['h'] / 2, z0, z1, lambda rm: ('2', False) if ROOM(rm) else ('1', True))
+    for fc in mg: csum[(fc['tag'], 'ext' if fc['ext'] else 'int')] += fa(fc)
     F.append({'id': 'CS-' + cid[2:], 'kind': 'struct', 'spec': 'ฉาบปูนโครงสร้าง (เสา) ทาสีน้ำอะคริลิก', 'member': cid, 'faces': mg, 'status': FD,
               'src': 'A.2.01 ป้ายวัสดุผนัง + หลักเกณฑ์ 2569 (ฉาบโครงสร้างแยกจากฉาบผนัง)', 'level': '1F',
-              'note': f'เสา {cid} +{z0:.2f}…+{z1:.2f} ผิวที่โผล่พ้นผนัง {len(mg)} แถบ · ด้านในห้องน้ำบุกระเบื้องตามผนัง (ไม่ฉาบ) · ด้านนอก ฉาบโครงสร้าง + ทาสีภายนอก (Earth 5 พ.ย.)'})
+              'note': f'เสา {cid} +{z0:.2f}…+{z1:.2f} ผิวที่โผล่พ้นผนัง {len(mg)} แถบ · ด้านในห้องน้ำบุกระเบื้องเต็มถึงหัวเสา (A.4.03 · Earth 5 พ.ย.) · ด้านนอก ฉาบโครงสร้าง + ทาสีภายนอก'})
     CS.append(cid)
+
+# ---------------------------------------------------------------- เสาเอ็นที่โผล่ทั้งต้น (หน้าห้องส้วม ไม่มีผนังก่อ) — ฉาบ + ทาสี (Earth 5 พ.ย.: ราคาเสาเอ็นต่อเมตรยังไม่รวมฉาบ)
+def in_brick(x, y):
+    for w in m['walls']:
+        if w['kind'] != 'brick_mon': continue
+        (ax, ay), (bx, by) = w['path'][0], w['path'][-1]; L = math.hypot(bx - ax, by - ay); ux, uy = (bx - ax) / L, (by - ay) / L
+        u = (x - ax) * ux + (y - ay) * uy; d = abs(-(x - ax) * uy + (y - ay) * ux)
+        if -0.06 <= u <= L + 0.06 and d <= w['t'] / 2 + 1e-6: return True
+    return False
+STF = []; ssum = 0.0
+for x in m['members']:
+    if x['type'] != 'stiffener': continue
+    a, b = N[x['i']], N[x['j']]
+    if in_brick(a['x'], a['y']): continue
+    s_ = SEC[x['section']]; z0, z1 = min(a['z'], b['z']), max(a['z'], b['z'])
+    mg = exposed(a['x'], a['y'], s_['b'] / 2, s_['h'] / 2, z0, z1, lambda rm: ('1', not ROOM(rm)))
+    if not mg: continue
+    ssum += sum(fa(fc) for fc in mg)
+    F.append({'id': 'SS-' + x['id'], 'kind': 'struct', 'spec': 'ฉาบปูนโครงสร้าง (เสาเอ็น) ทาสีน้ำอะคริลิก', 'member': x['id'], 'faces': mg, 'status': US,
+              'src': 'A.2.01 + Earth 5 พ.ย.', 'level': '1F', 'room': space(a['x'], a['y'] - 0.1),
+              'note': f'เสาเอ็น {x["id"]} ห่างกริด 1 {a["x"]:.2f} ห่าง A {a["y"]:.2f} ไม่มีผนังก่อ (ข้างวงกบประตูห้องส้วม) · ฉาบ + ทาสีภายใน (Earth 5 พ.ย.)'})
+    STF.append(x['id'])
+
+# ---------------------------------------------------------------- คานคอดินที่โผล่รอบนอก (ผิวทางเดิน/ทางลาด ถึงท้องผนังหรือผิวพื้นใน) — ฉาบโครงสร้าง + ทาสีภายนอก (Earth 5 พ.ย.)
+SLB = [(sl['polygon'], sl['top'], sl) for sl in m['slabs']]
+def slab_top(x, y):
+    for P, t, sl in SLB:
+        if pip(P, x, y):
+            r = sl.get('ramp')
+            if r: xs = [p[0] for p in P]; return r['low'] + (r['high'] - r['low']) * (x - min(xs)) / (max(xs) - min(xs))
+            return t
+    return 0.0   # นอกพื้น = ดินเดิม ±0.00
+def wall_at(x, y):
+    for w in m['walls']:
+        if w['kind'] in ('brick_mon', 'block'):
+            (ax, ay), (bx, by) = w['path'][0], w['path'][-1]; L = math.hypot(bx - ax, by - ay); ux, uy = (bx - ax) / L, (by - ay) / L
+            u = (x - ax) * ux + (y - ay) * uy; d = abs(-(x - ax) * uy + (y - ay) * ux)
+            if -1e-6 <= u <= L + 1e-6 and d <= w['t'] / 2 + 0.02: return w
+    return None
+TB = [x for x in m['members'] if x['type'] == 'tie_beam']
+def beam_at(x, y):
+    for b in TB:
+        p, q = N[b['i']], N[b['j']]
+        if abs(p['x'] - q['x']) < 1e-6 and abs(x - p['x']) < 0.11 and min(p['y'], q['y']) - 0.11 <= y <= max(p['y'], q['y']) + 0.11: return b['id']
+        if abs(p['y'] - q['y']) < 1e-6 and abs(y - p['y']) < 0.11 and min(p['x'], q['x']) - 0.11 <= x <= max(p['x'], q['x']) + 0.11: return b['id']
+    return None
+LINES = [((-0.10, -0.10), (10.90, -0.10), (0, -1), 'แนว A'), ((-0.10, 5.90), (10.90, 5.90), (0, 1), 'แนว C'),
+         ((-0.10, -0.10), (-0.10, 5.90), (-1, 0), 'กริด 1'), ((10.90, -0.10), (10.90, 5.90), (1, 0), 'กริด 4')]
+TBF = collections.defaultdict(list); tsum = 0.0; ds = 0.05
+for (x0, y0), (x1, y1), (nx, ny), nm in LINES:
+    L = math.hypot(x1 - x0, y1 - y0); ux, uy = (x1 - x0) / L, (y1 - y0) / L; run = None
+    for i in range(int(round(L / ds))):
+        u0, u1 = i * ds, (i + 1) * ds; px, py = x0 + ux * (u0 + u1) / 2, y0 + uy * (u0 + u1) / 2
+        zo = slab_top(px + nx * 0.06, py + ny * 0.06)   # ผิวภายนอก (ทางเดิน/ทางลาด/ดิน)
+        ix, iy = px - nx * 0.12, py - ny * 0.12
+        w = wall_at(px - nx * 0.05, py - ny * 0.05)
+        col = any(abs(px - cx) <= 0.1 + 1e-6 and abs(py - cy) <= 0.1 + 1e-6 for (cx, cy) in COL)
+        zt = 0.20 if (w or col) else slab_top(ix, iy)   # ท้องผนัง/โคนเสา +0.20 · ช่วงเปิดโล่ง = ผิวพื้นใน (ขอบพื้นโผล่ด้วย)
+        zo = round(zo, 3); zt = round(zt, 3); bid = beam_at(px - nx * 0.1, py - ny * 0.1) or nm
+        if zt - zo < 0.005: run = None; continue
+        key = (bid, zo, zt)
+        if run and run['key'] == key and abs(run['u1'] - u0) < 1e-6: run['u1'] = u1
+        else:
+            run = {'key': key, 'u0': u0, 'u1': u1}; TBF[bid].append(run)
+        run['geo'] = (x0, y0, ux, uy, nx, ny)
+for bid, runs in sorted(TBF.items()):
+    faces = []
+    for r in runs:
+        x0, y0, ux, uy, nx, ny = r['geo']; (_, zo, zt) = r['key']
+        faces.append({'p': [[round(x0 + ux * r['u0'], 3), round(y0 + uy * r['u0'], 3)], [round(x0 + ux * r['u1'], 3), round(y0 + uy * r['u1'], 3)]], 'n': [nx, ny], 'z': [zo, zt], 'tag': '1', 'ext': True})
+    a_ = sum(fa(fc) for fc in faces); tsum += a_
+    F.append({'id': 'TS-' + bid, 'kind': 'struct', 'spec': 'ฉาบปูนโครงสร้าง (คานคอดิน) ทาสีน้ำอะคริลิก', 'member': bid, 'faces': faces, 'status': US, 'src': 'รูปตัด A.4.x + Earth 5 พ.ย.', 'level': '1F',
+              'note': f'หน้านอกคานคอดิน {bid} ที่โผล่เหนือผิวทางเดิน/ทางลาด/ดิน ถึงท้องผนัง +0.20 (ช่วงไม่มีผนังถึงผิวพื้นใน — รวมขอบพื้น) {a_:.2f} ตร.ม. · ฉาบโครงสร้าง + ทาสีภายนอก (Earth 5 พ.ย.)'})
 
 # ---------------------------------------------------------------- คันทางลาด ผิวทรายล้าง (6) · ระแนง (7) · แผงเหล็กกล่องเฉียง · บล็อกช่องลม (3)
 for wid in ('K-R', 'K-P1', 'K-P2'):
     w = WL[wid]; L = math.dist(w['path'][0], w['path'][1])
     for sd in ('L', 'R'):
-        F.append({'id': f'WF-{wid}-{sd}', 'kind': 'wall', 'spec': SPEC['6'] + ' คันทางลาด', 'status': AS, 'src': 'A.2.01 ป้าย 6 + A.5.01', 'wall': wid, 'side': sd, 'u': [0, round(L, 3)],
+        F.append({'id': f'WF-{wid}-{sd}', 'kind': 'wall', 'spec': SPEC['6'] + ' คันและกล่องทางลาด', 'status': FD, 'src': 'A.2.01 ป้าย 6 + A.5.01', 'wall': wid, 'side': sd, 'u': [0, round(L, 3)],
                   'tag': '6', 'height': 0.10, 'qty': round(L * 0.15, 3), 'unit': 'ตร.ม.', 'room': 'ทางลาด',
-                  'note': 'คันกว้าง 0.10 สูง 0.10: ข้าง 0.10 + ครึ่งหลังคัน 0.05 ต่อด้าน (รวม 0.30 ตร.ม./ม.) · **ถาม:** หน้านอกกล่องทางลาดใต้คันลงถึงดิน ทำทรายล้างด้วยไหม'})
+                  'note': 'คันกว้าง 0.10 สูง 0.10: ข้าง 0.10 + ครึ่งหลังคัน 0.05 ต่อด้าน (รวม 0.30 ตร.ม./ม.)'})
+# หน้านอกกล่องทางลาดใต้คัน ลงถึงดิน/ทางเดิน — ทรายล้าง (Earth 5 พ.ย.)
+RS = []
+for x0, x1 in [(round(3.0 + 0.1 * k, 2), round(3.1 + 0.1 * k, 2)) for k in range(24)] + [(5.4, 6.6)]:   # ช่วงลาดแบ่งท่อน 0.10 (ภาพ 3D เรียบ · พื้นที่ = สี่เหลี่ยมคางหมูพอดี)
+    zt = (slab_top(x0 + 1e-3, -0.6) + slab_top(x1 - 1e-3, -0.6)) / 2
+    RS.append({'p': [[x0, -1.10], [x1, -1.10]], 'n': [0, -1], 'z': [0.0, round(zt, 3)], 'tag': '6', 'ext': True, 'spec': SPEC['6'] + ' คันและกล่องทางลาด'})
+RS.append({'p': [[6.60, -1.10], [6.60, -0.10]], 'n': [1, 0], 'z': [0.05, 0.25], 'tag': '6', 'ext': True, 'spec': SPEC['6'] + ' คันและกล่องทางลาด'})
+F.append({'id': 'RS-RAMP', 'kind': 'struct', 'spec': SPEC['6'] + ' คันและกล่องทางลาด', 'member': 'S-RAMP', 'faces': RS, 'status': US, 'src': 'A.5.01 + Earth 5 พ.ย.', 'level': '1F', 'room': 'ทางลาด',
+          'note': f'หน้านอกกล่องทางลาด (นอกแนว A กริด 2–3) จากดิน ±0.00 ถึงผิวทางลาด/ชานพัก ยาว 3.60 · ปลายชานพัก (ด้านทางเดิน S-WK-S2) จาก +0.05 ถึง +0.25 · รวม {sum(fa(f) for f in RS):.2f} ตร.ม. (Earth 5 พ.ย.)'})
 SL = {'SL-B3': 'เหนือผนังหลังเคาน์เตอร์ฝั่งชาย', 'SL-B4': 'เหนือผนังหลังเคาน์เตอร์ฝั่งหญิง', 'SL-D0': 'เหนือผนังหน้าห้องน้ำคนพิการ', 'SL-D1': 'ข้างช่องหน้าห้องน้ำคนพิการ (กริด 2)', 'SL-D2': 'ข้างช่องหน้าห้องน้ำคนพิการ (กริด 3)'}
 for wid, where in SL.items():
     w = WL[wid]; L = math.dist(w['path'][0], w['path'][1]); H = w['top'] - w['bottom']
@@ -184,7 +271,10 @@ row('ผนัง', 'WF-… กระเบื้อง (2)', f'กรุกร�
 row('ผนัง', 'WF-B1-R-4 / WF-B6-R-4', f'แผ่นอิฐแดงโชว์ลาย ด้านนอกผนังซุ้มทางเข้า {S("4", "ext"):.2f} ตร.ม. ไม่ฉาบ', 'A.2.01, A.3.01', FD, 'ไม่ฉาบเหมือนกระเบื้อง (Earth 5 พ.ย.)')
 cs1 = csum[('1', 'ext')]; cs2 = csum[('2', 'int')]
 row('เสา', f'CS-… ({len(COL)} ต้น)', f'ผิวเสา คสล. ที่โผล่พ้นผนัง: ฉาบโครงสร้าง + ทาสีภายนอก {cs1:.2f} ตร.ม. · บุกระเบื้องในห้องน้ำ {cs2:.2f} ตร.ม.', 'A.2.01 + หลักเกณฑ์ 2569', FD, 'ฉาบเสาแยก (Earth 5 พ.ย.)')
-row('ผนัง', 'WF-K-…', 'คันทางลาด ผิวทรายล้าง (6) ข้าง 2 ด้าน + หลังคัน 0.30 ตร.ม./ม. รวม ' + f'{sum(f["qty"] for f in F if f["id"].startswith("WF-K-")):.2f} ตร.ม.', 'A.2.01, A.5.01', AS, 'ถาม: หน้านอกกล่องทางลาด')
+row('ผนัง', 'WF-K-… / RS-RAMP', 'ผิวทรายล้าง (6): คันทางลาด (ข้าง 2 ด้าน + หลังคัน) ' + f'{sum(f["qty"] for f in F if f["id"].startswith("WF-K-")):.2f} + หน้านอกกล่องทางลาด {sum(fa(f) for f in RS):.2f} ตร.ม.', 'A.2.01, A.5.01', US, 'หน้านอกกล่องลงถึงดิน (Earth 5 พ.ย.)')
+row('เสาเอ็น', f'SS-… ({len(STF)} ต้น)', f'เสาเอ็นหน้าห้องส้วมที่ไม่มีผนังก่อ: ฉาบโครงสร้าง + ทาสีภายใน {ssum:.2f} ตร.ม.', 'A.2.01', US, 'ราคาเสาเอ็นต่อเมตรยังไม่รวมฉาบ (Earth 5 พ.ย.)')
+row('คาน', f'TS-… ({len(TBF)} ช่วง)', f'หน้านอกคานคอดินที่โผล่รอบอาคาร: ฉาบโครงสร้าง + ทาสีภายนอก {tsum:.2f} ตร.ม.', 'รูปตัด A.4.x', US, 'Earth 5 พ.ย.')
+row('ผนัง', 'W-D0L / W-D0R', 'เสาอิฐข้างช่องหน้าห้องน้ำคนพิการ ป้ายแก้เป็น 2|1: ด้านในห้องกระเบื้อง', 'A.4.01', US, '**มาร์ก:** แปลน A.2.01 เขียน 1|1 · รูปตัด A.4.01 เป็น 2 (Earth 5 พ.ย.)')
 row('ผนัง', 'RL-B3 / B4 / D0 / D1 / D2', f'ระแนงเหล็กกล่อง 25x25 @0.05 ทาสีน้ำมัน {sum(f["qty"] for f in F if f["id"].startswith("RL-") and f["id"] != "RL-A2"):.2f} ตร.ม. (3D เป็นซี่)', 'A.2.01')
 row('ผนัง', 'RL-A2', 'แผงเหล็กกล่อง 75x38 @0.10 เฉียง 45° ทาสีน้ำมัน 4.43 ตร.ม. (3D เป็นซี่เฉียง)', 'A.2.01, A.3.01')
 row('ประตู', 'DR1 / DR2 / GB / VB', 'ลาย 3D: DR1 บานเปิด UPVC วงกบ + มือจับก้านโยกสองด้าน · DR2 บานเลื่อนรางแขวน กระจกฝ้า + มือจับ · บล็อกแก้ว / บล็อกช่องลมเป็นตาราง', 'A.7.01')

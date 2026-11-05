@@ -22,6 +22,7 @@ for sid, fm in FL:
          'z': s['top'], 'level': s.get('level', '1F'), 'room': room, 'note': f'{fm} · ขอบถึงศูนย์ผนังตามผืนพื้นโครงสร้าง {sid}'}
     if s.get('ramp'):
         L = 2.40; f['qty'] = round(area(s['polygon']) * math.hypot(1, 0.20 / L), 3); f['unit'] = 'ตร.ม.'; f['note'] += ' · พื้นที่ตามแนวลาด 1:12'
+        f['ramp'] = dict(s['ramp']); f['note'] += ' · ผิวเอียงตามพื้นทางลาด (Earth 5 พ.ย.)'
     F.append(f); tot[fm] = tot.get(fm, 0) + (f.get('qty') or area(s['polygon']))
 for fm in ('F2', 'F3', 'F1'):
     row('พื้น', f'FF-… ({fm})', f'{SPEC[fm]} รวม {tot[fm]:.2f} ตร.ม.', 'A.2.01')
