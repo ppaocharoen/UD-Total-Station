@@ -1,0 +1,19 @@
+const {chromium}=require('/opt/npm-tools/node_modules/playwright');
+const http=require('http'),fs=require('fs'),path=require('path');
+const srv=http.createServer((q,res)=>{let f=path.join('/home/claude',decodeURIComponent(q.url.split('?')[0]));fs.readFile(f,(e,d)=>{if(e){res.writeHead(404);res.end();return;}const ct=f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':f.endsWith('.json')?'application/json':'text/html; charset=utf-8';res.writeHead(200,{'Content-Type':ct});res.end(d);});}).listen(8871);
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=swiftshader','--enable-webgl','--ignore-gpu-blocklist']});
+ const p=await b.newPage({viewport:{width:1400,height:900}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('http://localhost:8871/UD-Total-Station/boq/index.html?pricing=/udmaterial-price/lib/pricing-v1.js');
+ await p.waitForFunction(()=>S.db&&S.db.wages.length>1000,null,{timeout:120000});
+ await p.evaluate(async()=>{const j=await (await fetch('/th12_test.bm.json')).text(); loadModel(j,'th12_test.bm.json');});
+ await p.waitForTimeout(1500);
+ await p.evaluate(()=>{const x=$$('#tabs .nav-tab').find(x=>x.dataset.tab==='model'); if(x) x.click();}); await p.waitForTimeout(2500);
+ const cam=(t,e)=>`(()=>{const v=S.viewer; v.controls.target.set(${t[0]},${t[2]},${-t[1]}); v.camera.position.set(${e[0]},${e[2]},${-e[1]}); v.controls.update();})()`;
+ await p.evaluate(()=>{tlDone&&tlDone(); applyPreset('all'); S.viewer.setMarkers([]); S.viewer.setSection(null); S.viewer.scene.fog=null; $('#stage').classList.add('collapsed'); $('#hud').style.display='none'; const tl=document.querySelector('#tl-panel,.tl-panel,#timeline'); if(tl) tl.style.display='none'; const ps=document.querySelector('.side,#side,#panel'); });
+ console.log(JSON.stringify(await p.evaluate(()=>{const c=(S.clashes||S.clash||[]); return Array.isArray(c)?c.slice(0,20):Object.keys(c);})));
+ const out=process.argv[2]||'.';
+ const V=[['3d_โถงทางเข้า',[5.35,1.2,1.5],[5.35,-4.2,2.0]],['3d_เคาน์เตอร์นอก_หญิง',[7.4,1.2,1.3],[7.0,-1.0,1.7]],['3d_เคาน์เตอร์ใน_หญิง',[7.8,1.5,1.3],[7.4,3.8,1.9]],['3d_ห้องคนพิการ',[5.3,2.4,1.0],[6.2,1.15,2.2]],['3d_ห้องคนพิการ_ซ้าย',[4.4,2.0,1.0],[6.3,2.6,1.6]]];
+ const shot=async(tag)=>{for(const [n,t,e] of V){await p.evaluate(cam(t,e)); await p.waitForTimeout(800); await p.screenshot({path:`${out}/${n}.png`});}};
+ await p.evaluate(()=>{S.viewer.edgeOn=true; S.viewer.setSolid(true);}); await shot('ทึบ');
+
+ console.log(errs); await b.close(); srv.close();})();
