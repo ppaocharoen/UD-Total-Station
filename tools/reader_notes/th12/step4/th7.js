@@ -1,0 +1,20 @@
+const {chromium}=require('/opt/npm-tools/node_modules/playwright');
+const http=require('http'),fs=require('fs'),path=require('path');
+const srv=http.createServer((q,res)=>{let f=path.join('/home/claude',decodeURIComponent(q.url.split('?')[0]));fs.readFile(f,(e,d)=>{if(e){res.writeHead(404);res.end();return;}const ct=f.endsWith('.js')?'text/javascript':f.endsWith('.css')?'text/css':f.endsWith('.json')?'application/json':'text/html; charset=utf-8';res.writeHead(200,{'Content-Type':ct});res.end(d);});}).listen(8863);
+(async()=>{const b=await chromium.launch({executablePath:'/opt/pw-browsers/chromium-1194/chrome-linux/chrome',args:['--use-gl=swiftshader','--enable-webgl','--ignore-gpu-blocklist']});
+ const p=await b.newPage({viewport:{width:1400,height:900}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('http://localhost:8863/UD-Total-Station/boq/index.html?pricing=/udmaterial-price/lib/pricing-v1.js');
+ await p.waitForFunction(()=>S.db&&S.db.wages.length>1000,null,{timeout:120000});
+ await p.evaluate(async()=>{const j=await (await fetch('/th12_test.bm.json')).text(); loadModel(j,'th12_test.bm.json');});
+ await p.waitForTimeout(1500);
+ await p.evaluate(()=>{const x=$$('#tabs .nav-tab').find(x=>x.dataset.tab==='model'); if(x) x.click();}); await p.waitForTimeout(2500);
+ const cam=(t,e)=>`(()=>{const v=S.viewer; v.controls.target.set(${t[0]},${t[2]},${-t[1]}); v.camera.position.set(${e[0]},${e[2]},${-e[1]}); v.controls.update();})()`;
+ await p.evaluate(()=>{tlDone&&tlDone(); applyPreset('all'); S.viewer.setMarkers([]); S.viewer.setSection(null); S.viewer.scene.fog=null; $('#stage').classList.add('collapsed'); $('#hud').style.display='none'; const tl=document.querySelector('#tl-panel,.tl-panel,#timeline'); if(tl) tl.style.display='none'; const ps=document.querySelector('.side,#side,#panel'); });
+ console.log(JSON.stringify(await p.evaluate(()=>{const c=(S.clashes||S.clash||[]); return Array.isArray(c)?c.slice(0,20):Object.keys(c);})));
+ const out=process.argv[2]||'.';
+ await p.evaluate(()=>S.viewer.setSolid(true));
+ const V=[['s_front',[5.4,0,1.8],[5.4,-14,3.2]],['s_iso',[5.4,2.9,1.6],[-6,-9,8]],['s_rear',[5.4,5.8,1.8],[13,17,5]],['s_door',[3.2,4.15,1.2],[3.2,2.2,1.6]],['s_eave',[0,-1.1,3.8],[-3.0,-3.6,4.6]],['s_dr2',[5.4,0.95,1.3],[5.4,-1.2,1.6]],['s_wash',[3.0,1.45,1.6],[3.0,-0.4,1.9]]];
+ for(const [n,t,e] of V){await p.evaluate(cam(t,e)); await p.waitForTimeout(900); await p.screenshot({path:`${out}/${n}.png`});}
+ await p.evaluate(()=>{S.viewer.setVisible('หลังคา',false); S.viewer.setVisible('ฝ้า',false); S.viewer.setSection({axis:'Z',c:2.2});}); await p.evaluate(cam([5.4,2.9,0],[2,-6,9])); await p.waitForTimeout(900); await p.screenshot({path:`${out}/s_cut.png`});
+ await p.evaluate(()=>S.viewer.setVisible('งานผิว',false)); await p.waitForTimeout(500); await p.screenshot({path:`${out}/s_cut_nofin.png`});
+ console.log(errs); await b.close(); srv.close();})();

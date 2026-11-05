@@ -1420,8 +1420,10 @@ function elemSpec(id) {
     title = PT_TH[t.kind] || 'จุดไฟฟ้า'; mark = e.type; lines.push(t.desc || '', `ระดับ ${lvlOf(e.xyz[2])}`, `วงจร ${e.circuit || '-'}${cc.desc ? ' · ' + cc.desc : ''}`, e.switch ? `เปิดปิดด้วย ${e.switch}` : '');
     if (t.kind === 'switch') { const ls = (el.points || []).filter(q => q.switch === e.id).map(q => q.id); lines.push(ls.length ? 'คุมโคม: ' + ls.join(', ') : 'ไม่มีโคม (สำรอง)'); } }
   else if (set === 'panels') { title = 'ตู้ไฟฟ้า'; lines.push(`${e.ways || ''} ช่อง · เมน ${e.main || '-'}`, `ระดับ ${lvlOf(e.xyz[2])}`); }
-  else if (set === 'finishes') { title = { counter: 'เคาน์เตอร์', ceiling: 'ฝ้า', floor: 'ผิวพื้น', wall: 'ผิวผนัง', other: 'งานผิว/อุปกรณ์' }[e.kind] || 'งานผิว';
-    lines.push(e.spec || '', e.qty ? `${f2(e.qty)} ${e.unit || ''}` : ''); }
+  else if (set === 'finishes') { title = { counter: 'เคาน์เตอร์', ceiling: 'ฝ้า', floor: 'ผิวพื้น', wall: 'ผิวผนัง', other: 'งานผิว/อุปกรณ์', struct: 'ผิวเสา/คาน' }[e.kind] || 'งานผิว';
+    if (e.kind === 'struct') { const fa = (e.faces || []).map(f => Math.hypot(f.p[1][0] - f.p[0][0], f.p[1][1] - f.p[0][1]) * (f.z[1] - f.z[0]));
+      lines.push(e.spec || '', `${e.member || ''} · ผิวโผล่ ${(e.faces || []).length} แถบ รวม ${f2(fa.reduce((a, b) => a + b, 0))} ตร.ม.`); }
+    else lines.push(e.spec || '', e.qty ? `${f2(e.qty)} ${e.unit || ''}${e.counted_by === 'wall' ? ' (คิดที่ผนัง: ฉาบ + ทาสี)' : ''}` : ''); }
   else title = set;
   const rb = design && design.rebar; if (rb) lines.push(rebarTxt(rb));
   return { set, e, title, mark, lines: lines.filter(Boolean), note: e.note, src: e.src, status: e.status };

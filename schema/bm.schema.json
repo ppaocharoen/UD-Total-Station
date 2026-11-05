@@ -1666,7 +1666,8 @@
             "skirting",
             "counter",
             "railing",
-            "other"
+            "other",
+            "struct"
           ]
         },
         "spec": {
@@ -1716,6 +1717,57 @@
             "$ref": "#/$defs/polygon"
           },
           "description": "งานพื้น: ช่องที่ไม่ปู (เช่น รางน้ำที่คิดแยก) — หักออกจากพื้นที่"
+        },
+        "counted_by": {
+          "enum": [
+            "wall"
+          ],
+          "description": "ผิวรายด้านที่ไว้แสดง 3D เท่านั้น — ปริมาณฉาบ/ทาสีคิดจาก plaster_area / paint_area ของผนังแล้ว ถอดปริมาณข้าม"
+        },
+        "faces": {
+          "type": "array",
+          "description": "kind struct: ผิวโครงสร้างที่โผล่ (เสา คาน) ทีละหน้า — p = ขอบล่างสองจุดในแปลน, n = ทิศหันออก, z = [ล่าง, บน], tag = ป้ายผิว (1 ฉาบทาสี · อื่น ๆ บุผิวตาม spec ไม่ฉาบ), ext = ภายนอก",
+          "items": {
+            "type": "object",
+            "required": [
+              "p",
+              "z"
+            ],
+            "properties": {
+              "p": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/xy"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "n": {
+                "$ref": "#/$defs/xy"
+              },
+              "z": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "tag": {
+                "type": "string"
+              },
+              "ext": {
+                "type": "boolean"
+              },
+              "spec": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "member": {
+          "$ref": "#/$defs/id",
+          "description": "kind struct: ชิ้นโครงสร้างที่ผิวนี้หุ้ม"
         }
       }
     },

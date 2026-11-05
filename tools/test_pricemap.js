@@ -15,6 +15,7 @@ chk(W('fx_WC') === 'ARC-2.6.1' && W('fx_LAV') === 'ARC-2.6.6' && W('fx_FD') === 
 chk(W('cover_metal_sheet') === 'ARC-2.1.8-a' && W('ridge_cap') === 'ARC-2.1.8-c', 'เมทัลชีท 2.1.8-a ครอบสัน 2.1.8-c');
 chk(W('lintel') === 'ARC-2.3.1-w' && by.lintel.code === '4.1', 'เสาเอ็นทับหลัง ครึ่งแผ่น ARC-2.3.1-w + comp 4.1');
 chk(W('plaster_int_brick') === 'ARC-2.3.1.2-c' && W('plaster_ext_brick') === 'ARC-2.3.1.2-d', 'ฉาบใน 2.3.1.2-c ฉาบนอก 2.3.1.2-d');
+chk(PM.RULES.plaster({ t: 'plaster', side: 'ext', struct: true }).wage_code === 'ARC-2.3.1.2-b' && PM.RULES.plaster({ t: 'plaster', side: 'int', struct: true }).wage_code === 'ARC-2.3.1.2-a', 'ฉาบโครงสร้าง (เสา คาน) ใน 2.3.1.2-a นอก 2.3.1.2-b');
 const fl = Object.keys(by).find(k => k.startsWith('fin_floor_'));
 chk(by[fl].code === '9.41' && W(fl) === 'ARC-2.4.8-c', 'แกรนิตโต้ 60×60 → comp 9.41 (ผิวด้าน) + ARC-2.4.8-c');
 const d1 = by.open_D1;

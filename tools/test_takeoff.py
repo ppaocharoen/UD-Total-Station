@@ -116,5 +116,18 @@ good = "rebar_RB12" in k4 and "rebar_DB12" in k4 and abs(k4["rebar_RB12"]["qty_n
 ok &= good
 print(("PASS" if good else "FAIL"), "RB12 แยกจาก DB12", {k: v["qty_net"] for k, v in k4.items() if k.startswith("rebar")})
 
+# ผิวผนังที่ไว้แสดง 3D (counted_by wall) ไม่ถอดซ้ำ · ผิวเสา (kind struct): ผิว 1 = ฉาบโครงสร้าง + ทาสี · ผิวอื่นบุตาม spec (ท12, 5 พ.ย. 2569)
+m5 = json.loads(json.dumps(m3))
+m5["finishes"] = [{"id": "WF-T", "kind": "wall", "spec": "ผนังฉาบปูนเรียบทาสีน้ำอะคริลิก ภายนอก", "wall": "RW-T", "side": "L", "qty": 9.0, "counted_by": "wall", "status": "from_drawing", "src": "test"},
+                  {"id": "CS-T", "kind": "struct", "spec": "ฉาบเสา", "member": "C-T", "status": "from_drawing", "src": "test",
+                   "faces": [{"p": [[0, 0], [0.2, 0]], "n": [0, -1], "z": [0.2, 3.2], "tag": "1", "ext": True},
+                             {"p": [[0, 0.2], [0.1, 0.2]], "n": [0, 1], "z": [0.2, 2.2], "tag": "2", "spec": "ผนังกรุกระเบื้องเซรามิค ผิวมัน"}]}]
+it5, _, _ = run(m5)
+k5 = {i["key"]: i for i in it5 if i["key"].startswith(("plaster", "paint", "fin_"))}
+good = ("fin_wall_ผนังฉาบปูนเรียบทาสีน้ำอะคริลิก ภายนอก" not in k5 and abs(k5["plaster_struct_ext"]["qty"] - 0.6) < 1e-6 and abs(k5["paint_ext"]["qty"] - 0.6) < 1e-6
+        and abs(k5["fin_wall_ผนังกรุกระเบื้องเซรามิค ผิวมัน"]["qty"] - 0.2) < 1e-6 and k5["plaster_struct_ext"]["spec"].get("struct"))
+ok &= good
+print(("PASS" if good else "FAIL"), "ผิวเสา struct + ผิวแสดงผลไม่ถอดซ้ำ", {k: v["qty"] for k, v in k5.items()})
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

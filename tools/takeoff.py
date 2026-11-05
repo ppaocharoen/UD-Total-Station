@@ -830,6 +830,24 @@ class Takeoff:
         code = {"floor": "1.2.5", "wall": "1.2.5", "skirting": "1.2.5", "counter": "1.2.5", "railing": "1.2.5",
                 "ceiling": "1.2.2", "other": "1.2.5"}
         for f in self.m.get("finishes", []):
+            if f.get("counted_by") == "wall":   # ผิวทาสีรายด้านไว้แสดง 3D — ปริมาณฉาบ/ทาสีคิดจาก plaster_area / paint_area ของผนังแล้ว
+                continue
+            if f["kind"] == "struct":   # ผิวโครงสร้างที่โผล่ (เสา คาน): ฉาบโครงสร้าง + ทาสี (ผิว 1) หรือบุผิวตาม spec (กระเบื้อง ฯลฯ ไม่ฉาบ)
+                for fc in f.get("faces", []):
+                    a = math.dist(fc["p"][0], fc["p"][1]) * (fc["z"][1] - fc["z"][0])
+                    if a < 1e-4:
+                        continue
+                    sd = "ext" if fc.get("ext") else "int"; nm = "ภายนอก" if sd == "ext" else "ภายใน"
+                    calc = f"กว้าง {math.dist(fc['p'][0], fc['p'][1]):.2f} × สูง {fc['z'][1] - fc['z'][0]:.2f}"
+                    if str(fc.get("tag", "1")) == "1":
+                        it = self.add("1.2.4", f"plaster_struct_{sd}", f"ฉาบปูนโครงสร้าง (เสา คาน) {nm}", "ตร.ม.", a, f["id"], task="plaster", calc=calc)
+                        it["spec"] = {"t": "plaster", "side": sd, "struct": True}
+                        self.add("1.2.7", f"paint_{sd}", f"ทาสีน้ำอะคริลิก{nm}", "ตร.ม.", a, f["id"], task="paint", calc=calc)
+                    else:
+                        sp = fc.get("spec") or f["spec"]
+                        it = self.add("1.2.5", f"fin_wall_{sp}", sp, "ตร.ม.", a, f["id"], task="finish", calc=calc)
+                        it["spec"] = {"t": "finish", "kind": "wall", "desc": sp}
+                continue
             if f.get("qty") is not None:
                 q, unit = f["qty"], f.get("unit", "")
             elif f.get("rects"):
