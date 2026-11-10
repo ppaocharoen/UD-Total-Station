@@ -61,6 +61,17 @@ m = clone(); m.sections.push({ id: 'BX', kind: 'cold_formed', shape: 'box', name
 m.nodes.push({ id: 'H1', x: 0, y: 0, z: 5 }, { id: 'H2', x: 4, y: 4, z: 5 }, { id: 'R1', x: 2, y: 2.02, z: 5 }, { id: 'R2', x: 2, y: 6, z: 4.6 });
 m.members.push({ id: 'HPX', type: 'hip', i: 'H1', j: 'H2', section: 'BX', material: 'C240' }, { id: 'RFX', type: 'rafter', i: 'R1', j: 'R2', section: 'BX', material: 'C240' });
 r = C.check(m); check('C4 จันทันชนตะเข้ (ปลายอยู่ในชิ้นตะเข้) ไม่ขึ้นเตือน', !has(r, 'C4', 'warn', 'RFX'));
+// C4 อะเสวางบนหัวเสา/ชนอะเสอีกตัว (ไม่มีจุดต่อร่วม) = ต่อแล้ว · อะเสลอยไม่แตะชิ้นใด = เตือน
+m = clone(); m.sections.push({ id: 'CX', kind: 'cold_formed', shape: 'c', name: 'C100x50x20x2.3', kg_m: 4 });
+m.nodes.push({ id: 'KA', x: 20, y: 0, z: 0 }, { id: 'KB', x: 20, y: 0, z: 3 }, { id: 'KC', x: 24, y: 0, z: 0 }, { id: 'KD', x: 24, y: 0, z: 3 },
+  { id: 'PA', x: 20, y: 0, z: 3.05 }, { id: 'PB', x: 24, y: 0, z: 3.05 }, { id: 'QA', x: 19.925, y: 0, z: 3.05 }, { id: 'QB', x: 19.925, y: 3, z: 3.05 },
+  { id: 'FA', x: 30, y: 0, z: 6 }, { id: 'FB', x: 32, y: 0, z: 6 });
+m.members.push({ id: 'KC1', type: 'column', i: 'KA', j: 'KB', section: 'RC-20x20', material: 'C240' }, { id: 'KC2', type: 'column', i: 'KC', j: 'KD', section: 'RC-20x20', material: 'C240' },
+  { id: 'PLX', type: 'steel_beam', i: 'PA', j: 'PB', section: 'CX', material: 'C240' }, { id: 'PLY', type: 'steel_beam', i: 'QA', j: 'QB', section: 'CX', material: 'C240' },
+  { id: 'PLF', type: 'steel_beam', i: 'FA', j: 'FB', section: 'CX', material: 'C240' });
+r = C.check(m); check('C4 อะเสวางบนหัวเสา (ปลายแตะหัวเสา ไม่มีจุดต่อร่วม) ไม่ขึ้นเตือน', !has(r, 'C4', 'warn', 'PLX'));
+check('C4 อะเสอีกแนวที่ปลายวางบนหัวเสา ปลายอีกข้างยื่น ไม่ขึ้นเตือน', !has(r, 'C4', 'warn', 'PLY'));
+check('C4 อะเสลอยไม่แตะชิ้นใด ยังขึ้นเตือน', has(r, 'C4', 'warn', 'PLF'));
 // C2 ปลายคานลอย
 m = clone(); m.nodes.push({ id: 'N-X', x: -3.0, y: 0.0, z: 3.3 });
 m.members.push({ id: 'B9', mark: 'B9', type: 'beam', i: 'N-1A-R', j: 'N-X', section: 'RC-20x40', material: 'C240' });

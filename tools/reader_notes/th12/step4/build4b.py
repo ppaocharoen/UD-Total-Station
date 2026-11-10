@@ -46,7 +46,7 @@ area = collections.defaultdict(lambda: {'int': 0.0, 'ext': 0.0})
 for wid in ('W-D0L', 'W-D0R'):   # Earth 5 พ.ย.: รูปตัด A.4.01 ด้านในห้องคนพิการเป็นป้าย 2 (แปลนเขียน 1|1)
     w = WL[wid]; w['mark'] = '2|1'; w['status'] = US
     w['note'] = w.get('note', '') + ' · ป้ายผนังแก้เป็น 2|1: ด้านในห้องน้ำคนพิการกระเบื้องตามรูปตัด A.4.01 (Earth 5 พ.ย. · แปลน A.2.01 เขียน 1|1 — **มาร์ก**)'
-SUM = collections.defaultdict(float); WT = []; k = 0; bad = []
+SUM = collections.defaultdict(float); WT = []; k = 0; bad = []; WSIDES = {}
 for w in m['walls']:
     if w['kind'] != 'brick_mon': continue
     (ax, ay), (bx, by) = w['path']; L = math.hypot(bx - ax, by - ay); ux, uy = (bx - ax) / L, (by - ay) / L
@@ -59,6 +59,7 @@ for w in m['walls']:
         sp = [space(ax + ux * (i + 0.5) * L / 10 + nx * off, ay + uy * (i + 0.5) * L / 10 + ny * off) for i in range(10)]
         rm = collections.Counter(sp).most_common(1)[0][0]
         sides[sd] = rm
+    WSIDES[w['id']] = sides
     if inn != out or extra:
         ins = [sd for sd, r in sides.items() if ROOM(r)]
         if len(ins) != 1: bad.append((w['id'], sides)); continue
@@ -172,6 +173,10 @@ for x in m['members']:
               'note': f'เสาเอ็น {x["id"]} ห่างกริด 1 {a["x"]:.2f} ห่าง A {a["y"]:.2f} ไม่มีผนังก่อ (ข้างวงกบประตูห้องส้วม) · ฉาบ + ทาสีภายใน (Earth 5 พ.ย.)'})
     STF.append(x['id'])
 
+# ---------------------------------------------------------------- สันผนัง + หลังผนัง (Earth 11 พ.ย.) — ดู edges4.py
+from edges4 import wall_edges
+ED = wall_edges(m, F, N, SEC, OT, OPS, space, FZ, ROOM, SPEC, WSIDES, in_brick, set(STF), US, AS, FD)
+
 # ---------------------------------------------------------------- คานคอดินที่โผล่รอบนอก (ผิวทางเดิน/ทางลาด ถึงท้องผนังหรือผิวพื้นใน) — ฉาบโครงสร้าง + ทาสีภายนอก (Earth 5 พ.ย.)
 SLB = [(sl['polygon'], sl['top'], sl) for sl in m['slabs']]
 def slab_top(x, y):
@@ -271,6 +276,11 @@ S = lambda t, s: SUM[(t, s)]
 row('ผนัง', 'WF-… ฉาบทาสี (1)', f'ฉาบปูนเรียบ + ทาสีน้ำอะคริลิก ภายใน {S("1", "int"):.2f} · ภายนอก {S("1", "ext"):.2f} ตร.ม. (คิดที่ผนัง plaster_area / paint_area)', 'A.2.01', FD, 'ด้านโถงทางเข้า/ทางเดิน = ภายนอก (Earth 5 พ.ย.)')
 row('ผนัง', 'WF-… กระเบื้อง (2)', f'กรุกระเบื้องเซรามิคผิวมัน เต็มความสูงผนัง {S("2", "int") + S("2", "ext"):.2f} ตร.ม. ไม่ฉาบ', 'A.2.01, A.4.03')
 row('ผนัง', 'WF-B1-R-4 / WF-B6-R-4', f'แผ่นอิฐแดงโชว์ลาย ด้านนอกผนังซุ้มทางเข้า {S("4", "ext"):.2f} ตร.ม. ไม่ฉาบ', 'A.2.01, A.3.01', FD, 'ไม่ฉาบเหมือนกระเบื้อง (Earth 5 พ.ย.)')
+eT = lambda what, tg, st: sum(v for (t_, _, s_), v in ED[what].items() if t_ == tg and s_ == st)
+row('ผนัง', 'WF-…-E (สันผนัง)', f'สันผนัง (ปลายผนัง ข้างช่องเปิดโล่ง ขอบเสาเอ็นที่โผล่ ท้องโค้ง): กระเบื้อง {eT("E", "2", "ok"):.2f} + {eT("E", "2", "assumed"):.2f} (สมมติ) ตร.ม. · ฉาบทาสีภายนอก {eT("E", "1", "ok"):.2f} ตร.ม. (รวมที่ผนัง)',
+    'A.2.01', US, 'Earth 11 พ.ย.: สันผนัง 2|2 เป็นกระเบื้อง · ผนังผิวสองด้านต่างกัน: ปลายอิสระใช้ผิวตามพื้นที่ที่หันไปหา ส่วนข้างช่องเปิดโล่ง/ท้องโค้ง สมมติกระเบื้อง (ถาม)')
+row('ผนัง', 'WF-…-T (หลังผนัง)', f'หลังผนัง (ยอดผนังที่ไม่มีอะไรปิด): กระเบื้อง {eT("T", "2", "ok"):.2f} + {eT("T", "2", "assumed"):.2f} (สมมติ) ตร.ม. · ฉาบทาสีภายนอก {eT("T", "1", "ok"):.2f} ตร.ม. (รวมที่ผนัง)',
+    'A.2.01', US, 'Earth 11 พ.ย.: ผนังกรุกระเบื้อง ยอดผนังที่ไม่มีอะไรปิดเป็นกระเบื้องด้วย · ผนังนอก 2|1 (W-G1 W-G4 W-C1…C4) สมมติกระเบื้อง (ถาม)')
 cs1 = csum[('1', 'ext')]; cs2 = csum[('2', 'int')]
 row('เสา', f'CS-… ({len(COL)} ต้น)', f'ผิวเสา คสล. ที่โผล่พ้นผนัง: ฉาบโครงสร้าง + ทาสีภายนอก {cs1:.2f} ตร.ม. · บุกระเบื้องในห้องน้ำ {cs2:.2f} ตร.ม.', 'A.2.01 + หลักเกณฑ์ 2569', FD, 'ฉาบเสาแยก (Earth 5 พ.ย.)')
 row('ผนัง', 'WF-K-… / RS-RAMP', 'ผิวทรายล้าง (6): คันทางลาด (ข้าง 2 ด้าน + หลังคัน) ' + f'{sum(f["qty"] for f in F if f["id"].startswith("WF-K-")):.2f} + หน้านอกกล่องทางลาด {sum(fa(f) for f in RS):.2f} ตร.ม.', 'A.2.01, A.5.01', US, 'หน้านอกกล่องลงถึงดิน (Earth 5 พ.ย.)')
@@ -287,5 +297,6 @@ m['history'].append({'at': datetime.datetime.now().astimezone().isoformat(timesp
                      'note': 'Step 4 ส่วนที่ 2: ผิวผนังทีละด้าน ผิวเสา คันทรายล้าง ระแนง ลายประตู/บล็อก เชิงชาย/ครอบ 3D'})
 json.dump(m, open('stage4b.bm.json', 'w'), ensure_ascii=False, indent=1)
 json.dump(rows, open('stage4b_rows.json', 'w'), ensure_ascii=False, indent=1)
-json.dump({'sum': {f'{a}|{b}': round(v, 3) for (a, b), v in SUM.items()}, 'col': {f'{a}|{b}': round(v, 3) for (a, b), v in csum.items()}}, open('qty4b.json', 'w'), ensure_ascii=False, indent=1)
+json.dump({'sum': {f'{a}|{b}': round(v, 3) for (a, b), v in SUM.items()}, 'col': {f'{a}|{b}': round(v, 3) for (a, b), v in csum.items()},
+           'edge': {f'{w_}|{a}|{b}|{c}': round(v, 3) for w_ in 'ET' for (a, b, c), v in ED[w_].items()}, 'mixed': ED['mixed']}, open('qty4b.json', 'w'), ensure_ascii=False, indent=1)
 print('wall faces', len(WT), {f'{a}|{b}': round(v, 2) for (a, b), v in SUM.items()}, 'cols', len(CS), {f'{a}|{b}': round(v, 2) for (a, b), v in csum.items()})

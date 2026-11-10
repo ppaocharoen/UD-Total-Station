@@ -129,5 +129,19 @@ good = ("fin_wall_ผนังฉาบปูนเรียบทาสีน�
 ok &= good
 print(("PASS" if good else "FAIL"), "ผิวเสา struct + ผิวแสดงผลไม่ถอดซ้ำ", {k: v["qty"] for k, v in k5.items()})
 
+# ผิวสันผนัง (side E: faces) + หลังผนัง (side T: rects + z): ใช้ qty รวมกับรายการผิวผนังตาม spec · ผิวทาสี (counted_by wall) ไม่ถอดซ้ำ (ท12, 11 พ.ย. 2569)
+m6 = json.loads(json.dumps(m3)); TILE = "ผนังกรุกระเบื้องเซรามิค ผิวมัน"
+m6["finishes"] = [{"id": "WF-X-L", "kind": "wall", "spec": TILE, "wall": "RW-T", "side": "L", "u": [0, 3], "tag": "2", "height": 3.0, "qty": 9.0, "unit": "ตร.ม.", "status": "from_drawing", "src": "test"},
+                  {"id": "WF-X-E", "kind": "wall", "spec": TILE, "wall": "RW-T", "side": "E", "tag": "2", "qty": 0.31, "unit": "ตร.ม.", "status": "user", "src": "test",
+                   "faces": [{"p": [[3.0, -0.05], [3.0, 0.05]], "n": [1, 0], "z": [0.2, 3.3]}]},
+                  {"id": "WF-X-T", "kind": "wall", "spec": TILE, "wall": "RW-T", "side": "T", "tag": "2", "qty": 0.30, "unit": "ตร.ม.", "z": 3.3, "rects": [[0, -0.05, 3.0, 0.05]], "status": "user", "src": "test"},
+                  {"id": "WF-Y-T", "kind": "wall", "spec": "ผนังฉาบปูนเรียบทาสีน้ำอะคริลิก ภายนอก", "wall": "RW-T", "side": "T", "tag": "1", "qty": 0.5, "unit": "ตร.ม.", "z": 3.3, "rects": [[0, -0.05, 5.0, 0.05]],
+                   "counted_by": "wall", "status": "from_drawing", "src": "test"}]
+it6, _, _ = run(m6)
+k6 = {i["key"]: i for i in it6 if i["key"].startswith("fin_")}
+good = abs(k6["fin_wall_" + TILE]["qty"] - 9.61) < 1e-6 and "fin_wall_ผนังฉาบปูนเรียบทาสีน้ำอะคริลิก ภายนอก" not in k6
+ok &= good
+print(("PASS" if good else "FAIL"), "ผิวสันผนัง/หลังผนัง รวมกับผิวผนังตาม spec", {k: v["qty"] for k, v in k6.items()})
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

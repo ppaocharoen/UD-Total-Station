@@ -1428,7 +1428,8 @@ function elemSpec(id) {
   else if (set === 'finishes') { title = { counter: 'เคาน์เตอร์', ceiling: 'ฝ้า', floor: 'ผิวพื้น', wall: 'ผิวผนัง', other: 'งานผิว/อุปกรณ์', struct: 'ผิวเสา/คาน' }[e.kind] || 'งานผิว';
     if (e.kind === 'struct') { const fa = (e.faces || []).map(f => Math.hypot(f.p[1][0] - f.p[0][0], f.p[1][1] - f.p[0][1]) * (f.z[1] - f.z[0]));
       lines.push(e.spec || '', `${e.member || ''} · ผิวโผล่ ${(e.faces || []).length} แถบ รวม ${f2(fa.reduce((a, b) => a + b, 0))} ตร.ม.`); }
-    else lines.push(e.spec || '', e.qty ? `${f2(e.qty)} ${e.unit || ''}${e.counted_by === 'wall' ? ' (คิดที่ผนัง: ฉาบ + ทาสี)' : ''}` : ''); }
+    else { if (e.kind === 'wall' && (e.side === 'E' || e.side === 'T')) title = e.side === 'T' ? 'ผิวหลังผนัง (ยอดผนัง)' : 'ผิวสันผนัง (ปลาย/ขอบผนัง)';
+      lines.push(e.spec || '', e.qty ? `${f2(e.qty)} ${e.unit || ''}${e.counted_by === 'wall' ? ' (คิดที่ผนัง: ฉาบ + ทาสี)' : ''}` : ''); } }
   else title = set;
   const rb = design && design.rebar; if (rb) lines.push(rebarTxt(rb));
   return { set, e, title, mark, lines: lines.filter(Boolean), note: e.note, src: e.src, status: e.status };
