@@ -52,6 +52,17 @@ for k, v in EXPECT.items():
     ok &= good
     print(("PASS" if good else "FAIL"), k, got, "คาด", v)
 
+from takeoff import sheet_layout, SHEET_DEFAULT  # noqa: E402
+pl = [(-1.1, -1.1, 3.9), (11.9, -1.1, 3.9), (11.9, 6.9, 3.35), (-1.1, 6.9, 3.35)]
+n1, l1, k1 = sheet_layout(pl, SHEET_DEFAULT)
+pl2 = [(0, 0, 0), (7.6, 0, 0), (7.6, 16, 2), (0, 16, 2)]
+n2, l2, k2 = sheet_layout(pl2, SHEET_DEFAULT)
+sp = by["cover_metal_sheet"]["spec"].get("sheet") or {}
+good = n1 == 18 and abs(l1 - 8.019) < 0.005 and k1 == 1 and n2 == 10 and k2 == 2 and sp.get("cover") == 0.76 and sp.get("n", 0) > 0 \
+    and by["cover_metal_sheet"]["unit"] == "ตร.ม." and "แผ่น" in by["cover_metal_sheet"]["note"]
+ok &= good
+print(("PASS" if good else "FAIL"), "เมทัลชีท: 13.00 ม. ÷ 0.76 = 18 แผ่น × 8.02 ม. · ยาวเกิน 15 ม. แบ่ง 2 ช่วง · หน่วยยังเป็น ตร.ม.", n1, round(l1, 3), k1, n2, k2, sp)
+
 good = by.get('pipe_cw_PVC ชั้น 13.5_1/2"', {}).get("status") == "assumed" and by.get('pipe_vent_PVC ชั้น 8.5_2"', {}).get("status") == "computed"
 ok &= good
 print(("PASS" if good else "FAIL"), "ท่อที่ประมาณแนวให้ติดป้าย assumed, ท่อที่เขียนไว้เป็น computed")

@@ -201,7 +201,7 @@ def wall_edges(m, F, N, SEC, OT, OPS, space, FZ, ROOM, SPEC, WSIDES, in_brick, S
     sid = lambda wid: wid[2:] if wid.startswith('W-') else wid
     def base(w, tg, mixed, ext, sd):
         return {'kind': 'wall', 'spec': SPEC[tg] + ((' ภายนอก' if ext else ' ภายใน') if tg == '1' else ''), 'wall': w['id'], 'side': sd, 'tag': tg, 'unit': 'ตร.ม.', 'room': room_of(w), 'level': '1F',
-                'status': status_assumed if mixed else (status_user if tg != '1' else status_fd),
+                'status': status_user if (mixed or tg != '1') else status_fd,
                 'src': f'A.2.01 ป้ายวัสดุผนัง {w["mark"]} + Earth 11 พ.ย. (สัน/หลังผนังที่ไม่มีอะไรปิดใช้ผิวเดียวกับผนัง)'}
     def book(w, f, tg, mixed, ext, a, what):
         if tg == '1':
@@ -210,7 +210,7 @@ def wall_edges(m, F, N, SEC, OT, OPS, space, FZ, ROOM, SPEC, WSIDES, in_brick, S
             w['plaster'] = w['paint'] = True; w['plaster_area'] = pa; w['paint_area'] = dict(pa)
             f['note'] += f' · ฉาบ + ทาสี{"ภายนอก" if ext else "ภายใน"} — ปริมาณรวมอยู่ที่ผนัง {w["id"]} (plaster_area / paint_area)'
         if mixed:
-            f['note'] += f' · **สมมติ:** ผนังป้าย {w["mark"]} สองด้านผิวต่างกัน ใช้กระเบื้อง — รอ Earth ยืนยัน'; out['mixed'].append((f['id'], w['id'], w['mark'], what, round(a, 3)))
+            f['note'] += f' · ผนังป้าย {w["mark"]} สองด้านผิวต่างกัน ใช้กระเบื้อง (Earth 11 พ.ย. ยืนยัน)'; out['mixed'].append((f['id'], w['id'], w['mark'], what, round(a, 3)))
         f['qty'] = round(a, 3); out[what][(tg, 'ext' if ext else 'int', 'assumed' if mixed else 'ok')] += a; F.append(f); out['rec'].append(f)
     for wid, ar in arcs.items():   # ท้องโค้งรวมกับกลุ่มสันผนังที่หันเข้าแนวผนังของผนังนั้น
         w = WLd[wid]; inn, o_ = marks(w); key = (wid, inn, False, False) if inn == o_ else (wid, '2' if '2' in (inn, o_) else inn, True, False)

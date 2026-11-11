@@ -102,6 +102,26 @@ def rkey_dia(k):
 WALL_NAME = {"brick_mon": "ผนังก่ออิฐมอญครึ่งแผ่น", "brick_mon_full": "ผนังก่ออิฐมอญเต็มแผ่น", "aac": "ผนังก่ออิฐมวลเบา",
              "block": "ผนังก่อคอนกรีตบล็อก", "block_07": "ผนังก่อคอนกรีตบล็อก 7 ซม.", "gypsum": "ผนังเบายิปซัมบอร์ด",
              "precast_panel": "ผนังสำเร็จรูป", "rc": "ผนัง คสล.", "other": "ผนัง"}
+SHEET_DEFAULT = {"cover": 0.76, "max_len": 15.0}   # เมทัลชีทมาตรฐาน: หน้ากว้างปิดจริง 0.76 ม. · ยาวสูงสุดต่อแผ่น 15–20 ม. (Earth 11 พ.ย.)
+
+
+def sheet_layout(pl, sh):
+    """จำนวนแผ่นลอนของระนาบหลังคา: (จำนวนแผ่นตามกว้าง, ความยาวตามลาด, จำนวนช่วงตามยาว)"""
+    a, b = v_sub(pl[1], pl[0]), v_sub(pl[2], pl[0])
+    n = (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
+    h = math.hypot(n[0], n[1])
+    if h < 1e-9:   # ระนาบราบ: วางตามด้านยาว
+        xs, ys = [p[0] for p in pl], [p[1] for p in pl]
+        w, ln = sorted((max(xs) - min(xs), max(ys) - min(ys)))
+    else:
+        u = (-n[1] / h, n[0] / h, 0.0)                    # แนวราบในระนาบ (ขนานชายคา)
+        L = v_len(n); nn = tuple(c / L for c in n)
+        v = (nn[1] * u[2] - nn[2] * u[1], nn[2] * u[0] - nn[0] * u[2], nn[0] * u[1] - nn[1] * u[0])   # แนวลาด
+        us = [sum(p[i] * u[i] for i in range(3)) for p in pl]; vs = [sum(p[i] * v[i] for i in range(3)) for p in pl]
+        w, ln = max(us) - min(us), max(vs) - min(vs)
+    return (int(math.ceil(w / sh["cover"] - 1e-6)), ln, max(1, int(math.ceil(ln / sh["max_len"] - 1e-6))))
+
+
 COVER_NAME = {"metal_sheet": "เมทัลชีท", "cpac_tile": "กระเบื้องคอนกรีต", "ceramic_tile": "กระเบื้องเซรามิก",
               "fibre_cement": "กระเบื้องไฟเบอร์ซีเมนต์ลอนคู่", "shingle": "แผ่นชิงเกิ้ล", "upvc": "UPVC",
               "polycarbonate": "โพลีคาร์บอเนต", "concrete_deck": "พื้น คสล. (ดาดฟ้า)"}
@@ -664,6 +684,13 @@ class Takeoff:
                               "ตร.ม.", area, rf["id"], waste=w, task="roof_cover",
                               note="พื้นที่ตามแนวลาด; ถ้าคิดเป็นแผ่นให้แปลงตามคู่มือผู้ผลิตแล้วเผื่อ 3%/5%")
                 it["spec"] = {"t": "cover", "cover": rf["cover"], "form": rf["form"]}
+                if rf["cover"] == "metal_sheet":   # แผ่นลอน: หน้ากว้างปิดจริง 0.76 (ซ้อน 1 ลอน) วางยาวตามแนวลาด — หน่วยราคายังเป็น ตร.ม.
+                    sh = dict(SHEET_DEFAULT, **(rf.get("sheet") or {}))
+                    lay = [sheet_layout(p, sh) for p in planes]
+                    it["spec"]["sheet"] = {"cover": sh["cover"], "max_len": sh["max_len"],
+                                           "n": sum(l[0] for l in lay), "len": round(max(l[1] for l in lay), 2), "rows": max(l[2] for l in lay)}
+                    it["note"] = ("พื้นที่ตามแนวลาด · แผ่นลอนหน้ากว้างปิดจริง %.2f ม. (ซ้อนทับ 1 ลอน) วางยาวตามแนวลาด: " % sh["cover"]
+                                  + " + ".join("%d แผ่น × %.2f ม.%s" % (l[0], l[1] / l[2], (" × %d ช่วง (ยาวเกิน %.0f ม. ต่อทาบ)" % (l[2], sh["max_len"])) if l[2] > 1 else "") for l in lay))
                 ridge, hip, valley = roof_edges(rf, planes)
                 if ridge:
                     it = self.add("1.2.1", "ridge_cap", "ครอบสันหลังคา", "ม.", ridge, rf["id"], waste=0.03, task="roof_cover")
