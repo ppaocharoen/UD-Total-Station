@@ -92,6 +92,7 @@ function loadModel(json, name) {
   const m = JSON.parse(json);
   if (!m.schema_version || !m.meta) throw new Error('ไม่ใช่ไฟล์ .bm.json');
   S.model = m; S.modelName = name;
+  if (!(m.quantities && m.quantities.items && m.quantities.items.length)) setTimeout(() => { toast('ไฟล์นี้ยังไม่มีผลถอดปริมาณ — BOQ / Gantt / งวดงานจะยังไม่ขึ้น (ใช้ไฟล์ที่ถอดปริมาณแล้ว)'); const t = $('#toast'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('on'), 9000); }, 600);
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('udboq:' + name) || 'null'); } catch (e) { /* */ }
   S.boq = saved && saved.format === 'ud-boq' ? Object.assign(newBoq(), saved) : newBoq();

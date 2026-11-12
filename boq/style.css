@@ -636,3 +636,5 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 @media print{html.plain{background:#fff!important}html.plain .card,html.plain .sum-doc{box-shadow:none;border-radius:0}}
 
 #model-side>h2.sec-head{cursor:pointer;user-select:none}#model-side>h2.sec-head::before{content:'▾ ';font-size:.8em;opacity:.6}#model-side>h2.sec-head.shut::before{content:'▸ '}
+
+@media(min-width:801px){body.on-model main{max-width:none;padding:0}}
