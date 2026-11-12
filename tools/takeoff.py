@@ -1028,7 +1028,8 @@ class Takeoff:
         for f in pl.get("fixtures", []):
             kind = ft.get(f["type"], {}).get("kind")
             for sysn, dia in PIPE_DEFAULT.get(kind, []):
-                if f.get("id") in served[sysn] or any(math.dist(f["xyz"], q) < 0.3 for q in drawn[sysn]):
+                sv = served[sysn] | ((served["soil"] | served["waste"]) if sysn in ("soil", "waste") else set())   # ท่อระบายที่เขียนเป็นโสโครกหรือน้ำทิ้ง ถือว่าต่อแล้วทั้งคู่ (เช่น โถปัสสาวะต่อท่อ S)
+                if f.get("id") in sv or any(math.dist(f["xyz"], q) < 0.3 for q in drawn[sysn]):
                     continue
                 need[sysn].append((f, dia))
         for sysn, items in need.items():
