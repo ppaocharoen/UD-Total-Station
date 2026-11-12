@@ -54,7 +54,7 @@ html.dos .logo-dev{color:#c0c0ff}
 .crt-btn{font-family:var(--f-mono);font-size:11px;background:transparent;border:1px solid var(--border2);color:var(--text2);padding:3px 7px;cursor:pointer}
 .crt-btn:hover{color:var(--green);border-color:var(--green)}
 
-main{padding:16px;max-width:1500px;margin:0 auto}
+main{padding:16px;max-width:max(1500px,94vw);margin:0 auto}
 .page{display:none}.page.active{display:block}
 .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:16px}
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;position:relative;backdrop-filter:blur(6px)}

@@ -1210,9 +1210,12 @@ function tlSet(day) {
   v.setState(u => {
     if (!u.id) return BmViewer.CATS.slice(2).some(c => c[1].includes(u.group)) ? { visible: (prog.mep_fix ?? 1) >= 0.5 } : null;
     // แผ่นหลังคาโผล่ตอนงานมุง (id หลังคาอยู่ในงานโครงหลังคาด้วยเพราะคิดพื้นที่โครงหลังคา)
-    const tid = (u.group === 'หลังคา' && M.task.roof_cover && M.task.roof_cover.from.includes(u.id)) ? 'roof_cover' : M.primary[u.id]; if (!tid) return null;
+    let tid = (u.group === 'หลังคา' && M.task.roof_cover && M.task.roof_cover.from.includes(u.id)) ? 'roof_cover' : M.primary[u.id], rid = u.id;
+    // งานผิวที่ปริมาณนับรวมกับผนัง (ทาสี/ฉาบ ไม่มีรายการของตัวเอง): โผล่ตามงานทาสี/ฉาบ/งานผิว ตามลำดับของผนังที่ผิวนั้นปิดอยู่ — ไม่โผล่ตั้งแต่วันแรก
+    if (!tid && u.group === 'งานผิว') { tid = ['paint', 'plaster', 'finish'].find(k => M.task[k]) || (p.tasks[p.tasks.length - 1] || {}).id; rid = (u.covers || []).find(c => (M.rank[tid] || {})[c] !== undefined) || u.id; }
+    if (!tid) return null;
     if (u.rebar) return { visible: RC(tid) && step(tid, u.id, 'rebar') > 0 };
-    const s0 = step(tid, u.id);
+    const s0 = step(tid, rid);
     if (s0 <= 0) return { visible: false };
     const st = {};
     if (u.growFrom) st.grow = Math.max(0, Math.min(1, (s0 - 0.4) / 0.6)); else if (s0 < 0.5) st.visible = false;
