@@ -162,7 +162,7 @@ input.days.ov{border-color:var(--amber);color:var(--amber)}
 .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
 .btn-grid .btn.small{margin:0;justify-content:center}
 .chips{display:flex;flex-wrap:wrap;gap:4px}
-.layer-cat{flex-basis:100%;margin-top:4px}.layer-cat>.hint{display:block;font-size:11px;margin-bottom:2px}
+.layer-cat{flex-basis:100%;margin-top:4px}.layer-cat>.hint{display:block;font-size:11px;margin-bottom:2px}.cat-head{cursor:pointer;user-select:none;padding:3px 0}.cat-head:hover{color:var(--text)}.cat-head .tw::before{content:'▾ '}.layer-cat.shut .cat-head .tw::before{content:'▸ '}.layer-cat.shut>.chips{display:none}.cat-n{font-style:normal;opacity:.7;margin-left:4px}
 .chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:3px 8px;border:1px solid var(--border2);background:rgba(0,30,10,.5);color:var(--text3);cursor:pointer;user-select:none;border-radius:2px}
 .chip i{width:9px;height:9px;display:inline-block;opacity:.4}
 .chip em{font-style:normal;font-family:var(--f-mono);font-size:10px;color:var(--text3)}
@@ -634,3 +634,5 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
   html.plain #pr1-table td.c-tot{color:var(--green)}
 }
 @media print{html.plain{background:#fff!important}html.plain .card,html.plain .sum-doc{box-shadow:none;border-radius:0}}
+
+#model-side>h2.sec-head{cursor:pointer;user-select:none}#model-side>h2.sec-head::before{content:'▾ ';font-size:.8em;opacity:.6}#model-side>h2.sec-head.shut::before{content:'▸ '}

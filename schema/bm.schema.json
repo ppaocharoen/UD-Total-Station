@@ -1419,9 +1419,12 @@
             "hip",
             "shed",
             "flat",
+            "curved",
             "custom"
           ]
         },
+        "rise": { "type": "number", "exclusiveMinimum": 0, "description": "หลังคาโค้ง: ระยะยกจากระดับชายคาถึงยอดโค้ง (ใส่ rise หรือ radius)" },
+        "radius": { "type": "number", "exclusiveMinimum": 0, "description": "หลังคาโค้ง: รัศมีโค้ง" },
         "outline": {
           "$ref": "#/$defs/polygon",
           "description": "ขอบชายคารวมระยะยื่น"

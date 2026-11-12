@@ -17,7 +17,7 @@ from collections import OrderedDict, defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from validate import qty_hash, qty_base_hash, design_hash  # noqa: E402
-from roofgeom import roof_planes, plane_lines, poly_area3, v_len, v_sub  # noqa: E402
+from roofgeom import roof_planes, plane_lines, poly_area3, v_len, v_sub, curved_len, curved_purlins, curved_arc  # noqa: E402
 
 
 def roof_edges(rf, planes):
@@ -655,6 +655,9 @@ class Takeoff:
             r["ridge"] = "x" if rf["ridge"] == "X" else "z"
         if rf.get("low"):
             r["low"] = {"x1": "x1", "x2": "x2", "y1": "z1", "y2": "z2"}[rf["low"]]
+        for k in ("rise", "radius"):
+            if rf.get(k):
+                r[k] = rf[k]
         if rf["form"] == "custom":   # ระนาบตั้ง (หน้าจั่วปั้นหยา kind=gablet) ไม่ใช่ผิวมุง
             r["planes"] = [{"pts": [[p[0], p[2], p[1]] for p in pl["pts"]]} for pl in rf.get("planes", []) if pl.get("kind", "cover") == "cover"]
         return r
@@ -687,11 +690,14 @@ class Takeoff:
                 if rf["cover"] == "metal_sheet":   # แผ่นลอน: หน้ากว้างปิดจริง 0.76 (ซ้อน 1 ลอน) วางยาวตามแนวลาด — หน่วยราคายังเป็น ตร.ม.
                     sh = dict(SHEET_DEFAULT, **(rf.get("sheet") or {}))
                     lay = [sheet_layout(p, sh) for p in planes]
+                    if rf["form"] == "curved":   # แผ่นดัดโค้งยาวตลอดส่วนโค้ง
+                        arc = curved_len(r); A = curved_arc(r); wd = A["u1"] - A["u0"]
+                        lay = [(int(math.ceil(wd / sh["cover"] - 1e-6)), arc, max(1, int(math.ceil(arc / sh["max_len"] - 1e-6))))]
                     it["spec"]["sheet"] = {"cover": sh["cover"], "max_len": sh["max_len"],
                                            "n": sum(l[0] for l in lay), "len": round(max(l[1] for l in lay), 2), "rows": max(l[2] for l in lay)}
-                    it["note"] = ("พื้นที่ตามแนวลาด · แผ่นลอนหน้ากว้างปิดจริง %.2f ม. (ซ้อนทับ 1 ลอน) วางยาวตามแนวลาด: " % sh["cover"]
+                    it["note"] = (("พื้นที่ตามแนวโค้ง" if rf["form"] == "curved" else "พื้นที่ตามแนวลาด") + " · แผ่นลอนหน้ากว้างปิดจริง %.2f ม. (ซ้อนทับ 1 ลอน) วางยาวตามแนวลาด: " % sh["cover"]
                                   + " + ".join("%d แผ่น × %.2f ม.%s" % (l[0], l[1] / l[2], (" × %d ช่วง (ยาวเกิน %.0f ม. ต่อทาบ)" % (l[2], sh["max_len"])) if l[2] > 1 else "") for l in lay))
-                ridge, hip, valley = roof_edges(rf, planes)
+                ridge, hip, valley = (0, 0, 0) if rf["form"] == "curved" else roof_edges(rf, planes)   # หลังคาโค้ง: รอยต่อแถบไม่ใช่สัน
                 if ridge:
                     it = self.add("1.2.1", "ridge_cap", "ครอบสันหลังคา", "ม.", ridge, rf["id"], waste=0.03, task="roof_cover")
                     it["spec"] = {"t": "ridge", "cover": rf["cover"]}
@@ -708,7 +714,10 @@ class Takeoff:
                     spec = rf.get(part)
                     if not spec or typ in explicit:
                         continue
-                    L = sum(v_len(v_sub(a, b)) for p in planes if len(p) >= 3 for a, b in plane_lines(p, spec["spacing"], along, r["eave"]))
+                    if rf["form"] == "curved" and along == "u":
+                        L = sum(v_len(v_sub(a, b)) for a, b in curved_purlins(r, spec["spacing"]))
+                    else:
+                        L = sum(v_len(v_sub(a, b)) for p in planes if len(p) >= 3 for a, b in plane_lines(p, spec["spacing"], along, r["eave"]))
                     steel_len[spec["section"]] += L
                     steel_src[spec["section"]].append(rf["id"])
                     steel_mem[spec["section"]][rf["id"]] = steel_mem[spec["section"]].get(rf["id"], 0) + L

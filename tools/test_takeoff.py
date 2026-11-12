@@ -63,6 +63,22 @@ good = n1 == 18 and abs(l1 - 8.019) < 0.005 and k1 == 1 and n2 == 10 and k2 == 2
 ok &= good
 print(("PASS" if good else "FAIL"), "เมทัลชีท: 13.00 ม. ÷ 0.76 = 18 แผ่น × 8.02 ม. · ยาวเกิน 15 ม. แบ่ง 2 ช่วง · หน่วยยังเป็น ตร.ม.", n1, round(l1, 3), k1, n2, k2, sp)
 
+import copy, math  # noqa: E402
+mc = copy.deepcopy(m); rc = mc["roofs"][0]; rc.update({"form": "curved", "rise": 1.0, "outline": [[0, 0], [10, 0], [10, 6], [0, 6]]}); rc.pop("low", None); rc["ridge"] = "X"
+for k in ("pitch",): rc[k] = 0
+ic = {it["key"]: it for it in run(mc)[0]}
+R = (9 + 1) / 2.0; arc = 2 * R * math.asin(3 / R)
+good = abs(ic["cover_metal_sheet"]["qty"] - round(arc * 10 * 1.03, 2)) < 0.15 and "ridge_cap" not in ic and ic["cover_metal_sheet"]["spec"]["sheet"]["n"] == 14 \
+    and abs(ic["cover_metal_sheet"]["spec"]["sheet"]["len"] - arc) < 0.01
+ok &= good
+print(("PASS" if good else "FAIL"), "หลังคาโค้ง: พื้นที่ = ส่วนโค้ง × ยาว · ไม่มีครอบสัน · แผ่นยาวตามโค้ง", ic["cover_metal_sheet"]["qty"], round(arc * 10 * 1.03, 2), ic["cover_metal_sheet"]["spec"]["sheet"])
+rc2 = dict(rc, low="y1", rise=None, radius=10.0)
+ic2 = {it["key"]: it for it in run(dict(mc, roofs=[rc2]))[0]}
+arc2 = 10.0 * math.asin(6 / 10.0)
+good = abs(ic2["cover_metal_sheet"]["qty"] - round(arc2 * 10 * 1.03, 2)) < 0.15
+ok &= good
+print(("PASS" if good else "FAIL"), "หลังคาโค้งด้านเดียว กำหนดด้วยรัศมี", ic2["cover_metal_sheet"]["qty"], round(arc2 * 10 * 1.03, 2))
+
 good = by.get('pipe_cw_PVC ชั้น 13.5_1/2"', {}).get("status") == "assumed" and by.get('pipe_vent_PVC ชั้น 8.5_2"', {}).get("status") == "computed"
 ok &= good
 print(("PASS" if good else "FAIL"), "ท่อที่ประมาณแนวให้ติดป้าย assumed, ท่อที่เขียนไว้เป็น computed")

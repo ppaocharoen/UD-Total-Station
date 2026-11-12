@@ -1037,7 +1037,9 @@ function buildLayers(groups) {
   const known = new Set(BmViewer.CATS.flatMap(c => c[1]));
   const cats = BmViewer.CATS.map(([cat, gs]) => [cat, gs.filter(g => groups.includes(g))]).concat([['อื่นๆ', groups.filter(g => !known.has(g))]]).filter(c => c[1].length);
   $('#layer-list').innerHTML = ov.map(([k, t, col, n]) => `<span class="chip ${v[k + 'On'] === false ? '' : 'on'}" data-ov="${k}" style="color:${col}"><i style="background:${col}"></i><span style="color:var(--text)">${t}</span><em>${n}</em></span>`).join('') +
-    cats.map(([cat, gs]) => `<div class="layer-cat"><span class="hint">${esc(cat)}</span><div class="chips">${gs.map(chip).join('')}</div></div>`).join('');
+    cats.map(([cat, gs]) => `<div class="layer-cat ${catOpen(cat) ? '' : 'shut'}" data-cat="${esc(cat)}"><span class="hint cat-head" title="กดเพื่อย่อ/แสดงรายการในหมวดนี้"><b class="tw"></b>${esc(cat)} <em class="cat-n"></em></span><div class="chips">${gs.map(chip).join('')}</div></div>`).join('');
+  $$('#layer-list .cat-head').forEach(h => h.onclick = () => { const d = h.parentNode, o = catState(); o[d.dataset.cat] = d.classList.contains('shut'); d.classList.toggle('shut');
+    try { localStorage.setItem('ud.layercat', JSON.stringify(o)); } catch (e) {} });
   $$('#layer-list [data-ov]').forEach(ch => ch.onclick = () => { const k = ch.dataset.ov, on = v[k + 'On'] === false; v.setOverlay(k, on); ch.classList.toggle('on', on); });
   $$('#layer-list [data-layer]').forEach(ch => ch.onclick = () => {
     const g = ch.dataset.layer, on = !v.groups[g].visible;
@@ -1047,7 +1049,10 @@ function buildLayers(groups) {
   });
   S.scopeKey = ''; S.typeSel = null; Object.assign(RB, { on: false, floors: null, types: null, one: null }); $('#rb-panel').hidden = true; syncLayers(); buildClip(); buildScope(); buildTypes(); tlReset(); renderClash();
 }
-function syncLayers() { $$('#layer-list [data-layer]').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); }); }
+function catState() { try { return JSON.parse(localStorage.getItem('ud.layercat') || '{}') || {}; } catch (e) { return {}; } }
+function catOpen(cat) { return catState()[cat] === true; }   // ค่าตั้งต้น: ย่อทุกหมวด (จำที่ผู้ใช้เปิดไว้)
+function syncLayers() { $$('#layer-list [data-layer]').forEach(ch => { const g = S.viewer.groups[ch.dataset.layer]; ch.classList.toggle('on', !!(g && g.visible)); });
+  $$('#layer-list .layer-cat').forEach(d => { const ch = [...d.querySelectorAll('[data-layer]')]; d.querySelector('.cat-n').textContent = `แสดง ${ch.filter(c => c.classList.contains('on')).length}/${ch.length}`; }); }
 // ตัดดูโมเดล: แนวระดับ (Z) หรือแนวตั้งตามแกน X / Y ของแบบ · เลือกระดับ/แนวกริด หรือเลื่อนอิสระ · กลับด้านได้
 const CLIP = { ax: 'Z', c: null, flip: false };
 function clipOpts(ax) {
@@ -1665,6 +1670,13 @@ function bind() {
   $('#b-diff-3d').onclick = () => { if (!S.diffIds) return toast('เปิดรุ่นก่อนก่อน'); $$('#tabs .nav-tab').find(x => x.dataset.tab === 'model').click(); setTimeout(() => S.viewer && S.viewer.highlight(S.diffIds), 80); toast(`ไฮไลต์ชิ้นที่เพิ่ม/แก้ ${S.diffIds.length} ชิ้น`); };
   $('#b-diff-clear').onclick = () => { S.old = null; S.diffIds = null; $('#diff-status').textContent = ''; renderDiff(); };
   $$('.dock-tab[data-dock]').forEach(t => t.onclick = () => setDock(t.dataset.dock));
+  // เมนูข้างโมเดล: ทุกหัวข้อกดย่อ/แสดงได้ (จำไว้ในเบราว์เซอร์) — ค่าตั้งต้นย่อ "ชนิดชิ้นส่วน"
+  (() => { const side = $('#model-side'); if (!side) return; let st = {}; try { st = JSON.parse(localStorage.getItem('ud.sidesec') || '{}') || {}; } catch (e) {}
+    [...side.children].filter(h => h.tagName === 'H2').forEach(h => { const key = h.textContent.trim(), body = document.createElement('div'); body.className = 'sec-body';
+      let n = h.nextSibling; while (n && !(n.nodeType === 1 && n.tagName === 'H2')) { const nx = n.nextSibling; body.appendChild(n); n = nx; }
+      h.after(body); h.classList.add('sec-head'); h.title = 'กดเพื่อย่อ/แสดงหัวข้อนี้';
+      const shut = key in st ? !st[key] : key === 'ชนิดชิ้นส่วน'; h.classList.toggle('shut', shut); body.hidden = shut;
+      h.onclick = () => { const sh = !h.classList.contains('shut'); h.classList.toggle('shut', sh); body.hidden = sh; st[key] = !sh; try { localStorage.setItem('ud.sidesec', JSON.stringify(st)); } catch (e) {} }; }); })();
   $('#dock-min').onclick = () => { const d = $('#dock'); d.classList.toggle('min'); $('#dock-min').textContent = d.classList.contains('min') ? '+ ขยาย' : '− ย่อ'; };
   $('#dk-q').oninput = () => renderPlan();
   $('#b-crt').onclick = () => setCrt(document.body.classList.contains('nocrt'));

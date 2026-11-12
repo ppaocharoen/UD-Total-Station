@@ -72,7 +72,66 @@ def roof_planes(r):
             P.append([[x1, y0, z1], [x2, y0, z1], [xm, yt, a]])
             P.append([[x2, y0, z2], [x1, y0, z2], [xm, yt, b]])
         return P
+    if form == "curved":
+        return curved_strips(r)
     raise ValueError(f"ไม่รู้จักรูปแบบหลังคา {form}")
+
+
+def curved_arc(r):
+    """หลังคาโค้ง (ส่วนของวงกลม): แกนตรง = ridge · โค้งข้ามอีกแกน · ไม่มี low = โค้งเต็มช่วง (ยอดกลาง) · มี low = โค้งด้านเดียว (ยอดอยู่ฝั่งสูง)
+    กำหนดด้วย rise (ระยะยกจากชายคาถึงยอด) หรือ radius · คืน dict: ax ('x' = แกนตรงขนาน x) a b (ช่วงโค้ง) c (ศูนย์กลาง) R yc th0 th1 (มุมจากแนวดิ่ง)"""
+    x1, z1, x2, z2, y0 = r["x1"], r["z1"], r["x2"], r["z2"], r["eave"]
+    low = r.get("low")
+    ax = ("x" if low in ("z1", "z2") else "z") if low else (r.get("ridge") or ("x" if (x2 - x1) >= (z2 - z1) else "z"))
+    a, b = (z1, z2) if ax == "x" else (x1, x2)
+    W = b - a
+    half = W if low else W / 2
+    rise, R = r.get("rise"), r.get("radius")
+    if rise:
+        rise = min(rise, half); R = (half * half + rise * rise) / (2 * rise)
+    elif R:
+        R = max(R, half); rise = R - math.sqrt(R * R - half * half)
+    else:
+        raise ValueError("หลังคาโค้งต้องมี rise หรือ radius")
+    c = (a + b) / 2 if not low else (b if low in ("z1", "x1") else a)
+    return {"ax": ax, "a": a, "b": b, "c": c, "R": R, "yc": y0 + rise - R, "rise": rise,
+            "th0": math.asin(max(-1, min(1, (a - c) / R))), "th1": math.asin(max(-1, min(1, (b - c) / R))),
+            "u0": x1 if ax == "x" else z1, "u1": x2 if ax == "x" else z2}
+
+
+def _arc_pt(A, th, u):
+    s, h = A["c"] + A["R"] * math.sin(th), A["yc"] + A["R"] * math.cos(th)
+    return [u, h, s] if A["ax"] == "x" else [s, h, u]
+
+
+def curved_len(r):
+    A = curved_arc(r)
+    return A["R"] * (A["th1"] - A["th0"])
+
+
+def curved_strips(r, n=None):
+    """แบ่งผิวโค้งเป็นแถบระนาบ (ขอบแรก = ขอบล่างของแถบ) — พื้นที่รวม ≈ ความยาวส่วนโค้ง × ความยาวอาคาร"""
+    A = curved_arc(r)
+    n = n or max(8, int(math.ceil((A["th1"] - A["th0"]) / math.radians(4))))
+    P = []
+    for i in range(n):
+        t0 = A["th0"] + (A["th1"] - A["th0"]) * i / n; t1 = A["th0"] + (A["th1"] - A["th0"]) * (i + 1) / n
+        lo, hi = (t0, t1) if math.cos(t0) <= math.cos(t1) else (t1, t0)
+        P.append([_arc_pt(A, lo, A["u0"]), _arc_pt(A, lo, A["u1"]), _arc_pt(A, hi, A["u1"]), _arc_pt(A, hi, A["u0"])])
+    return P
+
+
+def curved_purlins(r, spacing):
+    """แปของหลังคาโค้ง: วางตามความยาวส่วนโค้งทุก spacing (เริ่ม 0.05 จากชายคา) ยาวตลอดแกนตรง"""
+    A = curved_arc(r); L = A["R"] * (A["th1"] - A["th0"]); segs = []
+    if spacing <= 0:
+        return segs
+    d = 0.05
+    while d <= L - 0.02 + 1e-9:
+        th = A["th0"] + d / A["R"]
+        segs.append([_arc_pt(A, th, A["u0"]), _arc_pt(A, th, A["u1"])])
+        d += spacing
+    return segs
 
 
 def plane_lines(pts, spacing, along, base=None):
