@@ -64,6 +64,8 @@
         <button class="btn ghost" id="b-sample">ลองกับอาคารตัวอย่าง</button>
       </div>
       <div id="file-status" class="status"></div>
+      <h2 style="margin-top:14px">บัญชีผู้ใช้ · โมเดลในบัญชี</h2>
+      <div id="acct-body"><div class="hint">กำลังตรวจสอบบัญชี…</div></div>
     </div>
     <div class="card">
       <h2>ข้อมูลโครงการ</h2>
@@ -309,5 +311,7 @@
 <script src="../lib/steelconn.js"></script>
 <script src="app.js"></script>
 <script src="design.js"></script>
+<script src="account.js"></script>
+<script type="module" src="../lib/auth.js" onerror="acctFail()"></script>
 </body>
 </html>
