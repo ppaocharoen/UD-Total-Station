@@ -948,6 +948,14 @@ function kpiHtml(T, plan) {
     k(`${RG()} (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
     (plan ? k('ระยะเวลา', plan.calDays, 'วัน') : '');
 }
+function renderFitSum() {   // ตารางนับข้อต่อท่อในเมนูข้าง (นับจากโมเดล 3D)
+  if (!$('#side-sum')) return;
+  const fl = (S.viewer && S.viewer.fittings) || [], g = {}, SN = { cw: 'ประปา', hw: 'น้ำร้อน', waste: 'น้ำทิ้ง', soil: 'โสโครก', vent: 'ระบายอากาศ', rain: 'น้ำฝน', drain: 'ระบายน้ำ' };   // นับข้อต่อท่อตามระบบ/ชนิด/ขนาด
+    fl.forEach(f => { const k = [SN[f.system] || f.system, f.label, f.size].join('|'); g[k] = (g[k] || 0) + 1; });
+    const ks = Object.keys(g).sort();
+    $$('#side-sum .fit-sum').forEach(x => x.remove());
+  if (ks.length) $('#side-sum').insertAdjacentHTML('beforeend', `<details class="fit-sum"><summary>ข้อต่อท่อ ${fl.length} ตัว (นับจากโมเดล)</summary><table class="boq" style="width:100%;font-size:11px"><thead><tr><th style="text-align:left">ระบบ</th><th style="text-align:left">ชนิด</th><th>ขนาด</th><th>จำนวน</th></tr></thead><tbody>${ks.map(k => { const [a, b, c] = k.split('|'); return `<tr><td>${esc(a)}</td><td>${esc(b)}</td><td style="text-align:center">${esc(c)}</td><td style="text-align:right">${g[k]}</td></tr>`; }).join('')}</tbody></table><div class="hint">ราคาข้อต่อยังคิดเป็น % ของค่าท่อตามบัญชีค่าแรง ตารางนี้ใช้ตรวจ/สั่งของ</div></details>`);
+}
 function renderSideSum(T, plan) {
   const pr = T.pr, area = +S.boq.project.area || 0, q = S.model.quantities || {};
   const sum = (test, unit) => r2(pr.filter(r => test(r.key) && (!unit || r.unit === unit)).reduce((a, r) => a + (+r.qty || 0), 0));
@@ -970,6 +978,7 @@ function renderSideSum(T, plan) {
     (nNo ? `<a class="pk-link ss-warn" data-ss="pr1">[!] ยังไม่มีราคา ${nNo} รายการ</a><br>` : '') +
     (nAs ? `<a class="pk-link ss-warn" data-ss="pr1">[!] ปริมาณประมาณ ${nAs} รายการ (ตรวจกับแบบ)</a><br>` : '') +
     (nNote ? `<a class="pk-link" data-ss="project">ข้อสมมติจากตัวถอดปริมาณ ${nNote} ข้อ</a>` : '');
+  renderFitSum();
   $$('#side-sum [data-ss]').forEach(a => a.onclick = () => $$('#tabs .nav-tab').find(x => x.dataset.tab === a.dataset.ss).click());
 }
 function renderHud(T, plan) {
@@ -1027,6 +1036,7 @@ function setCrt(on) {
 
 // ------------------------------------------------------------------ 3D
 function buildLayers(groups) {
+  setTimeout(renderFitSum, 0);
   const v = S.viewer;
   const ov = [['grid', 'เส้นกริด', '#18ffff', (S.model.grids || []).length], ['ground', 'พื้นดิน', '#00ff41', '']].filter(o => o[3] !== 0);
   const chip = g => {

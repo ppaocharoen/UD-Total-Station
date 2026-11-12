@@ -45,7 +45,7 @@ for p in P:
     for s, t in zip(p['pts'], p['pts'][1:]):
         for k in range(21):
             q = [s[i] + (t[i] - s[i]) * k / 20 for i in range(3)]
-            if not (-0.20 - r + 0.002 < q[2] < 0.20 + r - 0.002): continue
+            if not (-0.25 - r + 0.002 < q[2] < 0.15 + r - 0.002): continue   # คาน 0.20×0.40 หลังคาน +0.15 (Earth 12 พ.ย.) — ผนังกั้นฝั่งพื้น +0.25 คานสูงกว่านี้ 0.05 ท่อฝั่งนั้นเดินสูงตาม
             for (a, e) in B:
                 lo = (min(a[0], e[0]) - 0.10, min(a[1], e[1]) - 0.10); hi = (max(a[0], e[0]) + 0.10, max(a[1], e[1]) + 0.10)
                 if lo[0] - r + 0.002 < q[0] < hi[0] + r - 0.002 and lo[1] - r + 0.002 < q[1] < hi[1] + r - 0.002: hit.append((p['id'], [round(c, 2) for c in q])); break
@@ -58,26 +58,8 @@ cw = [p for p in P if p['system'] == 'cw']; loose = []
 for p in cw:
     if not any(q is not p and any(segdist(p['pts'][0], p['pts'][0], s, t) < 0.012 for s, t in zip(q['pts'], q['pts'][1:])) for q in cw): loose.append(p['id'])
 print('ท่อน้ำดีที่ต้นทางไม่ต่อกับท่ออื่น:', loose)
-def fittings(P):
-    out, seen = [], set(); grp = lambda s: 0 if s in ('cw', 'hw') else 1
-    def push(p, pp, kind, dia=None):
-        k = tuple(round(c, 2) for c in p) + (grp(pp['system']),)
-        if k in seen: return
-        seen.add(k); out.append((pp['system'], dia or pp['dia'], kind))
-    for i, pp in enumerate(P):
-        pts = pp['pts']
-        for a, b, c in zip(pts, pts[1:], pts[2:]):
-            u = [b[k] - a[k] for k in range(3)]; v = [c[k] - b[k] for k in range(3)]; lu, lv = math.hypot(*u), math.hypot(*v)
-            if lu > 1e-6 and lv > 1e-6 and sum(x * y for x, y in zip(u, v)) / lu / lv < 0.985: push(b, pp, 'ข้องอ')
-        for e in (pts[0], pts[-1]):
-            done = False
-            for j, q in enumerate(P):
-                if j == i or grp(q['system']) != grp(pp['system']) or done: continue
-                for s, t in zip(q['pts'], q['pts'][1:]):
-                    if segdist(e, e, s, t) < 0.012:
-                        end = d3(e, q['pts'][0]) < 0.012 or d3(e, q['pts'][-1]) < 0.012; big = q['dia'] if OD[q['dia']] >= OD[pp['dia']] else pp['dia']
-                        push(e, pp, ('ข้อลด' if q['dia'] != pp['dia'] else 'ข้อต่อ') if end else 'สามทาง', big); done = True; break
-    return collections.Counter(out)
-FC = fittings(P)
-json.dump([[*k, v] for k, v in sorted(FC.items())], open('fittings.json', 'w'), ensure_ascii=False)
-print('ข้อต่อ:', dict(sorted(FC.items())))
+import subprocess
+js = "const v=require('/home/claude/UD-Total-Station/lib/viewer3d.js').BmViewer;const m=JSON.parse(require('fs').readFileSync(process.argv[1]));const g={};v.pipeFittings(m.mep.plumbing.pipes).forEach(f=>{const k=[f.system,f.label,f.size].join('|');g[k]=(g[k]||0)+1});console.log(JSON.stringify(Object.keys(g).sort().map(k=>[...k.split('|'),g[k]])))"
+FC = json.loads(subprocess.run(['node', '-e', js, sys.argv[1] if len(sys.argv) > 1 else 'stage5a.bm.json'], capture_output=True, text=True).stdout)
+json.dump(FC, open('fittings.json', 'w'), ensure_ascii=False)
+print('ข้อต่อ (นับด้วยตัวเดียวกับเว็บ):', sum(f[3] for f in FC)); [print('  ', f) for f in FC]
