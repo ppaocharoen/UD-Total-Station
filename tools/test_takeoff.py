@@ -170,5 +170,25 @@ good = abs(k6["fin_wall_" + TILE]["qty"] - 9.61) < 1e-6 and "fin_wall_ผนั�
 ok &= good
 print(("PASS" if good else "FAIL"), "ผิวสันผนัง/หลังผนัง รวมกับผิวผนังตาม spec", {k: v["qty"] for k, v in k6.items()})
 
+# บ่อถังบำบัด (equipment.pit) + กลุ่มงานแยกแถว (work: septic)
+m7 = json.loads(json.dumps(m3))
+m7.setdefault("slabs", []).append({"id": "S-TB", "kind": "ground", "t": 0.15, "top": -1.5, "polygon": [[0, 0], [1.7, 0], [1.7, 1.7], [0, 1.7]], "sand": 0.05, "lean": 0.05,
+                                   "pe_sheet": False, "work": "septic", "task": "mep_ext", "material": (m7.get("materials") or [{}])[0].get("id")})
+m7.setdefault("design", {}).setdefault("slabs", {})["S-TB"] = {"rebar": {"mesh": [9, 0.20, 1]}}
+m7.setdefault("mep", {}).setdefault("plumbing", {}).setdefault("equipment", []).append(
+    {"id": "TK", "kind": "septic_tank", "xyz": [0.85, 0.85, -0.7], "dims": [1.46, 1.46, 1.5], "size": "2000",
+     "pit": {"a": 1.7, "bottom": -1.75, "work": "septic", "fill": {"bottom": -1.5, "top": -0.2}}})
+it7, _, _ = run(m7)
+k7 = {i["key"]: i for i in it7}
+v_fill = 1.7 * 1.7 * 1.3 - math.pi * 0.73 * 0.73 * 1.3
+good = (abs(k7["excav_septic"]["qty_net"] - 1.7 * 1.7 * 1.75) < 0.006 and abs(k7["sand_fill_septic"]["qty_net"] - v_fill) < 0.006
+        and "rebar_RB9_septic" in k7 and "tie_wire_septic" in k7 and k7["excav_septic"]["name"].endswith("(งานถังบำบัด)")
+        and "S-TB" not in k7.get("rebar_RB9", {}).get("from", []))
+m7["mep"]["plumbing"]["equipment"][-1]["pit"]["bottom"] = -2.2
+k7b = {i["key"]: i for i in run(m7)[0]}
+good &= abs(k7b["excav_deep_septic"]["qty_net"] - 2.7 * 2.7 * 2.2) < 0.006
+ok &= good
+print(("PASS" if good else "FAIL"), "บ่อถังบำบัด: ขุด ≤2 ม./เกิน 2 ม. ทรายถมรอบถัง เหล็กแยกแถวงานถังบำบัด", {k: round(v["qty_net"], 3) for k, v in k7.items() if k.endswith("_septic")})
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

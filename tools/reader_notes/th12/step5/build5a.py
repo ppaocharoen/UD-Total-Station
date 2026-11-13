@@ -218,20 +218,24 @@ for i, t in TANKS.items():
     sq = [[round(x - h, 3), round(y - h, 3)], [round(x + h, 3), round(y - h, 3)], [round(x + h, 3), round(y + h, 3)], [round(x - h, 3), round(y + h, 3)]]
     n = i[-1]
     m['slabs'].append({'id': f'S-ST{n}B', 'mark': 'ST', 'kind': 'ground', 't': 0.15, 'top': t['zb'], 'polygon': sq, 'sand': 0.05, 'lean': 0.05, 'pe_sheet': False, 'material': 'C',
-                       'use': f'พื้นรองรับน้ำหนักถังบำบัด {i}', 'src': 'SN.3.01 ขยายพื้นรับน้ำหนักถังบำบัด', 'status': 'from_drawing', 'task': 'mep_ext',
+                       'use': f'พื้นรองรับน้ำหนักถังบำบัด {i}', 'work': 'septic', 'src': 'SN.3.01 ขยายพื้นรับน้ำหนักถังบำบัด', 'status': 'from_drawing', 'task': 'mep_ext',
                        'note': f'คอนกรีตหนา 0.15 RB9 @0.20# · คอนกรีตหยาบ 0.05 · ทรายหยาบ 0.05 · กว้าง A = 1.70 × 1.70 (KS-2000 (S),(F) — แบบเขียน "Varies") · หลังพื้น {t["zb"]:+.3f}'})
     ring = sq + [sq[0], [round(x, 3), round(y - h, 3)]][1:] if False else None
     circ = [[round(x + RO * _m.cos(-2 * _m.pi * k / 16 - _m.pi / 2), 3), round(y + RO * _m.sin(-2 * _m.pi * k / 16 - _m.pi / 2), 3)] for k in range(17)]
     poly = [[round(x, 3), round(y - h, 3)], sq[1], sq[2], sq[3], sq[0], [round(x, 3), round(y - h, 3)]] + circ   # ขอบนอก → ร่องตัด → วงช่องปากถัง (keyhole)
     m['slabs'].append({'id': f'S-ST{n}R', 'mark': 'ST', 'kind': 'ground', 't': 0.10, 'top': t['ztop'], 'polygon': poly, 'sand': 0, 'pe_sheet': False, 'material': 'C',
-                       'use': f'ค.ส.ล.รัดฝาถังบำบัด {i}', 'src': 'SN.3.01 แบบขยายบ่อบำบัดน้ำเสีย', 'status': 'from_drawing', 'task': 'mep_ext',
+                       'use': f'ค.ส.ล.รัดฝาถังบำบัด {i}', 'work': 'septic', 'src': 'SN.3.01 แบบขยายบ่อบำบัดน้ำเสีย', 'status': 'from_drawing', 'task': 'mep_ext',
                        'note': f'ค.ส.ล.รัดฝาถัง หนา 0.10 RB9 @0.20# วางบนทรายหยาบรอบถัง · ช่องปากถัง ⌀0.60 (แบบไม่บอกขนาดฝา — Earth 13 พ.ย. ยืนยัน) · หลัง {t["ztop"]:+.3f}'})
+    eqt = next(e for e in eq if e['id'] == i)
+    eqt['pit'] = {'a': TK['A'], 'b': TK['A'], 'bottom': round(t['zb'] - 0.15 - 0.05 - 0.05, 3), 'work': 'septic', 'task': 'mep_ext',
+                  'fill': {'bottom': t['zb'], 'top': t['zr'], 'name': 'ทรายหยาบถมรอบถังบำบัด (บดอัดแรงคน)'},
+                  'note': 'บ่อ 1.70×1.70 (A ของ KS-2000 (S),(F)) ก้นหลุม = ใต้ทรายหยาบรองพื้นถัง · ขุดดินตามกติกาฐานราก (Earth 13 พ.ย.) · ทรายหยาบถมรอบถังจากหลังพื้นรองถังถึงใต้ ค.ส.ล.รัดฝา'}
     m['design']['slabs'][f'S-ST{n}B'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': 'from_drawing', 'src': 'SN.3.01: RB 9 มม. @0.20#'}
     m['design']['slabs'][f'S-ST{n}R'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': 'from_drawing', 'src': 'SN.3.01: RB 9 มม. @0.20#'}
     rc = RO + 0.05
     path = [[round(x + rc * _m.cos(2 * _m.pi * k / 16), 3), round(y + rc * _m.sin(2 * _m.pi * k / 16), 3)] for k in range(17)]
     m['walls'].append({'id': f'W-ST{n}', 'kind': 'brick_mon', 't': 0.10, 'path': path, 'bottom': t['ztop'], 'top': 0.0, 'mark': 'อิฐมอญ', 'plaster': False, 'paint': False, 'exterior': True,
-                       'src': 'SN.3.01 (ก่ออิฐมอญโดยรอบกรณีฝาถังต่ำกว่าระดับดิน)', 'status': 'user', 'task': 'mep_ext',
+                       'src': 'SN.3.01 (ก่ออิฐมอญโดยรอบกรณีฝาถังต่ำกว่าระดับดิน)', 'status': 'user', 'task': 'mep_ext', 'work': 'septic',
                        'note': f'ก่ออิฐมอญรอบปากถัง {i} จากหลัง ค.ส.ล.รัดฝา {t["ztop"]:+.3f} ถึงระดับดิน ±0.00 สูง {-t["ztop"]:.3f} (ยึดระดับท่อเข้า — Earth 13 พ.ย.) · ไม่ฉาบ'})
 json.dump(m, open(os.path.join(H, 'stage5a.bm.json'), 'w'), ensure_ascii=False, indent=1)
 print(collections.Counter(f['type'] for f in fx), len(pipes), len(eq)); print({k: round(v, 3) for k, v in ZSINK.items()})
