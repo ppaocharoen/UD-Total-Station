@@ -43,7 +43,7 @@ check('B4 บันไดกว้าง 0.90 / ลูกตั้ง 0.20 ไ�
 check('B4 ระยะดิ่งใต้คาน B1 < 2.10 ม.', r.some(x => x.code === 'B4' && x.title.includes('ระยะดิ่ง')));
 m2 = clone(); m2.stairs = [{ id: 'STX', flights: [{ start: [1.0, -0.5], dir: '+Y', width: 0.9, bottom: 0.0, top: 0.8, risers: 4, going: 0.25 }] }];
 r = C.check(m2); check('A5 ขั้นบันไดผ่านคาน/เสาแนว A ชั้นล่าง = error', r.some(x => x.code === 'A5' && x.ids.includes('STX')));
-m2.stairs[0].flights[0].start = [3.0, 1.5]; r = C.check(m2); check('A5 บันไดกลางห้องไม่ชน', !r.some(x => x.code === 'A5'));
+m2.stairs[0].flights[0].start = [3.0, 1.5]; r = C.check(m2); check('A5 บันไดกลางห้องไม่ชน', !r.some(x => x.code === 'A6'));
 r = C.check(m, { buildingType: 'residential' });
 check('B4 อาคารอยู่อาศัย: กว้าง 0.90 ลูกตั้ง 0.20 ผ่านข้อ 23', !r.some(x => x.code === 'B4' && x.title.includes('ไม่ผ่าน')));
 // C3 ผนังวางบนพื้นวางบนดิน
@@ -81,6 +81,23 @@ check('C2 คานยื่นสั้นจากเสา ปลายอิ
 // A1 ท่อที่เขียนไว้ลอดเสา = error
 m = clone(); m.mep.plumbing.pipes.push({ id: 'P-X', system: 'cw', dia: '1/2"', pts: [[-0.5, 0.0, 1.0], [0.5, 0.0, 1.0]] });
 check('A1 ท่อ P-X ลอดเสา C1-1A-2 = error', has(C.check(m), 'A1', 'error', 'P-X', 'C1-1A-2'));
+
+// A6 ท่อฝังพื้นโผล่พ้นพื้นสำเร็จ · A1 ท่อผ่านคานเอ็น (แบบจำลองเล็กสร้างเอง)
+{
+  const mk = (z, extra) => ({ nodes: [{ id: 'a', x: 0, y: 0, z: 0.6 }, { id: 'b', x: 4, y: 0, z: 0.6 }], sections: [{ id: 'L', kind: 'rc_rect', b: 0.1, h: 0.15 }],
+    members: [{ id: 'LS', type: 'lintel', mark: 'คานเอ็น', i: 'a', j: 'b', section: 'L' }],
+    slabs: [{ id: 'S1', kind: 'ground', t: 0.12, top: 0.15, finish_t: 0.05, polygon: [[0, 0], [4, 0], [4, 3], [0, 3]] }],
+    walls: [{ id: 'W1', kind: 'brick', t: 0.1, path: [[0, 0], [4, 0]], bottom: 0.15, top: 2.8 }],
+    mep: { plumbing: { pipes: [Object.assign({ id: 'P1', system: 'waste', dia: '2"', pts: [[1, 0, z], [1, 0.5, z]] }, extra || {})] } } });
+  check('A6 ท่อ 2" ศูนย์ +0.18 หลังท่อ +0.21 > พื้นสำเร็จ +0.20 = warn', has(C.check(mk(0.18)), 'A6', 'warn', 'P1', 'S1'));
+  check('A6 ท่อ 2" ศูนย์ +0.16 หลังท่อ +0.19 ไม่เตือน', !C.check(mk(0.16)).some(x => x.code === 'A6'));
+  check('A6 ท่อที่ระบุ exposed ไม่เตือน', !C.check(mk(0.18, { exposed: true })).some(x => x.code === 'A6'));
+  check('A6 ท่อเดินลอยเหนือพื้น (+0.50) ไม่เตือน', !C.check(mk(0.50)).some(x => x.code === 'A6'));
+  const v = mk(0.16); v.mep.plumbing.pipes.push({ id: 'P2', system: 'cw', dia: '1"', pts: [[2, 0, 0.2], [2, 0, 1.4]] });
+  check('A1 ท่อขึ้นในผนังผ่านคานเอ็น LS = warn', has(C.check(v), 'A1', 'warn', 'P2', 'LS'));
+  v.mep.plumbing.pipes[1].pts = [[2, 0.2, 0.2], [2, 0.2, 1.4]];
+  check('A1 ท่อขึ้นห่างคานเอ็น ไม่เตือน', !has(C.check(v), 'A1', 'warn', 'P2', 'LS'));
+}
 
 // ประเภทอาคารตามกฎหมาย
 let L = C.classify(clone());

@@ -63,3 +63,48 @@ js = "const v=require('/home/claude/UD-Total-Station/lib/viewer3d.js').BmViewer;
 FC = json.loads(subprocess.run(['node', '-e', js, sys.argv[1] if len(sys.argv) > 1 else 'stage5a.bm.json'], capture_output=True, text=True).stdout)
 json.dump(FC, open('fittings.json', 'w'), ensure_ascii=False)
 print('ข้อต่อ (นับด้วยตัวเดียวกับเว็บ):', sum(f[3] for f in FC)); [print('  ', f) for f in FC]
+
+# ตรวจด้วยตัวตรวจ Clash ของเว็บ (ท่อลอดเสา/ตอม่อ/ฐานราก · ท่อโผล่พ้นพื้นสำเร็จ ฯลฯ)
+js2 = "const C=require('/home/claude/UD-Total-Station/lib/clash.js');const m=JSON.parse(require('fs').readFileSync(process.argv[1]));C.check(m,{buildingType:'public'}).filter(x=>x.sev!=='info').forEach(x=>console.log('  ',x.sev,x.code,x.title,'|',x.detail))"
+print('Clash เว็บ (error/warn):'); print(subprocess.run(['node', '-e', js2, sys.argv[1] if len(sys.argv) > 1 else 'stage5a.bm.json'], capture_output=True, text=True).stdout)
+
+# ---- ท่อ (รวมท่อฝังผนัง) กับ เสา ตอม่อ เสาเอ็น ทับหลัง · ปลอกท่อ · จุดทะลุพื้น/ผนัง
+S = {s['id']: s for s in m['sections']}
+def mbox(b):
+    a, e = N[b['i']], N[b['j']]; s = S.get(b['section'], {}); bw, bh = s.get('b', 0.1), s.get('h', 0.1)
+    if abs(a['x'] - e['x']) < 1e-6 and abs(a['y'] - e['y']) < 1e-6:   # แนวดิ่ง
+        return (a['x'] - bw / 2, a['y'] - bh / 2, min(a['z'], e['z'])), (a['x'] + bw / 2, a['y'] + bh / 2, max(a['z'], e['z']))
+    w = bw / 2; hz = abs(a['x'] - e['x']) > abs(a['y'] - e['y'])
+    return (min(a['x'], e['x']) - (0 if hz else w), min(a['y'], e['y']) - (w if hz else 0), a['z'] - bh), (max(a['x'], e['x']) + (0 if hz else w), max(a['y'], e['y']) + (w if hz else 0), a['z'])
+hits = collections.defaultdict(float)
+MB = [(b, mbox(b)) for b in m['members'] if b['type'] in ('column', 'stiffener', 'lintel')]
+for p in P:
+    r = OD[p['dia']] / 2
+    for s, t in zip(p['pts'], p['pts'][1:]):
+        L = d3(s, t); n = max(1, int(L / 0.01))
+        for k in range(n + 1):
+            q = [s[i] + (t[i] - s[i]) * k / n for i in range(3)]
+            for b, (lo, hi) in MB:
+                if all(lo[i] - r + 0.003 < q[i] < hi[i] + r - 0.003 for i in range(3)): hits[(p['id'], b['id'], b['type'])] += L / n
+print('ท่อผ่านเนื้อ เสา/ตอม่อ/เสาเอ็น/ทับหลัง:', len(hits))
+for k, v in sorted(hits.items()): print('  ', k, round(v, 2))
+# ปลอกท่อ: ท่อแนวนอนผ่านเนื้อคาน = ต้องฝังปลอก (ตรวจข้างบน = 0) · นับจุดลอดใต้คาน และจุดท่อแนวดิ่งทะลุพื้น
+under = collections.Counter(); thru = collections.Counter()
+def ccw(A, B_, C): return (C[1] - A[1]) * (B_[0] - A[0]) > (B_[1] - A[1]) * (C[0] - A[0])
+def inpoly(pt, poly):
+    c = False
+    for i in range(len(poly)):
+        (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % len(poly)]
+        if (y1 > pt[1]) != (y2 > pt[1]) and pt[0] < (x2 - x1) * (pt[1] - y1) / (y2 - y1) + x1: c = not c
+    return c
+for p in P:
+    for s, t in zip(p['pts'], p['pts'][1:]):
+        if abs(s[2] - t[2]) < 0.02:   # แนวนอน: ตัดแนวศูนย์คาน และอยู่ใต้ท้องคาน
+            for (a, e, T) in B:
+                if ccw(s, a, e) != ccw(t, a, e) and ccw(s, t, a) != ccw(s, t, e) and max(s[2], t[2]) < T - 0.40 + 0.001: under[(p['system'], p['dia'])] += 1
+        elif math.hypot(s[0] - t[0], s[1] - t[1]) < 0.02:   # แนวดิ่ง: ทะลุแผ่นพื้น
+            for sl in m['slabs']:
+                if sl.get('ramp') or sl['id'] == 'S-RB': continue
+                if inpoly(s, sl['polygon']) and min(s[2], t[2]) < sl['top'] - sl['t'] + 0.001 and max(s[2], t[2]) > sl['top'] - 0.001: thru[(p['system'], p['dia'])] += 1
+print('จุดท่อลอดใต้คานคอดิน:', sum(under.values()), dict(under)); print('จุดท่อแนวดิ่งทะลุพื้น:', sum(thru.values()), dict(thru))
+json.dump({'under': [[*k, v] for k, v in sorted(under.items())], 'thru': [[*k, v] for k, v in sorted(thru.items())], 'member_hits': [[*k, round(v, 2)] for k, v in sorted(hits.items())]}, open('sleeve.json', 'w'), ensure_ascii=False)

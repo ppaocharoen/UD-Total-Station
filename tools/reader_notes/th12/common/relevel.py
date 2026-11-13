@@ -3,6 +3,7 @@
 #   ผนังก่อเริ่มที่หลังคาน (ไม่อยู่บนคาน = หลังพื้นโครงสร้าง) · ตอม่อจบที่ท้องคานต่ำสุดของหัวเสานั้น · ระดับช่องเปิดคงเดิม
 import math
 FIN = 0.05
+FIN_RAMP = 0.03   # ทรายล้างทางลาด/ชานพัก (Earth 13 พ.ย.)
 NOTE = 'Earth 12–13 พ.ย.: หลังคาน = พื้นสำเร็จฝั่งบ่าคาน − 0.05'
 def beam_top(a, b):
     """หลังคานของ ท12 ตามตารางที่ Earth ยืนยัน 13 พ.ย.: +0.20 เฉพาะแถว A · คาน A+0.90 · กริด 1–4 ช่วง A–B (พื้น +0.25) นอกนั้น +0.15"""
@@ -31,7 +32,14 @@ def relevel(m):
     STR = {}
     for s in m['slabs']:
         i = s['id']; old = s['top']
-        if i.startswith('S-WK') or i in ('S-RAMP', 'S-LAND', 'S-RB'): STR[i] = old; continue   # ทางเดินไม่มีฟินิช · ทางลาดรอความหนาทรายล้าง
+        if i.startswith('S-WK') or i == 'S-RB': STR[i] = old; continue   # ทางเดินไม่มีฟินิช · พื้นล่างกล่องทางลาดคงเดิม
+        if i in ('S-RAMP', 'S-LAND'):   # ทางลาด/ชานพัก: ฟินิช = ทรายล้างหนา 0.03 (Earth 13 พ.ย.)
+            s['finish_t'] = FIN_RAMP; s['top'] = round(old - FIN_RAMP, 3); STR[i] = s['top']; s['status'] = 'user'
+            if 'ramp' in s: s['ramp'] = dict(s['ramp'], low=round(s['ramp']['low'] - FIN_RAMP, 3), high=round(s['ramp']['high'] - FIN_RAMP, 3))
+            if i == 'S-RAMP': s['sand'] = 0.027; sn = 'ทรายอัดในกล่อง ≈ 0.065 ลบ.ม. (ช่องใน 0.75 × ยาว 1.44 × สูงเฉลี่ย 0.06) คิดเป็นหนาเทียบเท่า 0.027 บนพื้นที่ 2.40'
+            else: s['sand'] = 0.083; sn = 'ทรายอัดในกล่อง ≈ 0.099 ลบ.ม. (ช่องใน 0.75 × 1.10 × 0.12) คิดเป็นหนาเทียบเท่า 0.083 บนพื้นที่ 1.20'
+            s['note'] = (s.get('note') or '').split(' · ทรายอัดในกล่อง')[0] + f' · {sn} · หลังพื้นโครงสร้างต่ำกว่าผิวสำเร็จ 0.03 = ความหนาทรายล้าง (Earth 13 พ.ย.) — ผิวสำเร็จคงเดิม {old:+.2f}'
+            continue
         s['finish_t'] = FIN; s['top'] = round(old - FIN, 3); STR[i] = s['top']
         if s.get('t') == 0.17: s['t'] = 0.12
         s['status'] = 'user'
@@ -90,6 +98,13 @@ def relevel(m):
                 nt = f'{tp}-L{int(round(d * 100))}'
                 if nt not in OT: OT[nt] = dict(OT[tp], sill=round((OT[tp].get('sill') or 0) + d, 3))
                 o['type'] = nt
+    # ---- ผนัง คสล. กล่องทางลาด: ยอด = ท้องพื้นบน ลดตาม 0.03 · ช่วงแรกสั้นลง (พื้นบนชนพื้นล่างถึง x 3.96)
+    for w in m['walls']:
+        if not w['id'].startswith('RW-'): continue
+        old = w['top']; w['top'] = round(old - FIN_RAMP, 3)
+        if w['top'] <= 0.001:   # RW-O1 / RW-I1: เหลือเฉพาะ x 3.96–4.20 สูงเฉลี่ย 0.01
+            w['path'] = [[3.96, w['path'][0][1]], w['path'][-1]]; w['top'] = 0.01
+        w['status'] = 'user'; w['note'] = (w.get('note') or '') + f' · ยอดผนังลด 0.03 ตามพื้นบนที่ลดเท่าความหนาทรายล้าง (เดิม {old:+.3f} → {w["top"]:+.3f} · Earth 13 พ.ย.)'
     m['meta']['releveled'] = True
-    m['meta']['level_rule'] = 'พื้น on ground: หลังคานคอดิน = พื้นสำเร็จฝั่งบ่าคาน − 0.05 · พื้นโครงสร้าง = พื้นสำเร็จ − 0.05 (ทางเดินไม่มีฟินิช) · ผนังก่อจากหลังคาน (Earth 12–13 พ.ย. 2569)'
+    m['meta']['level_rule'] = 'พื้น on ground: หลังคานคอดิน = พื้นสำเร็จฝั่งบ่าคาน − 0.05 · พื้นโครงสร้าง = พื้นสำเร็จ − 0.05 (ทางเดินไม่มีฟินิช) · ผนังก่อจากหลังคาน · ทางลาด/ชานพัก ฟินิชทรายล้าง 0.03 (Earth 12–13 พ.ย. 2569)'
     return m
