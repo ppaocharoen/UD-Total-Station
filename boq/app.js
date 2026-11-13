@@ -950,7 +950,7 @@ function kpiHtml(T, plan) {
 }
 function renderFitSum() {   // ตารางนับข้อต่อท่อในเมนูข้าง (นับจากโมเดล 3D)
   if (!$('#side-sum')) return;
-  const fl = (S.viewer && S.viewer.fittings) || [], g = {}, SN = { cw: 'ประปา', hw: 'น้ำร้อน', waste: 'น้ำทิ้ง', soil: 'โสโครก', vent: 'ระบายอากาศ', rain: 'น้ำฝน', drain: 'ระบายน้ำ' };   // นับข้อต่อท่อตามระบบ/ชนิด/ขนาด
+  const fl = (S.viewer && S.viewer.fittings) || [], g = {}, SN = { cw: 'ประปา', hw: 'น้ำร้อน', waste: 'น้ำทิ้ง', soil: 'โสโครก', vent: 'ระบายอากาศ', rain: 'น้ำฝน', drain: 'ระบายน้ำ', conduit: 'ท่อร้อยสาย' };   // นับข้อต่อท่อตามระบบ/ชนิด/ขนาด
     fl.forEach(f => { const k = [SN[f.system] || f.system, f.label, f.size].join('|'); g[k] = (g[k] || 0) + 1; });
     const ks = Object.keys(g).sort();
     $$('#side-sum .fit-sum').forEach(x => x.remove());

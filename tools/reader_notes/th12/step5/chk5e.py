@@ -9,7 +9,22 @@ def mbox(b):
         return (a['x'] - bw / 2, a['y'] - bh / 2, min(a['z'], e['z'])), (a['x'] + bw / 2, a['y'] + bh / 2, max(a['z'], e['z']))
     hz = abs(a['x'] - e['x']) > abs(a['y'] - e['y']); w = bw / 2
     return (min(a['x'], e['x']) - (0 if hz else w), min(a['y'], e['y']) - (w if hz else 0), min(a['z'], e['z']) - bh), (max(a['x'], e['x']) + (0 if hz else w), max(a['y'], e['y']) + (w if hz else 0), max(a['z'], e['z']))
-MB = [(b, mbox(b)) for b in m['members'] if b['type'] in ('column', 'stiffener', 'lintel', 'tie_beam', 'steel_beam', 'steel_column')]
+STEEL = ('steel_beam', 'steel_column', 'rafter', 'truss_chord', 'truss_web')
+MB = [(b, mbox(b)) for b in m['members'] if b['type'] in ('column', 'stiffener', 'lintel', 'tie_beam')]
+MS = []   # เหล็กรูปพรรณ: ศูนย์ชิ้น = แกนชิ้น · ตรวจแบบแกนเอียงได้ (จันทันลาด)
+for b in m['members']:
+    if b['type'] not in STEEL: continue
+    a_, e_ = N[b['i']], N[b['j']]; s_ = S.get(b['section'], {})
+    MS.append((b, (a_['x'], a_['y'], a_['z']), (e_['x'], e_['y'], e_['z']), (s_.get('b') or 0.05) / 2, (s_.get('h') or 0.1) / 2))
+def in_steel(q, A, B, hb, hh):
+    d = [B[i] - A[i] for i in range(3)]; L = math.sqrt(sum(c * c for c in d))
+    u = [c / L for c in d]; w = [q[i] - A[i] for i in range(3)]; t = sum(w[i] * u[i] for i in range(3))
+    if t < -R or t > L + R: return False
+    p = [w[i] - t * u[i] for i in range(3)]
+    if abs(u[2]) > 0.9: return abs(p[0]) < hb * 2 + R - 0.002 and abs(p[1]) < hh + R - 0.002 if False else (abs(p[0]) < 0.05 + R - 0.002 and abs(p[1]) < 0.05 + R - 0.002)
+    hz = [-u[1], u[0], 0]; hn = math.hypot(*hz[:2]) or 1; hz = [c / hn for c in hz]
+    off_h = abs(sum(p[i] * hz[i] for i in range(3))); off_v = abs(p[2] / (math.hypot(u[0], u[1]) or 1))
+    return off_h < hb + R - 0.002 and off_v < hh + R - 0.002
 el = m['mep']['electrical']; R = 0.01
 hits = collections.defaultdict(float)
 lines = [(c['id'], c['pts']) for c in el['conduits']] + [('SERVICE', el['service']['pts'])]
@@ -20,6 +35,8 @@ for cid, P in lines:
             q = [s[i] + (t[i] - s[i]) * k / n for i in range(3)]
             for b, (lo, hi) in MB:
                 if all(lo[i] - R + 0.002 < q[i] < hi[i] + R - 0.002 for i in range(3)): hits[(cid, b['id'], b['type'])] += L / n
+            for b, A_, B_, hb, hh in MS:
+                if in_steel(q, A_, B_, hb, hh): hits[(cid, b['id'], b['type'])] += L / n
 print('ท่อร้อยสายผ่านเนื้อโครงสร้าง:', len(hits))
 for k, v in sorted(hits.items()): print('  ', k, round(v, 2))
 tot = sum(math.dist(P[i], P[i + 1]) for _, P in lines[:-1] for i in range(len(P) - 1))

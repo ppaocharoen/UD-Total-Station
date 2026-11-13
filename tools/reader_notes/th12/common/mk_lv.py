@@ -22,4 +22,4 @@ for d in diff: print('  ', d)
 # ตารางตรวจ = ต้นฉบับ + ภาคผนวก common/app_lv.json (แก้ข้อความภาคผนวกในไฟล์นั้น · ตารางปริมาณมาจาก lvdiff.json)
 A = json.load(open(f'{W}/common/app_lv.json'))
 for n, src in ((2, 's2'), (3, 's3'), (4, 's4')):
-    open(f'{OUT}/th12s{n}/ตารางตรวจ Step{n}.md', 'w').write(open(f'{W}/{src}/ตารางตรวจ Step{n}.md').read().rstrip() + '\n' + '\n'.join(A) + '\n')
+    open(f'{OUT}/th12s{n}/ตารางตรวจ Step{n}.md', 'w').write(open(f'{W}/{src}/ตารางตรวจ Step{n}.md').read().rstrip() + '\n' + '\n'.join(A) + '\n' + (open(f'{W}/common/app4.md').read() if n == 4 else ''))

@@ -82,151 +82,254 @@ circuits = [
 m['mep']['electrical'] = {'route_height': CEIL, 'wire_type': 'IEC 01 (THW)', 'conduit': 'PVC สีขาว 1/2"', 'panels': [panel], 'point_types': PT, 'circuits': circuits, 'points': pts,
                           'note': 'E.2.01: เดินสายร้อยท่อ PVC สีขาว — แสงสว่างเดินลอยใต้ฝ้าเพดาน · ปลั๊ก/สวิตช์ฝังท่อในผนัง ใส่บล็อกฝังผนัง · ระดับ/ตำแหน่งเป็นแนวทางเบื้องต้น ปรับได้ตามหน้างาน · ยังไม่ได้เขียนแนวท่อร้อยสาย (ปริมาณท่อ/สายประมาณจากตำแหน่งจุด เดินระดับฝ้าแบบมุมฉาก)'}
 
-# ================= แนวท่อร้อยสายจริง (Earth 13 พ.ย.: เขียนแนวจริง ตามแนวทางที่ตกลงไว้ตอนทำแบบห้องสุขาชุดก่อน 22 ต.ค.)
-# เส้นสายไฟในแบบ (ชั้น EL_wire) = สายจากสวิตช์ไปโคม (เส้นโค้ง/เฉียง = สัญลักษณ์โยงจุด) → เดินท่อมุมฉากเลียบแนวผนัง/คาน
-# ระดับ: แสงสว่างเดินลอยใต้ท้องฝ้า (หมายเหตุ E.2.01) · ลงสวิตช์/เต้ารับ/แผงฝังในผนัง · สายป้อนจากแผง LC แบบไม่เขียน → มุมฉาก จุดใกล้สุดทีละจุด (คิดเอง)
-import math, collections, sys
+# ================= แนวท่อร้อยสาย รอบ 3 (Earth 13 พ.ย. 16:17/16:28)
+# - ท่อเดินเหนือฝ้า ในช่องโครงคร่าว C-Line ใต้ท้องจันทัน (A.4.01: ฝ้าไม่ติดจันทัน มี C-Line ขวางก่อน · ผ่าน C-Line เจาะรู)
+# - ลงสวิตช์/เต้ารับ/แผง: ฝังผนังขึ้นถึงหลังผนัง → ลากบนหลังผนังไปเสาที่ใกล้สุด → ขึ้นตามผิวเสาเข้าเหนือฝ้า (ไม่ลอยขึ้นจากผนังตรงไปฝ้า)
+# - แนวเหนือฝ้าตรง หักน้อย: ท่อหลักแนวแถว B ชิดหน้าเสา · กิ่งเข้าโคมเป็นตัว L เส้นเดียว · กล่องต่อสายที่หัวเสา/ที่โคม (นับจำนวนได้)
+# - ข้ามแนวคานใต้ท้องจันทัน (โครง TRUSS แถว A · อะเสบน RB-B2 แถว B · อะเส RB-C แถว C): ยกท่อข้ามหลังคานระหว่างจันทัน
+# - กลุ่มสวิตช์ → โคม ใช้ตามเส้นสายในแบบ E.2.01 (ตรวจด้วยโปรแกรมด้านล่าง)
+import math, collections, sys, heapq
 sys.path.insert(0, H); from ex5 import sheet, loc
 ESH = sheet('E.2.01'); EL = loc('E.2.01')
 PTS = {p['id']: p for p in pts}
-RAWE = {}   # จุดที่เส้นสายในแบบมาจับ: ปลายหลอดทั้งสอง + กึ่งกลาง / ตำแหน่งสัญลักษณ์สวิตช์
+# ---- ตรวจกลุ่มสวิตช์ → โคม จากเส้นสายในแบบ
+RAWE = {}
 for p in pts:
     x, y = p['xyz'][:2]
     if p['type'] in ('L18', 'L9'):
         h = 0.60 if p['type'] == 'L18' else 0.35
         d = (0, h) if p.get('rot') == 90 else (h, 0)
         RAWE[p['id']] = [(x - d[0], y - d[1]), (x + d[0], y + d[1]), (x, y)]
-SYMSW = {f'S-{n}': (sx if sx is not None else x, (2.007 if n in ('02', '11') else y) if r != 90 else 3.32) for n, x, y, r, sx, room, ctl in SW}
-for k, v in SYMSW.items(): RAWE[k] = [v]
+for n, x, y, r, sx, room, ctl in SW: RAWE[f'S-{n}'] = [(sx if sx is not None else x, (2.007 if n in ('02', '11') else y) if r != 90 else 3.32)]
 RAWE['WL-01'] = [(-0.002, -0.096)]; RAWE['WL-02'] = [(10.798, -0.296)]
 def near_pt(pt):
-    best = min(((math.dist(pt, e), pid, e) for pid, es in RAWE.items() for e in es), default=(9, None, None))
-    return (best[1], best[2]) if best[0] < 0.45 else (None, None)
-WALL2 = [w['path'] for w in m['walls'] if w['kind'] in ('brick_mon', 'block', 'aac') and len(w['path']) == 2 and not w['id'].startswith('W-ST')]
-def wdist(px, py):
-    best = 9
-    for a, b in WALL2:
-        dx, dy = b[0] - a[0], b[1] - a[1]; L2 = dx * dx + dy * dy or 1e-9
-        t = max(0, min(1, ((px - a[0]) * dx + (py - a[1]) * dy) / L2)); best = min(best, math.hypot(px - a[0] - t * dx, py - a[1] - t * dy))
-    return best
-def hug(a, b, n=10): return sum(wdist(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n) for k in range(n + 1)) / (n + 1) * math.dist(a, b)
-def Lp(a, b):
-    c1, c2 = (b[0], a[1]), (a[0], b[1])
-    return [a, c1, b] if hug(a, c1) + hug(c1, b) <= hug(a, c2) + hug(c2, b) else [a, c2, b]
-def ortho(xy, arc):
-    if arc: return Lp(xy[0], xy[-1])
-    out = [xy[0]]
-    for b in xy[1:]:
-        a = out[-1]
-        if math.dist(a, b) < 0.01: continue
-        out += [b] if abs(a[0] - b[0]) < 0.02 or abs(a[1] - b[1]) < 0.02 else Lp(a, b)[1:]
-    return out
-ZOFF = 0.015   # ท่อ 1/2" เดินลอยแนบใต้ฝ้า (ศูนย์ท่อต่ำกว่าผิวฝ้า)
-zt = lambda x, y: round(zc(y) - ZOFF, 3)
-def into_wall(p):   # จุดในแนวศูนย์ผนังหลังกล่องสวิตช์/เต้ารับ/แผง (ฝังผนัง)
-    r = math.radians(p.get('rot', 0)); return (round(p['xyz'][0] - 0.03 * math.cos(r), 3), round(p['xyz'][1] - 0.03 * math.sin(r), 3))   # ท่อฝังในเนื้อผนัง ลึกจากผิว 0.03
-def drop(p, top=True):   # จากใต้ฝ้า ลงในผนังถึงกล่อง
-    wx, wy = into_wall(p); z = p['xyz'][2]
-    return [[wx, wy, zt(wx, wy)], [wx, wy, z]]
-cond = []
-def C(cid, circ, pts3, st, note):
-    q = [[round(a, 3) for a in p] for p in pts3]; out = [q[0]]
-    for p in q[1:]:
-        if math.dist(p, out[-1]) > 0.005: out.append(p)
-    cond.append({'id': cid, 'circuit': circ, 'pts': out, 'status': st, 'src': SRC, 'note': note})
-HEADS = []
-for p in sorted([p for p in pts if p['type'] in ('S1', 'P1')], key=lambda p: p['id']):
-    if not any(h['circuit'] == p['circuit'] and h['type'] == p['type'] and math.dist(into_wall(p), into_wall(h)) < 0.45 for h in HEADS): HEADS.append(p)   # สวิตช์ติดกันใช้กล่องรวม/ท่อลงเส้นเดียว
-HEAD_OF = {p['id']: next(h for h in HEADS if h['circuit'] == p['circuit'] and h['type'] == p['type'] and math.dist(into_wall(p), into_wall(h)) < 0.45) for p in pts if p['type'] in ('S1', 'P1')}
-wires = []
+    b = min(((math.dist(pt, e), pid) for pid, es in RAWE.items() for e in es), default=(9, None))
+    return b[1] if b[0] < 0.45 else None
+par = {p: p for p in PTS}
+def fnd(a):
+    while par[a] != a: par[a] = par[par[a]]; a = par[a]
+    return a
+nw = 0
 for qd in ESH['prims']:
     if qd.get('layer') != 'EL_wire' or qd.get('parent') is not None: continue
     if qd['kind'] == 'poly': xy = [EL(p) for p in qd['p']]
     elif qd['kind'] == 'arc':
         c = EL(qd['c']); a0, a1 = math.radians(qd['a0']), math.radians(qd['a1'])
         if a1 < a0: a1 += 2 * math.pi
-        xy = [(c[0] + qd['r'] * math.cos(a0 + (a1 - a0) * k / 12), c[1] + qd['r'] * math.sin(a0 + (a1 - a0) * k / 12)) for k in range(13)]
+        xy = [(c[0] + qd['r'] * math.cos(a0), c[1] + qd['r'] * math.sin(a0)), (c[0] + qd['r'] * math.cos(a1), c[1] + qd['r'] * math.sin(a1))]
     else: continue
-    xy = [(float(x), float(y)) for x, y in xy]
-    if max(x for x, _ in xy) > 11.8: continue   # ตารางสัญลักษณ์
-    (A, ea), (B, eb) = near_pt(xy[0]), near_pt(xy[-1])
-    wires.append((ortho(xy, qd['kind'] == 'arc'), A, B, ea, eb))
-LAMP = ('L18', 'L9', 'WL')
-for k, (xy, A, B, ea, eb) in enumerate(wires, 1):
-    p3 = [[x, y, zt(x, y)] for x, y in xy]
-    for end, pid in ((0, A), (1, B)):
-        if not pid: continue
-        p = PTS[pid]
-        if p['type'] == 'S1':
-            seg = drop(HEAD_OF[pid]); h = [[seg[0][0], p3[0 if end == 0 else -1][1], seg[0][2]]] if False else []
-            # จากปลายเส้นในแบบ เดินมุมฉากถึงเหนือจุดลงผนัง แล้วลงในผนัง
-            tip = p3[0] if end == 0 else p3[-1]
-            via = [[q[0], q[1], zt(q[0], q[1])] for q in Lp(tuple(tip[:2]), tuple(seg[0][:2]))[1:]]
-            add_ = via + [seg[1]]
-            p3 = (add_[::-1] + p3) if end == 0 else (p3 + add_)
-        elif p['type'] == 'WL':   # โคมกิ่งติดผนังภายนอก: ลงตามผิวเสา/ผนังถึงโคม
-            tip = p3[0] if end == 0 else p3[-1]
-            ox, oy = p['xyz'][0], p['xyz'][1] - 0.012   # ท่อลอยแนบผิวเสา/ผนังด้านนอก
-            add_ = [[ox, oy, tip[2]], [ox, oy, p['xyz'][2] + 0.11]]
-            p3 = (add_[::-1] + p3) if end == 0 else (p3 + add_)
-        else:   # โคม: ปลายท่อเข้ากล่องโคมที่ระดับใต้ฝ้า
-            tip = p3[0] if end == 0 else p3[-1]
-            if math.dist(tip[:2], p['xyz'][:2]) > 0.02 and pid in RAWE and not any(math.dist(tip[:2], e) < 0.02 for e in RAWE[pid]):
-                e = min(RAWE[pid], key=lambda e: math.dist(e, tip[:2])); add_ = [[e[0], e[1], zt(*e)]]
-                p3 = (add_ + p3) if end == 0 else (p3 + add_)
-    C(f'EW-{k:02d}', 'L1', p3, 'from_drawing', f'แนวสายตาม E.2.01 ({A or "?"} ↔ {B or "?"}) · เส้นในแบบปรับเป็นมุมฉากเลียบแนวผนัง · เดินลอยใต้ฝ้า ลงสวิตช์ฝังผนัง')
-# ตรวจ: สวิตช์ → โคม จากเส้นในแบบ เทียบกับที่อ่านไว้
-par = {p: p for p in PTS}
-def fnd(a):
-    while par[a] != a: par[a] = par[par[a]]; a = par[a]
-    return a
-for xy, A, B, ea, eb in wires:
+    if max(float(x) for x, _ in xy) > 11.8: continue
+    A, B = near_pt(tuple(map(float, xy[0]))), near_pt(tuple(map(float, xy[-1]))); nw += 1
     if A and B: par[fnd(A)] = fnd(B)
+LAMP = ('L18', 'L9', 'WL')
 grp = collections.defaultdict(set)
 for pid in PTS:
     if PTS[pid]['type'] in LAMP + ('S1',): grp[fnd(pid)].add(pid)
-CHK = []
-for p in pts:
-    if p['type'] == 'S1':
-        g = {q for q in grp[fnd(p['id'])] if PTS[q]['type'] in LAMP}
-        CHK.append((p['id'], sorted(g), sorted(p['controls']), g == set(p['controls'])))
-# สายป้อน: แผง LC → กลุ่มสวิตช์ (L1) / เต้ารับ (P1, P2) มุมฉากใต้ฝ้า จุดใกล้สุดทีละจุด ลงผนังที่ปลาย
-pn = panel; pw = into_wall(pn)
-def feeders(circ, targets):
-    cur = pw; first = True; k = 0
-    while targets:
-        nx = min(targets, key=lambda q: abs(into_wall(q)[0] - cur[0]) + abs(into_wall(q)[1] - cur[1])); targets.remove(nx); k += 1
-        tw = into_wall(nx)
-        p3 = ([[pw[0], pw[1], pn['xyz'][2] + 0.20]] if first else []) + [[q[0], q[1], zt(*q)] for q in Lp(cur, tw)] + [[tw[0], tw[1], nx['xyz'][2]]]
-        C(f'EF-{circ}-{k:02d}', circ, p3, 'assumed', f'สายป้อนจากแผง LC ถึง {nx["id"]} — แบบไม่เขียนแนว: เดินมุมฉากใต้ฝ้า ขึ้น/ลงฝังผนัง (คิดเอง)')
-        cur = tw; first = False
-feeders('L1', [h for h in HEADS if h['type'] == 'S1']); feeders('P1', [h for h in HEADS if h['circuit'] == 'P1']); feeders('P2', [h for h in HEADS if h['circuit'] == 'P2'])
-# สวิตช์ติดกัน (กล่องข้างกัน) ต่อถึงกันในผนัง
+CHK = [(p['id'], sorted(q for q in grp[fnd(p['id'])] if PTS[q]['type'] in LAMP), sorted(p['controls'])) for p in pts if p['type'] == 'S1']
+assert all(a == b for _, a, b in CHK), CHK
+
+# ---- เรขาคณิต
+PL = lambda y: 3.70 - 0.06897 * y          # ท้องจันทัน (ระนาบโครงหลังคา)
+ZC = lambda y: round(PL(y) - 0.02, 3)      # ศูนย์ท่อในช่อง C-Line ใต้ท้องจันทัน
+ZH = lambda y: round(PL(y) + 0.035, 3)     # ยกข้ามหลังคานระหว่างจันทัน
+BEAMS = [(0.0, 0.0375 + 0.03, 'โครง TRUSS แถว A'), (1.5, 0.05 + 0.03, 'อะเสบน RB-B2 แถว B'), (5.8, 0.05 + 0.03, 'อะเส RB-C แถว C')]
+RAFX = [-1.062 + 1.0771 * k for k in range(13)]
+raf_ok = lambda x: all(abs(x - r) > 0.05 for r in RAFX)
+def into_wall(p, d=0.03):
+    r = math.radians(p.get('rot', 0)); return (round(p['xyz'][0] - d * math.cos(r), 3), round(p['xyz'][1] - d * math.sin(r), 3))
+WSEG = [(w['id'], tuple(w['path'][0]), tuple(w['path'][1]), w['top']) for w in m['walls']
+        if w['kind'] in ('brick_mon', 'block', 'aac') and len(w['path']) == 2 and w['top'] >= 2.5 and not w['id'].startswith(('W-ST', 'KW'))]
+COLS = {c['id']: (N_[c['i']]['x'], N_[c['i']]['y']) for N_ in [{n['id']: n for n in m['nodes']}] for c in m['members'] if c['type'] == 'column' and c['id'].startswith('C-') and not c['id'].endswith('j')}
+def proj(p, a, b):
+    dx, dy = b[0] - a[0], b[1] - a[1]; L2 = dx * dx + dy * dy
+    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2)); q = (a[0] + t * dx, a[1] + t * dy)
+    return q, math.dist(p, q)
+# กราฟหลังผนัง: จุด = ปลายผนัง + จุดต่อแบบ T · เส้น = ช่วงผนัง (ระดับหลังผนังนั้น)
+G = collections.defaultdict(list); NODES = {}
+def nid(p): k = (round(p[0], 3), round(p[1], 3)); NODES[k] = p; return k
+segpts = {wid: [a, b] for wid, a, b, t in WSEG}
+for wid, a, b, t in WSEG:
+    for wid2, a2, b2, t2 in WSEG:
+        if wid2 == wid: continue
+        for e in (a2, b2):
+            q, dd = proj(e, a, b)
+            if dd < 0.08: segpts[wid].append(q)
+for wid, a, b, t in WSEG:
+    ps = sorted({nid(p) for p in segpts[wid]}, key=lambda k: math.dist(k, a))
+    for u, v in zip(ps, ps[1:]):
+        G[u].append((v, math.dist(u, v), t, wid)); G[v].append((u, math.dist(u, v), t, wid))
+    for wid2, a2, b2, t2 in WSEG:   # ปลายผนังต่อกับจุดบนผนังอีกเส้น (ขาตัว T)
+        pass
+for k in list(NODES):   # รวมจุดที่ใกล้กัน (ผนังชนกันที่ศูนย์ห่าง ≤ 0.08)
+    for k2 in list(NODES):
+        if k != k2 and math.dist(k, k2) < 0.08:
+            G[k].append((k2, math.dist(k, k2), None, 'J'))
+def wall_route(p):
+    """จากกล่องในผนัง → ขึ้นในผนังถึงหลังผนัง → ลากบนหลังผนังไปเสาที่ใกล้สุด → คืน (จุด 3D, เสา, ผิวเสาที่ขึ้น)"""
+    w0 = into_wall(p)
+    best = min(((proj(w0, a, b)[1], wid, a, b, t) for wid, a, b, t in WSEG), key=lambda r: r[0])
+    _, wid, a, b, top = best
+    q, _ = proj(w0, a, b)
+    start = ('S',)
+    dist = {start: 0}; prev = {}; pq = [(0, start)]; tops = {start: top}
+    nbr = lambda u: ([(nid(e), math.dist(q, e), top, wid) for e in ([a, b] + [pp for pp in segpts[wid]])] if u == start else G[u])
+    goal = None
+    while pq:
+        d0, u = heapq.heappop(pq)
+        if d0 > dist.get(u, 1e9): continue
+        up = q if u == start else u
+        cc = [(cid, c) for cid, c in COLS.items() if math.dist(up, c) < 0.17]
+        if cc: goal = (u, cc[0]); break
+        for v, L, t, w in nbr(u):
+            nd = d0 + L
+            if nd < dist.get(v, 1e9): dist[v] = nd; prev[v] = u; tops[v] = t if t is not None else tops[u]; heapq.heappush(pq, (nd, v))
+    u, (cid, c) = goal
+    chain = [u]
+    while chain[-1] != start: chain.append(prev[chain[-1]])
+    chain = chain[::-1]
+    pts3 = [[w0[0], w0[1], p['xyz'][2]]]
+    cur_top = top - 0.06   # ท่อฝังในผนังช่วงบนสุด (หลังผนังมีอะเสเหล็กวางทับบางแนว)
+    pts3.append([q[0], q[1], cur_top]) if math.dist(w0, q) > 0.005 else None
+    pts3[-1:] = [[w0[0], w0[1], cur_top]] if math.dist(w0, q) <= 0.005 else pts3[-1:]
+    for k in chain[1:]:
+        t = tops.get(k); zt = (t if t is not None else top) - 0.06
+        if abs(zt - pts3[-1][2]) > 0.005: pts3.append([pts3[-1][0], pts3[-1][1], zt])
+        pts3.append([k[0], k[1], zt])
+    # ตัดปลายที่เข้าไปในเนื้อเสา (เสา 0.20×0.20) ถอยกลับตามแนวผนังให้พ้นผิวเสา
+    while len(pts3) > 2 and max(abs(pts3[-1][0] - c[0]), abs(pts3[-1][1] - c[1])) < 0.10 + 0.012:
+        a_, b_ = pts3[-2], pts3[-1]; dx_, dy_ = b_[0] - a_[0], b_[1] - a_[1]; L_ = math.hypot(dx_, dy_)
+        if L_ < 1e-6: pts3.pop(); continue
+        for tt in [i / 100 for i in range(100, -1, -1)]:
+            px, py = a_[0] + dx_ * tt, a_[1] + dy_ * tt
+            if max(abs(px - c[0]), abs(py - c[1])) >= 0.112: break
+        pts3[-1] = [round(px, 3), round(py, 3), b_[2]]; break
+    # ผิวเสาที่ขึ้น: ด้านที่หันมาทางผนังที่มาถึง (ถ้าผ่านแนวคานแถว B/C ให้ขึ้นด้านนอกแนวคาน) — เลี่ยงแนวจันทัน
+    end = pts3[-1]; dx, dy = end[0] - c[0], end[1] - c[1]
+    # จุดขึ้นข้างเสา: พ้นแนวอะเสเหล็ก (แถว B/C วิ่งแนว x · กริด 1/4 วิ่งแนว y บนหลังผนัง) และอยู่ฝั่งในอาคาร
+    if abs(c[0]) < 0.01: fx = c[0] + 0.112
+    elif abs(c[0] - 10.8) < 0.01: fx = c[0] - 0.112
+    else: fx = c[0] + math.copysign(0.112, dx) if abs(dx) >= abs(dy) else end[0]
+    if abs(c[1] - 1.5) < 0.01: fy = 1.388 if (end[1] < 1.44 and abs(c[0]) > 0.01 and abs(c[0] - 10.8) > 0.01) else 1.612
+    elif abs(c[1] - 5.8) < 0.01: fy = c[1] - 0.112
+    else: fy = c[1] + math.copysign(0.112, dy) if abs(dy) > abs(dx) else end[1]
+    sg = 1 if fx >= c[0] else -1   # เลื่อนหนีแนวจันทันไปทางนอกเสาเท่านั้น
+    for dxx in (0, 0.06, 0.12, 0.18):
+        if raf_ok(fx + sg * dxx) and abs(fx + sg * dxx - c[0]) >= 0.112 - 1e-6 or (abs(fx - c[0]) < 0.112 and raf_ok(fx + sg * dxx)): fx += sg * dxx; break
+    pts3 += [[round(fx, 3), round(end[1], 3), end[2]]] if abs(fx - end[0]) > 0.005 else []
+    pts3 += [[round(fx, 3), round(fy, 3), end[2]]] if abs(fy - pts3[-1][1]) > 0.005 else []
+    pts3.append([round(fx, 3), round(fy, 3), ZC(fy)])
+    return pts3, cid, (round(fx, 3), round(fy, 3))
+def hopify(P):
+    """ช่วงท่อแนว y ที่ข้ามแนวคาน → ยกข้ามหลังคาน (ระหว่างจันทัน)"""
+    out = [P[0]]
+    for a, b in zip(P, P[1:]):
+        if abs(a[0] - b[0]) < 1e-6 and abs(a[1] - b[1]) > 1e-6 and abs(a[2] - ZC(a[1])) < 0.01 and abs(b[2] - ZC(b[1])) < 0.01:
+            s = 1 if b[1] > a[1] else -1
+            for yb, hw, nm in sorted(BEAMS, key=lambda r: s * r[0]):
+                if min(a[1], b[1]) < yb - hw and max(a[1], b[1]) > yb + hw:
+                    y1, y2 = yb - s * hw, yb + s * hw
+                    out += [[a[0], y1, ZC(y1)], [a[0], y1, ZH(y1)], [a[0], y2, ZH(y2)], [a[0], y2, ZC(y2)]]
+        out.append(b)
+    return out
+def Lroute(a, b, prefer=None):
+    """จาก a ไป b เหนือฝ้า: ตัว L เส้นเดียว · เลือกทางที่ข้ามคานน้อย และช่วงแนว y ไม่ทับแนวจันทันตอนยกข้ามคาน"""
+    opts = []
+    for corner in ((b[0], a[1]), (a[0], b[1])):
+        legs = [(a[:2], corner), (corner, b[:2])]
+        cross = sum(1 for p, q in legs if abs(p[0] - q[0]) < 1e-6 for yb, hw, nm in BEAMS if min(p[1], q[1]) < yb - hw and max(p[1], q[1]) > yb + hw)
+        bad = sum(1 for p, q in legs if abs(p[0] - q[0]) < 1e-6 and not raf_ok(p[0]) and any(min(p[1], q[1]) < yb < max(p[1], q[1]) for yb, hw, nm in BEAMS))
+        onbeam = sum(1 for p, q in legs if abs(p[1] - q[1]) < 1e-6 and math.dist(p, q) > 0.01 and any(abs(p[1] - yb) < hw for yb, hw, nm in BEAMS))
+        opts.append((bad * 10 + onbeam * 10 + cross, 0 if (prefer and corner == prefer) else 1, corner))
+    best = min(opts); corner = best[2]
+    P = [[a[0], a[1], ZC(a[1])], [corner[0], corner[1], ZC(corner[1])], [b[0], b[1], ZC(b[1])]]
+    if best[0] >= 10:   # ช่วงแนว y ที่ต้องยกข้ามคานอยู่ใต้แนวจันทัน → เยื้องแนวออกจากจันทัน (ตัว Z)
+        k = 0 if abs(P[0][0] - P[1][0]) < 1e-6 else 1
+        xa = P[k][0]; xs = next(xa + d for d in (0.07, -0.07, 0.12, -0.12) if raf_ok(xa + d))
+        p0, p1 = P[k], P[k + 1]
+        if k == 0: P = [p0, [xs, p0[1], p0[2]], [xs, p1[1], p1[2]], [p1[0], p1[1], p1[2]]] + P[2:]
+        else: P = P[:1] + [p0, [xs, p0[1], p0[2]], [xs, p1[1], p1[2]], p1]
+    P = [p for k, p in enumerate(P) if k == 0 or math.dist(p, P[k - 1]) > 0.005]
+    return hopify(P)
+cond = []; boxes = {}
+def C(cid, circ, pts3, st, note):
+    q = [[round(a, 3) for a in p] for p in pts3]; out = [q[0]]
+    for p in q[1:]:
+        if math.dist(p, out[-1]) > 0.004: out.append(p)
+    # ตัดจุดกลางที่อยู่บนเส้นตรงเดียวกัน
+    o2 = [out[0]]
+    for k in range(1, len(out) - 1):
+        a, b, c = o2[-1], out[k], out[k + 1]
+        u = [b[i] - a[i] for i in range(3)]; v = [c[i] - b[i] for i in range(3)]
+        cr = math.dist([u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], [0, 0, 0])
+        if cr > 1e-6 * (math.hypot(*u) * math.hypot(*v) + 1e-9): o2.append(b)
+    o2.append(out[-1])
+    cond.append({'id': cid, 'circuit': circ, 'pts': o2, 'status': st, 'src': SRC, 'note': note})
+def BOX(bid, xyz, kind, note):
+    boxes.setdefault(bid, {'id': bid, 'xyz': [round(c, 3) for c in xyz], 'kind': kind, 'note': note})
+    return boxes[bid]['xyz']
+# ---- กลุ่มกล่องในผนังที่ติดกัน → ท่อลงเส้นเดียว
+HEADS = []
+for p in sorted([p for p in pts if p['type'] in ('S1', 'P1')], key=lambda p: p['id']):
+    if not any(h['circuit'] == p['circuit'] and h['type'] == p['type'] and math.dist(into_wall(p), into_wall(h)) < 0.45 for h in HEADS): HEADS.append(p)
+HEAD_OF = {p['id']: next(h for h in HEADS if h['circuit'] == p['circuit'] and h['type'] == p['type'] and math.dist(into_wall(p), into_wall(h)) < 0.45) for p in pts if p['type'] in ('S1', 'P1')}
 for p in pts:
     if p['type'] in ('S1', 'P1') and HEAD_OF[p['id']] is not p:
         h = HEAD_OF[p['id']]; a, b = into_wall(h), into_wall(p)
-        if math.dist(a, b) > 0.01: C(f'EJ-{p["id"]}', p['circuit'], [[a[0], a[1], h['xyz'][2] + 0.10], [b[0], b[1], p['xyz'][2] + 0.10], [b[0], b[1], p['xyz'][2]]], 'assumed', f'ต่อกล่อง {h["id"]} → {p["id"]} ในผนัง')
-# สายเมน: เข้าที่เสา GL 4/C (Earth 13 พ.ย. สมมติ) → แผง LC
-mx, my = 10.915, 5.62   # ผิวนอกผนัง GL 4 ข้างเสา 4/C (ท่อลอยแนบผิว)
-zin = 3.00
-mpts = [[mx, my, 0.05 + 1.50], [mx, my, zin], [10.70, my, zin], [10.70, my, zt(10.70, my)]] + [[q[0], q[1], zt(*q)] for q in Lp((10.70, my), pw)[1:]] + [[pw[0], pw[1], pn['xyz'][2] + 0.20]]
+        C(f'EJ-{p["id"]}', p['circuit'], [[a[0], a[1], h['xyz'][2] + 0.10], [b[0], b[1], p['xyz'][2] + 0.10], [b[0], b[1], p['xyz'][2]]], 'assumed', f'ต่อกล่อง {h["id"]} → {p["id"]} ในผนัง')
+# ---- จากกล่องในผนัง (หัวกลุ่ม) ขึ้นเสา → กล่องพักสายหัวเสา
+COLTOP = {}
+def rise(dev, cid_conduit, circ, note):
+    P3, col, f = wall_route(dev)
+    bid = f'JB-{col}' if col not in COLTOP else f'JB-{col}-{len([b for b in boxes if b.startswith("JB-" + col)])}'
+    same = next((b for b in boxes.values() if b['id'].startswith('JB-' + col) and math.dist(b['xyz'][:2], P3[-1][:2]) < 0.02), None)
+    top = same['xyz'] if same else BOX(bid, P3[-1], 'pull', f'กล่องพักสายหัวเสา {col} เหนือฝ้า')
+    C(cid_conduit, circ, P3, 'user', note)
+    if col not in COLTOP: COLTOP[col] = top
+    elif not same:   # กล่องอีกด้านของเสา → ต่อเข้ากล่องหลักของเสา (ข้ามแนวคานยกข้ามหลังคาน)
+        C(f'EB-{bid}', circ, Lroute(top, COLTOP[col]), 'user', f'ต่อกล่องหัวเสา {col} สองด้านเสา เหนือฝ้า')
+    return col, top
+GCOL = {}
+for h in HEADS:
+    ctl = sorted({l for p in pts if p['type'] == 'S1' and HEAD_OF[p['id']] is h for l in p['controls']})
+    col, top = rise(h, f'ED-{h["id"]}', h['circuit'], f'จาก{"กล่องสวิตช์" if h["type"] == "S1" else "กล่องเต้ารับ"} {h["id"]} ขึ้นในผนังถึงหลังผนัง → ลากบนหลังผนังไปเสา → ขึ้นตามผิวเสาเข้าเหนือฝ้า (Earth 13 พ.ย.)')
+    GCOL[h['id']] = (col, top, ctl)
+pcol, ptop = rise(panel, 'ED-LC', 'L1', 'จากแผง LC ขึ้นในผนังถึงหลังผนัง → ลากบนหลังผนังไปเสา → ขึ้นตามผิวเสาเข้าเหนือฝ้า')
+# ---- กิ่งเข้าโคม: จากกล่องหัวเสาไล่โคมใกล้สุดทีละดวง (กล่องต่อสายที่โคม)
+def lamp_box(l):
+    if l['type'] == 'WL':   # โคมกิ่งติดผนังภายนอก: กล่องเหนือฝ้าชายคาตรงแนวผิวเสา/ผนัง แล้วลงตามผิวถึงโคม
+        x, y = l['xyz'][0], l['xyz'][1] - 0.012
+        return BOX(f'JB-{l["id"]}', (x, y, ZC(y)), 'lamp', f'กล่องต่อสายเหนือฝ้าชายคา ลงโคม {l["id"]}')
+    x, y = l['xyz'][:2]
+    return BOX(f'JB-{l["id"]}', (x, y, ZC(y)), 'lamp', f'กล่องต่อสายเหนือฝ้าที่โคม {l["id"]}')
+k_ = 0
+for hid, (col, top, ctl) in GCOL.items():
+    left = [PTS[l] for l in ctl]; cur = top
+    while left:
+        nx = min(left, key=lambda l: abs(lamp_box(l)[0] - cur[0]) + abs(lamp_box(l)[1] - cur[1])); left.remove(nx); k_ += 1
+        bx = lamp_box(nx)
+        C(f'EL-{k_:02d}', 'L1', Lroute(cur, bx), 'user', f'กิ่งเข้าโคม {nx["id"]} (สวิตช์ {hid}) เหนือฝ้า')
+        if nx['type'] == 'WL':
+            C(f'EL-{k_:02d}d', 'L1', [bx, [bx[0], bx[1], nx['xyz'][2] + 0.11]], 'user', f'ลงตามผิวเสา/ผนังด้านนอกถึงโคม {nx["id"]}')
+        cur = bx
+# ---- สายป้อน: แผง LC → กล่องหัวเสาของแต่ละกลุ่ม (ท่อหลักเลียบแนวแถว B ชิดหน้าเสา)
+cols_need = sorted({c for c, t, l in GCOL.values()} - {pcol}, key=lambda c: abs(COLS[c][0] - COLS[pcol][0]))
+done = {pcol: ptop}; kf = 0
+for c in cols_need:
+    src_c = min(done, key=lambda d: abs(COLS[d][0] - COLS[c][0]) + abs(COLS[d][1] - COLS[c][1]) * 3)   # ต่อจากหัวเสาที่ใกล้สุด (ท่อหลักไล่ต่อกัน)
+    kf += 1; a, b = done[src_c], COLTOP[c]
+    C(f'EF-{kf:02d}', 'L1', Lroute(a, b), 'assumed', f'สายป้อนเหนือฝ้า กล่องหัวเสา {src_c} → {c} (แบบไม่เขียนแนว — คิดเอง)')
+    done[c] = b
+# ---- สายเมน: เข้าที่ GL 4/C (Earth 13 พ.ย.) ลอยตามผิวเสาด้านนอกขึ้นเหนือฝ้าชายคา → เหนือฝ้าเข้าอาคารช่วงที่พ้นอะเส RB-4 → กล่องหัวเสาที่แผง
+mx, my = 10.912, 5.70
+y_in = 3.60
+mpts = [[mx, my, 0.05 + 1.50], [mx, my, ZC(my)], [10.96, my, ZC(my)], [10.96, y_in, ZC(y_in)]] + Lroute([10.96, y_in], ptop)[1:]
 Lm = sum(math.dist(mpts[i], mpts[i + 1]) for i in range(len(mpts) - 1))
-m['mep']['electrical']['service'] = {'length': round(Lm, 2), 'conduit': 'PVC สีขาว 1"', 'wire_type': 'IEC 01 (THW)', 'wire_size': 10, 'conductors': 3, 'pts': mpts, 'status': 'user',
-    'note': 'สายเมนเข้าที่ GL 4/C (Earth 13 พ.ย. ให้สมมติ): ลอยขึ้นตามผิวนอกผนัง GL 4 ข้างเสา 4/C ถึง +3.00 ลอดผนังอิฐเข้าใน ขึ้นใต้ฝ้า เดินมุมฉากใต้ฝ้าถึงเหนือแผง LC แล้วลงฝังผนัง · จุดรับไฟสูง 1.50 จากทางเดิน · สาย 3×10 ตร.มม. ท่อ 1" (เมน 2P 32A) — Earth 13 พ.ย. ยืนยัน'}
-used = set()   # ท่อลงผนังที่ตำแหน่งเดียวกันใช้เส้นเดียว (สายหลายวงจร/หลายสวิตช์ร้อยรวม) — เส้นที่มาทีหลังจบที่จุดเหนือท่อลง
-for c in cond:
-    P = c['pts']
-    for end in (0, -1):
-        a_, b_ = (P[0], P[1]) if end == 0 else (P[-1], P[-2])
-        if len(P) > 2 and math.dist(a_[:2], b_[:2]) < 0.005 and abs(a_[2] - b_[2]) > 0.3 and a_[2] < 2.5:
-            k_ = (round(a_[0], 2), round(a_[1], 2))
-            if k_ in used: P.pop(end); c['note'] += ' · ใช้ท่อลงผนังร่วมกับเส้นอื่น'
-            else: used.add(k_)
-HITS_OK = {'EW-02': 'LH-03', 'EW-09': 'LH-04', 'EW-04': 'LT-01', 'EF-P1-01': 'LH-05', 'EF-P1-02': 'LH-06'}
-for c in cond:
-    if c['id'] in HITS_OK: c['note'] += f" · ท่อลงผนังผ่าน{'ทับหลัง' if HITS_OK[c['id']].startswith('LT') else 'คานเอ็นกลางผนัง'} {HITS_OK[c['id']]} — ฝังท่อก่อนเท (Earth 13 พ.ย. ให้ผ่านได้)"
+m['mep']['electrical']['service'] = {'length': round(Lm, 2), 'conduit': 'PVC สีขาว 1"', 'wire_type': 'IEC 01 (THW)', 'wire_size': 10, 'conductors': 3, 'pts': [[round(c, 3) for c in p] for p in mpts], 'status': 'user',
+    'note': 'สายเมนเข้าที่ GL 4/C (Earth 13 พ.ย.): ลอยขึ้นตามผิวนอกเสา 4/C จากจุดรับไฟ +1.55 → เหนือฝ้าชายคา เลียบนอกแนวอะเส RB-4 ถึงช่วงที่ท่อพ้นหลังอะเส → เข้าเหนือฝ้าในอาคารถึงกล่องหัวเสาเหนือแผง LC · สาย 3×10 ตร.มม. ท่อ 1" (Earth 13 พ.ย. ยืนยัน)'}
 m['mep']['electrical']['conduits'] = cond
-m['mep']['electrical']['note'] = m['mep']['electrical']['note'].replace(' · ยังไม่ได้เขียนแนวท่อร้อยสาย (ปริมาณท่อ/สายประมาณจากตำแหน่งจุด เดินระดับฝ้าแบบมุมฉาก)', ' · แนวท่อร้อยสายเขียนจริง: สวิตช์→โคมตามเส้นในแบบ (ปรับมุมฉาก) · สายป้อนจากแผงคิดเอง')
-json.dump({'chk': CHK, 'unmatched': [(k, A, B) for k, (xy, A, B, ea, eb) in enumerate(wires, 1) if not (A and B)]}, open(os.path.join(H, 'elchk.json'), 'w'), ensure_ascii=False)
+m['mep']['electrical']['boxes'] = list(boxes.values())
+m['mep']['electrical']['route_height'] = 3.50   # ใช้เมื่อไม่มีแนวท่อ (มีแนวท่อแล้ว เว็บใช้ความยาวตามแนว)
+m['mep']['electrical']['note'] = m['mep']['electrical']['note'].split(' · แนวท่อร้อยสาย')[0].split(' · ยังไม่ได้เขียน')[0] + ' · แนวท่อร้อยสาย (Earth 13 พ.ย.): เหนือฝ้าในช่อง C-Line ใต้ท้องจันทัน · ลงสวิตช์/เต้ารับ/แผงฝังผนัง ขึ้นถึงหลังผนัง ลากบนหลังผนังไปเสา ขึ้นตามผิวเสาเข้าเหนือฝ้า · กล่องต่อสายหัวเสา/ที่โคม (boxes) · ข้ามแนวคานใต้จันทันยกข้ามหลังคาน'
+json.dump({'chk': CHK, 'wires': nw}, open(os.path.join(H, 'elchk.json'), 'w'), ensure_ascii=False)
 json.dump(m, open(os.path.join(H, 'stage5b.bm.json'), 'w'), ensure_ascii=False, indent=1)
 import collections; print(collections.Counter(p['type'] for p in pts)); [print(p['id'], p['xyz'], p.get('rot')) for p in pts if p['type'] in ('S1', 'P1')]; print(panel['xyz'])
