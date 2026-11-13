@@ -2,7 +2,8 @@
 import json, os, math, collections
 H = os.path.dirname(os.path.abspath(__file__))
 import sys; sys.path.insert(0, os.path.join(H, '..', 'common')); from relevel import relevel
-m = relevel(json.load(open(os.path.join(H, '..', 's4', 'stage4c.bm.json'))))   # ระดับโครงสร้างตามกติกา Earth 12–13 พ.ย.
+from fix4d import fix4d
+m = fix4d(relevel(json.load(open(os.path.join(H, '..', 's4', 'stage4c.bm.json')))))   # ระดับโครงสร้างตามกติกา Earth 12–13 พ.ย.
 m.pop('quantities', None)
 m['meta']['name'] = 'ห้องน้ำ ท12 — Step 5 งานระบบ (ส่วนที่ 1 สุขาภิบาล)'
 GL, WALK, WC, ENT, GUT = 0.0, 0.05, 0.20, 0.25, 0.14
