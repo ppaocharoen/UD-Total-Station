@@ -65,6 +65,8 @@ def stub(fid, wall_pt, pt, zf, h, serves, note='', tee=None, du=0.0, inside=None
     for f in fx:
         if f['id'] == fid and f['type'] in ('WC', 'LAV1', 'LAV2'): f['supply_z'] = round(zp, 3)
 AH = 'ความสูงสต๊อปวาล์วสมมติ (มาตรฐานในแบบไม่ได้บอก)'
+# ถังบำบัด KS-2000 (S),(F) ตาราง SN.3.01 (Earth 13 พ.ย.) — H ฐาน→หลัง ค.ส.ล.รัดฝา · ih ท่อเข้า · Oh ท่อออก (วัดจากหลังพื้นรองถัง) · Od ⌀ถัง · A บ่อ/พื้นรองถัง
+TK = {'H': 1.67, 'ih': 1.41, 'Oh': 1.35, 'Od': 1.46, 'A': 1.70}; TKR = TK['Od'] / 2
 TR = WC + 0.20   # ระดับท่อน้ำทิ้งโถปัสสาวะเข้าผนัง = 0.20 เหนือพื้น ให้อยู่ใต้คานเอ็นใต้ช่อง LS-01 (+0.45) — Earth 13 พ.ย. (เดิมสมมติ 0.32)
 for k, y in enumerate((5.3, 4.5, 3.7)):
     F(f'UR-W{k+1}', 'UR', 0.0, y, WC, 'โซนปัสสาวะชาย ผนังกริด 1', 0, trap_z=TR); stub(f'UR-W{k+1}', (-0.05, y), (0.126, y), WC, HT['UR'], [f'UR-W{k+1}'], 'ท่อขึ้นเยื้อง 0.12 ม. หลบท่อน้ำทิ้งของโถเดียวกัน', du=0.12)
@@ -115,8 +117,8 @@ fl = lambda x, y, z: [(x, y, z)]
 D('S-1', 'soil', '4"', [(2.6, 5.43), (2.6, 5.99), (2.75, 6.14), (3.9, 6.14)], ['WC-1'], pre=fl(2.6, 5.43, WC))
 D('S-2', 'soil', '4"', [(3.7, 5.43), (3.7, 5.99), (3.85, 6.14), (4.95, 6.14)], ['WC-2'], pre=fl(3.7, 5.43, WC))
 D('S-3', 'soil', '4"', [(4.8, 5.43), (4.8, 5.99), (4.95, 6.14), (5.24, 6.43)], ['WC-3'], pre=fl(4.8, 5.43, WC))
-D('S-D', 'soil', '4"', [(4.8, 2.62), (5.24, 2.62), (5.24, 7.6), (5.09, 7.75), (4.28, 7.75)], ['WC-D'], 'เข้าถังบำบัด ST-1 · **มาร์ก:** ช่วงแรกปรับแนวจากเส้นเฉียงในแบบเป็นตั้งฉาก หลบท่อดิ่งของ FD-D ที่อยู่ห่างแนวท่อเดิมเพียง 0.05 ม. · เข้าถังด้วยข้อต่ออ่อน (flex)', fl(4.8, 2.62, ENT), flex_end=True)
-D('S-4', 'soil', '4"', [(5.9, 5.43), (5.9, 5.99), (6.05, 6.14), (11.47, 6.14), (11.62, 6.29), (11.62, 7.17)], ['WC-4'], 'เข้าถังบำบัด ST-2 ด้วยข้อต่ออ่อน (flex)', fl(5.9, 5.43, WC), flex_end=True)
+D('S-D', 'soil', '4"', [(4.8, 2.62), (5.24, 2.62), (5.24, 7.6), (5.09, 7.75), (3.695 + TKR, 7.75)], ['WC-D'], 'เข้าถังบำบัด ST-1 · **มาร์ก:** ช่วงแรกปรับแนวจากเส้นเฉียงในแบบเป็นตั้งฉาก หลบท่อดิ่งของ FD-D ที่อยู่ห่างแนวท่อเดิมเพียง 0.05 ม. · เข้าถังด้วยข้อต่ออ่อน (flex)', fl(4.8, 2.62, ENT), flex_end=True)
+D('S-4', 'soil', '4"', [(5.9, 5.43), (5.9, 5.99), (6.05, 6.14), (11.47, 6.14), (11.62, 6.29), (11.62, 7.755 - TKR)], ['WC-4'], 'เข้าถังบำบัด ST-2 ด้วยข้อต่ออ่อน (flex)', fl(5.9, 5.43, WC), flex_end=True)
 for i, x in ((5, 7.0), (6, 8.1), (7, 9.2), (8, 10.3)): D(f'S-{i}', 'soil', '4"', [(x, 5.43), (x, 5.99), (x + 0.15, 6.14)], [f'WC-{i}'], pre=fl(x, 5.43, WC))
 NU = 'ท่อน้ำทิ้งโถปัสสาวะ: หักเข้าผนัง ลงในผนังถึงเหนือหลังคาน หักหลบคาน แล้วลงชิดข้างคาน (Earth 12 พ.ย.)'
 ZJ = BTOP + R2
@@ -140,8 +142,8 @@ for i, x, y, zf, room in (('FD-M1', 2.25, 4.03, GUT, 'รางระบาย�
                           ('FD-CFI', 6.7, 1.75, WC, 'ใต้เคาน์เตอร์อ่างล้างหน้าหญิง ด้านใน (CT-FI)'), ('FD-CFO', 6.7, 1.25, ENT, 'ใต้เคาน์เตอร์อ่างล้างหน้าหญิง ด้านนอก (CT-FO)')):
     F(i, 'FD', x, y, zf, room, None, 'Floor drain (Earth 12 พ.ย. ยืนยัน)')
     if i in ('FD-M1', 'FD-F2', 'FD-CMI', 'FD-CFI'): D('W-' + i, 'waste', '2"', [(x, y)], [i], 'ท่อดิ่งจาก FD ลงท่อน้ำทิ้งใต้พื้น', fl(x, y, zf))
-D('S-OUT1', 'soil', '4"', [(3.11, 7.75), (1.86, 7.75), (1.71, 7.9), (1.71, 8.95)], None, 'ออกจากถังบำบัด ST-1 ด้วยข้อต่ออ่อน (flex) ต่อเข้าระบบระบายน้ำภายในโครงการ', flex_start=True)
-D('S-OUT2', 'soil', '4"', [(11.62, 8.34), (11.62, 10.32)], None, 'ออกจากถังบำบัด ST-2 ด้วยข้อต่ออ่อน (flex) ต่อเข้าระบบระบายน้ำภายในโครงการ', flex_start=True)
+D('S-OUT1', 'soil', '4"', [(3.695 - TKR, 7.75), (1.86, 7.75), (1.71, 7.9), (1.71, 8.95)], None, 'ออกจากถังบำบัด ST-1 ด้วยข้อต่ออ่อน (flex) ต่อเข้าระบบระบายน้ำภายในโครงการ', flex_start=True)
+D('S-OUT2', 'soil', '4"', [(11.62, 7.755 + TKR), (11.62, 10.32)], None, 'ออกจากถังบำบัด ST-2 ด้วยข้อต่ออ่อน (flex) ต่อเข้าระบบระบายน้ำภายในโครงการ', flex_start=True)
 # ---- ระดับตามความลาด: Lsink = ระยะตามท่อจากจุดนั้นถึงปลายทางของสาย (ถัง/จุดต่อระบบระบายน้ำโครงการ)
 d2 = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1])
 BY = {d['id']: d for d in DR}
@@ -174,7 +176,7 @@ ZSINK = {}
 for sk, ds in NET.items():
     if sk.startswith('S-OUT'): continue
     ZSINK[sk] = (Z0 if BY[sk]['system'] == 'soil' else Z0W) - SLOPE * max(Ls(d)[0] for d in ds)
-ZSINK['S-OUT1'] = ZSINK['S-D'] - 0.05 - SLOPE * Ls(BY['S-OUT1'])[0]; ZSINK['S-OUT2'] = ZSINK['S-4'] - 0.05 - SLOPE * Ls(BY['S-OUT2'])[0]
+ZSINK['S-OUT1'] = ZSINK['S-D'] - TK['ih'] + TK['Oh'] - SLOPE * Ls(BY['S-OUT1'])[0]; ZSINK['S-OUT2'] = ZSINK['S-4'] - TK['ih'] + TK['Oh'] - SLOPE * Ls(BY['S-OUT2'])[0]
 ND = f'ท่อใต้พื้น ลาด 1:{round(1 / SLOPE)} ไปปลายทาง (ความลาดสมมติ — แบบไม่ระบุ) · ท่อแนวดิ่งลงข้างคาน ไม่ทะลุคาน'
 for d in DR:
     zs = ZSINK[sink(d)]; run3 = [(p[0], p[1], zs + SLOPE * L) for p, L in zip(d['run'], Ls(d))]
@@ -190,8 +192,14 @@ def E(i, kind, x, y, z, size, dims=None, note='', src=SRC_CW):
 E('WT-1', 'water_tank', 6.498, 6.589, WALK + 0.925, 'Polymer วางบนพื้นดิน 2,000 ลิตร', [1.25, 1.25, 1.85], 'ยี่ห้อ WAVE, DOS หรือเทียบเท่า · วางบนพื้นทางเดินภายนอก +0.05 (Earth 12 พ.ย.) · ขนาดถัง ⌀1.25×1.85 เป็นขนาดทั่วไปของถัง 2,000 ลิตร (แบบเขียนสัญลักษณ์ ⌀0.70) · แบบหมายเหตุว่าปรับตำแหน่งได้ตามหน้างาน')
 E('PM-1', 'pump', 4.598, 6.589, WALK + 0.15, 'อัตโนมัติ มอเตอร์ 300 วัตต์', [0.36, 0.25, 0.30], 'ยี่ห้อ Mitsubishi, Hitachi หรือเทียบเท่า · วางบนพื้นทางเดินภายนอก +0.05')
 for i, x in (('GV-1', 7.402), ('GV-2', 5.078), ('GV-3', 4.117)): E(i, 'gate_valve', x, 6.588, ZE, '1"')
-E('ST-1', 'septic_tank', 3.695, 7.75, -0.15 - 0.8, '2,000 ลิตร', [1.17, 1.17, 1.6], f'ยี่ห้อ AQUA, WAVE, COTTO, DOS หรือเทียบเท่า · ฝังดิน หลังถัง −0.15 · ท่อเข้า {ZSINK["S-D"]:+.2f} · รับโถส้วมชาย 3 + คนพิการ 1 + โถปัสสาวะ 6', SRC_W)
-E('ST-2', 'septic_tank', 11.62, 7.755, -0.15 - 0.8, '2,000 ลิตร', [1.17, 1.17, 1.6], f'ยี่ห้อ AQUA, WAVE, COTTO, DOS หรือเทียบเท่า · ฝังดิน หลังถัง −0.15 · ท่อเข้า {ZSINK["S-4"]:+.2f} · รับโถส้วมหญิง 5', SRC_W)
+TANKS = {}
+def tank(i, x, y, zin, serves):   # ถังบำบัด + พื้นรองถัง + ค.ส.ล.รัดฝา + อิฐก่อรอบปากถังถึงดิน (SN.3.01)
+    zb = round(zin - TK['ih'], 3); ztop = round(zb + TK['H'], 3); zr = round(ztop - 0.10, 3)
+    TANKS[i] = dict(x=x, y=y, zb=zb, ztop=ztop, zr=zr, zin=zin)
+    E(i, 'septic_tank', x, y, round((zb + zr) / 2, 3), '2,000 ลิตร รุ่น KS-2000 (S),(F)', [TK['Od'], TK['Od'], round(zr - zb, 3)],
+      src='SN.2.01 + SN.3.01', note=f'ยี่ห้อ AQUA, WAVE, COTTO, DOS หรือเทียบเท่า (SN.3.01 เลือกขนาด KS-2000 · แบบ (S),(F) — Earth 13 พ.ย.) · ⌀{TK["Od"]:.2f} · ท่อเข้า {zin:+.3f} (ih 1.41 จากหลังพื้นรองถัง) · ท่อออก {zb + TK["Oh"]:+.3f} (Oh 1.35) · หลังพื้นรองถัง {zb:+.3f} · หลัง ค.ส.ล.รัดฝา {ztop:+.3f} · ก่ออิฐมอญรอบปากถังขึ้นถึงดิน ±0.00 (ยึดระดับท่อเข้า — Earth 13 พ.ย.) · รับ{serves}')
+tank('ST-1', 3.695, 7.75, ZSINK['S-D'], 'โถส้วมชาย 3 + คนพิการ 1 + โถปัสสาวะ 6')
+tank('ST-2', 11.62, 7.755, ZSINK['S-4'], 'โถส้วมหญิง 5')
 # ---- มาร์กจุดที่ตรวจพบ (13 พ.ย.)
 for p in pipes:
     i = p['id']
@@ -201,5 +209,29 @@ for p in pipes:
         p['sleeve'] = 'LS-01'; p['note'] += ' · ผ่านคานเอ็นใต้ช่อง LS-01 (0.10×0.15 ระดับ +0.45 ถึง +0.60) ด้วยปลอกท่อฝังในคานเอ็น (Earth 13 พ.ย.)'
 m.setdefault('mep', {})['plumbing'] = {'cw_material': 'PVC ชั้น 13.5', 'drain_material': 'PVC ชั้น 8.5', 'note': 'ชั้นคุณภาพท่อตาม A.0.01: น้ำดี PVC ชั้น 13.5 · น้ำเสีย PVC ชั้น 8.5',
                                        'fixture_types': FT, 'fixtures': fx, 'pipes': pipes, 'equipment': eq}
+# ---- งานติดตั้งถังบำบัด (SN.3.01 แบบขยายบ่อบำบัดน้ำเสีย + ขยายพื้นรับน้ำหนักถังบำบัด)
+import math as _m
+RO = 0.30   # รัศมีช่องปากถัง (ฝา NYLON) — สมมติ ⌀0.60
+m['slabs'] = [q for q in m['slabs'] if not q['id'].startswith('S-ST')]; m['walls'] = [w for w in m['walls'] if not w['id'].startswith('W-ST')]
+for i, t in TANKS.items():
+    x, y, h = t['x'], t['y'], TK['A'] / 2
+    sq = [[round(x - h, 3), round(y - h, 3)], [round(x + h, 3), round(y - h, 3)], [round(x + h, 3), round(y + h, 3)], [round(x - h, 3), round(y + h, 3)]]
+    n = i[-1]
+    m['slabs'].append({'id': f'S-ST{n}B', 'mark': 'ST', 'kind': 'ground', 't': 0.15, 'top': t['zb'], 'polygon': sq, 'sand': 0.05, 'lean': 0.05, 'pe_sheet': False, 'material': 'C',
+                       'use': f'พื้นรองรับน้ำหนักถังบำบัด {i}', 'src': 'SN.3.01 ขยายพื้นรับน้ำหนักถังบำบัด', 'status': 'from_drawing', 'task': 'mep_ext',
+                       'note': f'คอนกรีตหนา 0.15 RB9 @0.20# · คอนกรีตหยาบ 0.05 · ทรายหยาบ 0.05 · กว้าง A = 1.70 × 1.70 (KS-2000 (S),(F) — แบบเขียน "Varies") · หลังพื้น {t["zb"]:+.3f}'})
+    ring = sq + [sq[0], [round(x, 3), round(y - h, 3)]][1:] if False else None
+    circ = [[round(x + RO * _m.cos(-2 * _m.pi * k / 16 - _m.pi / 2), 3), round(y + RO * _m.sin(-2 * _m.pi * k / 16 - _m.pi / 2), 3)] for k in range(17)]
+    poly = [[round(x, 3), round(y - h, 3)], sq[1], sq[2], sq[3], sq[0], [round(x, 3), round(y - h, 3)]] + circ   # ขอบนอก → ร่องตัด → วงช่องปากถัง (keyhole)
+    m['slabs'].append({'id': f'S-ST{n}R', 'mark': 'ST', 'kind': 'ground', 't': 0.10, 'top': t['ztop'], 'polygon': poly, 'sand': 0, 'pe_sheet': False, 'material': 'C',
+                       'use': f'ค.ส.ล.รัดฝาถังบำบัด {i}', 'src': 'SN.3.01 แบบขยายบ่อบำบัดน้ำเสีย', 'status': 'from_drawing', 'task': 'mep_ext',
+                       'note': f'ค.ส.ล.รัดฝาถัง หนา 0.10 RB9 @0.20# วางบนทรายหยาบรอบถัง · ช่องปากถัง ⌀0.60 **สมมติ** (แบบไม่บอกขนาดฝา) · หลัง {t["ztop"]:+.3f}'})
+    m['design']['slabs'][f'S-ST{n}B'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': 'from_drawing', 'src': 'SN.3.01: RB 9 มม. @0.20#'}
+    m['design']['slabs'][f'S-ST{n}R'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': 'from_drawing', 'src': 'SN.3.01: RB 9 มม. @0.20#'}
+    rc = RO + 0.05
+    path = [[round(x + rc * _m.cos(2 * _m.pi * k / 16), 3), round(y + rc * _m.sin(2 * _m.pi * k / 16), 3)] for k in range(17)]
+    m['walls'].append({'id': f'W-ST{n}', 'kind': 'brick_mon', 't': 0.10, 'path': path, 'bottom': t['ztop'], 'top': 0.0, 'mark': 'อิฐมอญ', 'plaster': False, 'paint': False, 'exterior': True,
+                       'src': 'SN.3.01 (ก่ออิฐมอญโดยรอบกรณีฝาถังต่ำกว่าระดับดิน)', 'status': 'user', 'task': 'mep_ext',
+                       'note': f'ก่ออิฐมอญรอบปากถัง {i} จากหลัง ค.ส.ล.รัดฝา {t["ztop"]:+.3f} ถึงระดับดิน ±0.00 สูง {-t["ztop"]:.3f} (ยึดระดับท่อเข้า — Earth 13 พ.ย.) · ไม่ฉาบ'})
 json.dump(m, open(os.path.join(H, 'stage5a.bm.json'), 'w'), ensure_ascii=False, indent=1)
 print(collections.Counter(f['type'] for f in fx), len(pipes), len(eq)); print({k: round(v, 3) for k, v in ZSINK.items()})
