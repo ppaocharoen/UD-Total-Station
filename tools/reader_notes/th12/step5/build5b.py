@@ -130,7 +130,7 @@ assert all(a == b for _, a, b in CHK), CHK
 
 # ---- เรขาคณิต
 PL = lambda y: 3.70 - 0.06897 * y          # ท้องจันทัน (ระนาบโครงหลังคา)
-ZC = lambda y: round(PL(y) - 0.02, 3)      # ศูนย์ท่อในช่อง C-Line ใต้ท้องจันทัน
+ZC = lambda y: round(PL(y) - 0.0175, 3)    # ศูนย์ท่อในช่อง C-Line (สูง 0.035 — Earth 13 พ.ย.) ใต้ท้องจันทัน
 ZH = lambda y: round(PL(y) + 0.035, 3)     # ยกข้ามหลังคานระหว่างจันทัน
 BEAMS = [(0.0, 0.0375 + 0.03, 'โครง TRUSS แถว A'), (1.5, 0.05 + 0.03, 'อะเสบน RB-B2 แถว B'), (5.8, 0.05 + 0.03, 'อะเส RB-C แถว C')]
 RAFX = [-1.062 + 1.0771 * k for k in range(13)]
@@ -164,6 +164,29 @@ for k in list(NODES):   # รวมจุดที่ใกล้กัน (ผ�
     for k2 in list(NODES):
         if k != k2 and math.dist(k, k2) < 0.08:
             G[k].append((k2, math.dist(k, k2), None, 'J'))
+_Nn = {n['id']: n for n in m['nodes']}; _Ss = {x['id']: x for x in m['sections']}
+STB = []   # อะเสเหล็กที่วางบนหลังผนัง (ใช้หาฝั่งว่างบนหลังผนังให้ท่อวาง)
+for b_ in m['members']:
+    if b_['type'] != 'steel_beam': continue
+    A_, B_ = _Nn[b_['i']], _Nn[b_['j']]; sec = _Ss[b_['section']]
+    STB.append(((A_['x'], A_['y']), (B_['x'], B_['y']), (A_['z'] + B_['z']) / 2 - (sec.get('h') or 0.1) / 2, (sec.get('b') or 0.05) / 2))
+WT = {w['id']: w['t'] for w in m['walls']}
+def ledge(wid, a, b, top):
+    """ระยะเยื้องจากศูนย์ผนังไปฝั่งที่ว่างบนหลังผนัง (ถ้ามีอะเสเหล็กวางทับ) · ไม่มีอะเสทับ = กลางผนัง"""
+    dx, dy = b[0] - a[0], b[1] - a[1]; L = math.hypot(dx, dy); nx, ny = -dy / L, dx / L
+    for (p, q, zb, hb) in STB:
+        if abs(zb - top) > 0.03: continue
+        mid = ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
+        ex, ey = q[0] - p[0], q[1] - p[1]
+        if abs(ex * dy - ey * dx) > 1e-3 * math.hypot(ex, ey) * L: continue   # ต้องขนานกับผนัง
+        off = (p[0] - a[0]) * nx + (p[1] - a[1]) * ny
+        if abs(off) > WT[wid] / 2 + hb: continue
+        lo = max(min(p[0], q[0]), min(a[0], b[0])) - 0.01 if abs(dx) > abs(dy) else max(min(p[1], q[1]), min(a[1], b[1])) - 0.01
+        hi = min(max(p[0], q[0]), max(a[0], b[0])) + 0.01 if abs(dx) > abs(dy) else min(max(p[1], q[1]), max(a[1], b[1])) + 0.01
+        if hi <= lo: continue
+        d = -math.copysign(WT[wid] / 2 - 0.02, off)
+        return (nx * d, ny * d)
+    return (0.0, 0.0)
 def wall_route(p):
     """จากกล่องในผนัง → ขึ้นในผนังถึงหลังผนัง → ลากบนหลังผนังไปเสาที่ใกล้สุด → คืน (จุด 3D, เสา, ผิวเสาที่ขึ้น)"""
     w0 = into_wall(p)
@@ -171,7 +194,7 @@ def wall_route(p):
     _, wid, a, b, top = best
     q, _ = proj(w0, a, b)
     start = ('S',)
-    dist = {start: 0}; prev = {}; pq = [(0, start)]; tops = {start: top}
+    dist = {start: 0}; prev = {}; prevw = {}; pq = [(0, start)]; tops = {start: top}
     nbr = lambda u: ([(nid(e), math.dist(q, e), top, wid) for e in ([a, b] + [pp for pp in segpts[wid]])] if u == start else G[u])
     goal = None
     while pq:
@@ -182,19 +205,45 @@ def wall_route(p):
         if cc: goal = (u, cc[0]); break
         for v, L, t, w in nbr(u):
             nd = d0 + L
-            if nd < dist.get(v, 1e9): dist[v] = nd; prev[v] = u; tops[v] = t if t is not None else tops[u]; heapq.heappush(pq, (nd, v))
+            if nd < dist.get(v, 1e9): dist[v] = nd; prev[v] = u; prevw[v] = w; tops[v] = t if t is not None else tops[u]; heapq.heappush(pq, (nd, v))
     u, (cid, c) = goal
     chain = [u]
     while chain[-1] != start: chain.append(prev[chain[-1]])
     chain = chain[::-1]
+    # แนวดิ่งในผนัง: จากกล่องขึ้นถึงหลังผนัง · แนวราบ: วางบนหลังผนัง (ฝั่งที่ว่างถ้ามีอะเสทับ) — Earth 13 พ.ย. ห้ามเดินแนวราบในผนัง
+    WS = {wid_: (a_, b_, t_) for wid_, a_, b_, t_ in WSEG}
+    o = ledge(wid, a, b, top)
+    v0 = (q[0] + o[0], q[1] + o[1])
     pts3 = [[w0[0], w0[1], p['xyz'][2]]]
-    cur_top = top - 0.06   # ท่อฝังในผนังช่วงบนสุด (หลังผนังมีอะเสเหล็กวางทับบางแนว)
-    pts3.append([q[0], q[1], cur_top]) if math.dist(w0, q) > 0.005 else None
-    pts3[-1:] = [[w0[0], w0[1], cur_top]] if math.dist(w0, q) <= 0.005 else pts3[-1:]
+    if math.dist(w0, v0) > 0.005: pts3.append([v0[0], v0[1], p['xyz'][2]])
+    pts3.append([v0[0], v0[1], top + 0.011])
+    cur_w = wid
     for k in chain[1:]:
-        t = tops.get(k); zt = (t if t is not None else top) - 0.06
+        w_ = prevw.get(k, cur_w)
+        if w_ == 'J' or w_ not in WS: w_ = cur_w
+        a2, b2, t2 = WS[w_]; o2 = ledge(w_, a2, b2, t2); zt = t2 + 0.011
         if abs(zt - pts3[-1][2]) > 0.005: pts3.append([pts3[-1][0], pts3[-1][1], zt])
-        pts3.append([k[0], k[1], zt])
+        if w_ != cur_w:   # เปลี่ยนแนวผนัง: ต่อจากแนวเดิมถึงจุดต่อ แล้วเข้าแนวใหม่
+            pts3.append([k[0] + o2[0], k[1] + o2[1], zt]) if False else None
+        pts3.append([k[0] + o2[0], k[1] + o2[1], zt]); cur_w = w_
+    # แนวบนหลังผนังที่ต้องลอดใต้อะเสเหล็ก (ผนังสองฝั่งแนวคาน) → หยุดก่อนถึงอะเส แล้วขึ้นแนบข้างอะเสเข้าเหนือฝ้า (มาร์ก)
+    def under_beam(x, y, z):
+        for (p_, q_, zb, hb) in STB:
+            if z + 0.011 < zb - 0.001: continue
+            ex, ey = q_[0] - p_[0], q_[1] - p_[1]; L2 = ex * ex + ey * ey
+            t_ = ((x - p_[0]) * ex + (y - p_[1]) * ey) / L2
+            if -0.01 <= t_ <= 1.01 and abs((x - p_[0]) * ey - (y - p_[1]) * ex) / math.sqrt(L2) < hb + 0.011: return True
+        return False
+    for i_ in range(2, len(pts3)):
+        A3, B3 = pts3[i_ - 1], pts3[i_]
+        if abs(A3[2] - B3[2]) > 0.005: continue
+        n_ = max(2, int(math.dist(A3, B3) / 0.005))
+        hit = next((k_ for k_ in range(n_ + 1) if under_beam(A3[0] + (B3[0] - A3[0]) * k_ / n_, A3[1] + (B3[1] - A3[1]) * k_ / n_, A3[2])), None)
+        if hit is None: continue
+        k_ = max(0, hit - 2); px, py = A3[0] + (B3[0] - A3[0]) * k_ / n_, A3[1] + (B3[1] - A3[1]) * k_ / n_
+        out = pts3[:i_] + [[round(px, 3), round(py, 3), A3[2]], [round(px, 3), round(py, 3), ZC(py)]]
+        key = f'B{round(px, 2)}_{round(py, 2)}'; COLS.setdefault(key, (px, py))
+        return out, key, (round(px, 3), round(py, 3))
     # ตัดปลายที่เข้าไปในเนื้อเสา (เสา 0.20×0.20) ถอยกลับตามแนวผนังให้พ้นผิวเสา
     while len(pts3) > 2 and max(abs(pts3[-1][0] - c[0]), abs(pts3[-1][1] - c[1])) < 0.10 + 0.012:
         a_, b_ = pts3[-2], pts3[-1]; dx_, dy_ = b_[0] - a_[0], b_[1] - a_[1]; L_ = math.hypot(dx_, dy_)
@@ -209,7 +258,7 @@ def wall_route(p):
     if abs(c[0]) < 0.01: fx = c[0] + 0.112
     elif abs(c[0] - 10.8) < 0.01: fx = c[0] - 0.112
     else: fx = c[0] + math.copysign(0.112, dx) if abs(dx) >= abs(dy) else end[0]
-    if abs(c[1] - 1.5) < 0.01: fy = 1.388 if (end[1] < 1.44 and abs(c[0]) > 0.01 and abs(c[0] - 10.8) > 0.01) else 1.612
+    if abs(c[1] - 1.5) < 0.01: fy = 1.388 if end[1] < 1.5 else 1.612   # แถว B: ขึ้นฝั่งเดียวกับที่ท่อมาถึง ไม่ลอดใต้อะเส
     elif abs(c[1] - 5.8) < 0.01: fy = c[1] - 0.112
     else: fy = c[1] + math.copysign(0.112, dy) if abs(dy) > abs(dx) else end[1]
     sg = 1 if fx >= c[0] else -1   # เลื่อนหนีแนวจันทันไปทางนอกเสาเท่านั้น
@@ -282,8 +331,8 @@ def rise(dev, cid_conduit, circ, note):
     P3, col, f = wall_route(dev)
     bid = f'JB-{col}' if col not in COLTOP else f'JB-{col}-{len([b for b in boxes if b.startswith("JB-" + col)])}'
     same = next((b for b in boxes.values() if b['id'].startswith('JB-' + col) and math.dist(b['xyz'][:2], P3[-1][:2]) < 0.02), None)
-    top = same['xyz'] if same else BOX(bid, P3[-1], 'pull', f'กล่องพักสายหัวเสา {col} เหนือฝ้า')
-    C(cid_conduit, circ, P3, 'user', note)
+    top = same['xyz'] if same else BOX(bid, P3[-1], 'pull', f'กล่องพักสายหัวเสา {col} เหนือฝ้า' if col.startswith('C-') else 'กล่องพักสายเหนือฝ้า ที่ท่อขึ้นแนบข้างอะเสเหล็ก')
+    C(cid_conduit, circ, P3, 'user', note + ('' if col.startswith('C-') else ' · **มาร์ก:** ผนังแนวนี้ต่อกับผนังใต้อะเสเหล็ก ท่อวางบนหลังผนังลอดอะเสไม่ได้ → ขึ้นแนบข้างอะเสเข้าเหนือฝ้า'))
     if col not in COLTOP: COLTOP[col] = top
     elif not same:   # กล่องอีกด้านของเสา → ต่อเข้ากล่องหลักของเสา (ข้ามแนวคานยกข้ามหลังคาน)
         C(f'EB-{bid}', circ, Lroute(top, COLTOP[col]), 'user', f'ต่อกล่องหัวเสา {col} สองด้านเสา เหนือฝ้า')
