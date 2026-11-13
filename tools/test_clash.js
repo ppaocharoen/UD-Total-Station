@@ -95,6 +95,9 @@ check('A1 ท่อ P-X ลอดเสา C1-1A-2 = error', has(C.check(m), 'A1
   check('A6 ท่อเดินลอยเหนือพื้น (+0.50) ไม่เตือน', !C.check(mk(0.50)).some(x => x.code === 'A6'));
   const v = mk(0.16); v.mep.plumbing.pipes.push({ id: 'P2', system: 'cw', dia: '1"', pts: [[2, 0, 0.2], [2, 0, 1.4]] });
   check('A1 ท่อขึ้นในผนังผ่านคานเอ็น LS = warn', has(C.check(v), 'A1', 'warn', 'P2', 'LS'));
+  v.mep.plumbing.pipes[1].sleeve = 'LS';
+  check('A1 ท่อที่ระบุฝังปลอกผ่านคานเอ็น = info', has(C.check(v), 'A1', 'info', 'P2', 'LS') && !has(C.check(v), 'A1', 'warn', 'P2', 'LS'));
+  delete v.mep.plumbing.pipes[1].sleeve;
   v.mep.plumbing.pipes[1].pts = [[2, 0.2, 0.2], [2, 0.2, 1.4]];
   check('A1 ท่อขึ้นห่างคานเอ็น ไม่เตือน', !has(C.check(v), 'A1', 'warn', 'P2', 'LS'));
 }
