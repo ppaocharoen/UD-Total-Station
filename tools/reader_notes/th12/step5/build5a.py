@@ -225,7 +225,7 @@ for i, t in TANKS.items():
     poly = [[round(x, 3), round(y - h, 3)], sq[1], sq[2], sq[3], sq[0], [round(x, 3), round(y - h, 3)]] + circ   # ขอบนอก → ร่องตัด → วงช่องปากถัง (keyhole)
     m['slabs'].append({'id': f'S-ST{n}R', 'mark': 'ST', 'kind': 'ground', 't': 0.10, 'top': t['ztop'], 'polygon': poly, 'sand': 0, 'pe_sheet': False, 'material': 'C',
                        'use': f'ค.ส.ล.รัดฝาถังบำบัด {i}', 'src': 'SN.3.01 แบบขยายบ่อบำบัดน้ำเสีย', 'status': 'from_drawing', 'task': 'mep_ext',
-                       'note': f'ค.ส.ล.รัดฝาถัง หนา 0.10 RB9 @0.20# วางบนทรายหยาบรอบถัง · ช่องปากถัง ⌀0.60 **สมมติ** (แบบไม่บอกขนาดฝา) · หลัง {t["ztop"]:+.3f}'})
+                       'note': f'ค.ส.ล.รัดฝาถัง หนา 0.10 RB9 @0.20# วางบนทรายหยาบรอบถัง · ช่องปากถัง ⌀0.60 (แบบไม่บอกขนาดฝา — Earth 13 พ.ย. ยืนยัน) · หลัง {t["ztop"]:+.3f}'})
     m['design']['slabs'][f'S-ST{n}B'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': 'from_drawing', 'src': 'SN.3.01: RB 9 มม. @0.20#'}
     m['design']['slabs'][f'S-ST{n}R'] = {'rebar': {'mesh': [9, 0.20, 1]}, 'status': 'from_drawing', 'src': 'SN.3.01: RB 9 มม. @0.20#'}
     rc = RO + 0.05

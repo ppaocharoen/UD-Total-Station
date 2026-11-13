@@ -211,8 +211,8 @@ mx, my = 10.915, 5.62   # ผิวนอกผนัง GL 4 ข้างเส
 zin = 3.00
 mpts = [[mx, my, 0.05 + 1.50], [mx, my, zin], [10.70, my, zin], [10.70, my, zt(10.70, my)]] + [[q[0], q[1], zt(*q)] for q in Lp((10.70, my), pw)[1:]] + [[pw[0], pw[1], pn['xyz'][2] + 0.20]]
 Lm = sum(math.dist(mpts[i], mpts[i + 1]) for i in range(len(mpts) - 1))
-m['mep']['electrical']['service'] = {'length': round(Lm, 2), 'conduit': 'PVC สีขาว 1"', 'wire_type': 'IEC 01 (THW)', 'wire_size': 10, 'conductors': 3, 'pts': mpts, 'status': 'assumed',
-    'note': 'สายเมนเข้าที่ GL 4/C (Earth 13 พ.ย. ให้สมมติ): ลอยขึ้นตามผิวนอกผนัง GL 4 ข้างเสา 4/C ถึง +3.00 ลอดผนังอิฐเข้าใน ขึ้นใต้ฝ้า เดินมุมฉากใต้ฝ้าถึงเหนือแผง LC แล้วลงฝังผนัง · จุดรับไฟสูง 1.50 จากทางเดิน · **สาย 3×10 ตร.มม. ท่อ 1" สมมติ** (เมน 2P 32A)'}
+m['mep']['electrical']['service'] = {'length': round(Lm, 2), 'conduit': 'PVC สีขาว 1"', 'wire_type': 'IEC 01 (THW)', 'wire_size': 10, 'conductors': 3, 'pts': mpts, 'status': 'user',
+    'note': 'สายเมนเข้าที่ GL 4/C (Earth 13 พ.ย. ให้สมมติ): ลอยขึ้นตามผิวนอกผนัง GL 4 ข้างเสา 4/C ถึง +3.00 ลอดผนังอิฐเข้าใน ขึ้นใต้ฝ้า เดินมุมฉากใต้ฝ้าถึงเหนือแผง LC แล้วลงฝังผนัง · จุดรับไฟสูง 1.50 จากทางเดิน · สาย 3×10 ตร.มม. ท่อ 1" (เมน 2P 32A) — Earth 13 พ.ย. ยืนยัน'}
 used = set()   # ท่อลงผนังที่ตำแหน่งเดียวกันใช้เส้นเดียว (สายหลายวงจร/หลายสวิตช์ร้อยรวม) — เส้นที่มาทีหลังจบที่จุดเหนือท่อลง
 for c in cond:
     P = c['pts']
@@ -222,6 +222,9 @@ for c in cond:
             k_ = (round(a_[0], 2), round(a_[1], 2))
             if k_ in used: P.pop(end); c['note'] += ' · ใช้ท่อลงผนังร่วมกับเส้นอื่น'
             else: used.add(k_)
+HITS_OK = {'EW-02': 'LH-03', 'EW-09': 'LH-04', 'EW-04': 'LT-01', 'EF-P1-01': 'LH-05', 'EF-P1-02': 'LH-06'}
+for c in cond:
+    if c['id'] in HITS_OK: c['note'] += f" · ท่อลงผนังผ่าน{'ทับหลัง' if HITS_OK[c['id']].startswith('LT') else 'คานเอ็นกลางผนัง'} {HITS_OK[c['id']]} — ฝังท่อก่อนเท (Earth 13 พ.ย. ให้ผ่านได้)"
 m['mep']['electrical']['conduits'] = cond
 m['mep']['electrical']['note'] = m['mep']['electrical']['note'].replace(' · ยังไม่ได้เขียนแนวท่อร้อยสาย (ปริมาณท่อ/สายประมาณจากตำแหน่งจุด เดินระดับฝ้าแบบมุมฉาก)', ' · แนวท่อร้อยสายเขียนจริง: สวิตช์→โคมตามเส้นในแบบ (ปรับมุมฉาก) · สายป้อนจากแผงคิดเอง')
 json.dump({'chk': CHK, 'unmatched': [(k, A, B) for k, (xy, A, B, ea, eb) in enumerate(wires, 1) if not (A and B)]}, open(os.path.join(H, 'elchk.json'), 'w'), ensure_ascii=False)
