@@ -38,15 +38,15 @@ for c in sorted(clash)[:40]: print('  ', c)
 # ท่อผ่านเนื้อคานคอดิน (0.20×0.40 หลัง +0.20)
 N = {n['id']: n for n in m['nodes']}; B = []
 for b in m['members']:
-    if b['type'] == 'tie_beam': a, e = N[b['i']], N[b['j']]; B.append(((a['x'], a['y']), (e['x'], e['y'])))
+    if b['type'] == 'tie_beam': a, e = N[b['i']], N[b['j']]; B.append(((a['x'], a['y']), (e['x'], e['y']), a['z']))
 hit = []
 for p in P:
     r = OD[p['dia']] / 2
     for s, t in zip(p['pts'], p['pts'][1:]):
         for k in range(21):
             q = [s[i] + (t[i] - s[i]) * k / 20 for i in range(3)]
-            if not (-0.25 - r + 0.002 < q[2] < 0.15 + r - 0.002): continue   # คาน 0.20×0.40 หลังคาน +0.15 (Earth 12 พ.ย.) — ผนังกั้นฝั่งพื้น +0.25 คานสูงกว่านี้ 0.05 ท่อฝั่งนั้นเดินสูงตาม
-            for (a, e) in B:
+            for (a, e, T) in B:   # คาน 0.20×0.40 หลังคานตามโมเดล
+                if not (T - 0.40 - r + 0.002 < q[2] < T + r - 0.002): continue
                 lo = (min(a[0], e[0]) - 0.10, min(a[1], e[1]) - 0.10); hi = (max(a[0], e[0]) + 0.10, max(a[1], e[1]) + 0.10)
                 if lo[0] - r + 0.002 < q[0] < hi[0] + r - 0.002 and lo[1] - r + 0.002 < q[1] < hi[1] + r - 0.002: hit.append((p['id'], [round(c, 2) for c in q])); break
             else: continue
