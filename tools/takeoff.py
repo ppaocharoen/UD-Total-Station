@@ -1122,7 +1122,7 @@ class Takeoff:
                                       ("test", "ทดสอบ ทำความสะอาด ทาสีทำสัญลักษณ์ท่อ", cd[2])):
                 it = self.add("1.3", f"{part}_{grp}", f"{label} ท่อ{pc['name']} (วัสดุ {pc[part]*100:g}% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
                               "งาน", 1, None, count=True, task="mep_rough", note=f"ว480 {grp}-{code}")
-                it["pct"] = {"of": keys, "mat": pc[part], "lab_of_mat": 0.30}
+                it["pct"] = {"of": keys, "mat": pc[part], "lab_of_mat": 0.30, "of_label": "ค่าท่อ"}
 
     # ------------------------------------------------------------ บันได: คอนกรีต ไม้แบบ (ช่วงพื้นเอียง + ชานพัก) และเหล็กตามผลออกแบบ
     def default_conc(self):

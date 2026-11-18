@@ -50,9 +50,20 @@ const base = (mode, pr2, pr3) => ({ mode, project: { name: 'ทดสอบ', lo
     if (p2) check(tag + ' ปร.2ก VAT', /^SUMPRODUCT\(ROUND\('ปร\.2'!K11:K11\*0\.07,2\)\)$/.test(fm(wb.getWorksheet('ปร.2(ก)').getCell('G10'))));
     // ลงนาม
     let sig = 0; s1.eachRow(row => row.eachCell(c => { if (c.master.address === c.address && typeof c.value === 'string' && /^\(\s+[กขค]\s+\)$/.test(c.value)) sig++; }));
-    check(tag + ' sig ปร.1', sig === (mode === 'central' ? 3 : 1), sig);
+    check(tag + ' ปร.1 ไม่มีช่องลงนาม (ลงนามที่ ปร.4 ตามไฟล์ตัวอย่าง — ตาม Cost Hub)', sig === 0, sig);
+    let sig4 = 0; s4.eachRow(row => row.eachCell(c => { if (c.master.address === c.address && typeof c.value === 'string' && /^\(\s+[กขค]\s+\)$/.test(c.value)) sig4++; }));
+    check(tag + ' ปร.4 มีช่องลงนาม', sig4 === (mode === 'central' ? 3 : 1), sig4);
     check(tag + ' date label', /^(ประมาณราคา|คำนวณราคากลาง)เมื่อวันที่$/.test(s1.getCell('A6').value) && (mode === 'central') === /ราคากลาง/.test(s1.getCell('A6').value));
     await wb.xlsx.writeBuffer();   // เขียนได้ไม่ error
+  }
+  // ตัวเลือกตาม Cost Hub: หลักที่ปัดลง (roundTo) และงานซ่อมแซม (ไม่ใช้ Factor F — VAT 7% เลือกได้)
+  { const o = await FX.build(ExcelJS, tpl, Object.assign(base('estimate', false, false), { roundTo: 100 })), s4 = o.wb.getWorksheet('ปร.4');
+    check('roundTo 100', fm(s4.getCell(`H${o.rows.pr4Final}`)) === `ROUNDDOWN(H${o.rows.pr4Sum},-2)`, fm(s4.getCell(`H${o.rows.pr4Final}`))); }
+  for (const vat of [true, false]) {
+    const o = await FX.build(ExcelJS, tpl, Object.assign(base('repair', false, false), { vat })), wb = o.wb, sa = wb.getWorksheet('ปร.1 (ก)');
+    check(`repair vat=${vat} J`, vat ? fm(sa.getCell('J10')) === 'ROUND(H10*0.07,2)' : sa.getCell('J10').value === '-', fm(sa.getCell('J10')) || sa.getCell('J10').value);
+    check(`repair vat=${vat} title`, /ซ่อมแซม/.test(wb.getWorksheet('ปร.4').getCell('A1').value));
+    await wb.xlsx.writeBuffer();
   }
   console.log(`test_formxlsx: ${pass} pass, ${fail} fail`); process.exit(fail ? 1 : 0);
 })();

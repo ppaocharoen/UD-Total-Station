@@ -2868,6 +2868,10 @@
           "type": "number",
           "description": "สัดส่วนค่าแรงต่อค่าวัสดุของแถวนี้ (pct)"
         },
+        "of_label": {
+          "type": "string",
+          "description": "ชื่อฐานที่แสดงในที่มาราคา เช่น ค่าท่อ (pct)"
+        },
         "find": {
           "type": "object",
           "description": "ตัวจับคู่ราคาพาณิชย์ (mat_find): type pvc_pipe {cls,dia} | thw {size} | re {re}"
