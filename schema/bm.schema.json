@@ -944,6 +944,17 @@
         "group": {
           "type": "string",
           "description": "กลุ่มสำหรับออกแบบ/ถอดปริมาณ เช่น roof_frame"
+        },
+        "open_dir": {
+          "enum": [
+            "+X",
+            "-X",
+            "+Y",
+            "-Y",
+            "+Z",
+            "-Z"
+          ],
+          "description": "ทิศที่ปากเหล็กตัว C หันไป (พิกัดโมเดล) — ใช้แสดง 3D"
         }
       }
     },
@@ -1423,8 +1434,16 @@
             "custom"
           ]
         },
-        "rise": { "type": "number", "exclusiveMinimum": 0, "description": "หลังคาโค้ง: ระยะยกจากระดับชายคาถึงยอดโค้ง (ใส่ rise หรือ radius)" },
-        "radius": { "type": "number", "exclusiveMinimum": 0, "description": "หลังคาโค้ง: รัศมีโค้ง" },
+        "rise": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "หลังคาโค้ง: ระยะยกจากระดับชายคาถึงยอดโค้ง (ใส่ rise หรือ radius)"
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "หลังคาโค้ง: รัศมีโค้ง"
+        },
         "outline": {
           "$ref": "#/$defs/polygon",
           "description": "ขอบชายคารวมระยะยื่น"
@@ -1477,6 +1496,16 @@
             },
             "spacing": {
               "$ref": "#/$defs/pos"
+            },
+            "open_dir": {
+              "enum": [
+                "+X",
+                "-X",
+                "+Y",
+                "-Y",
+                "+Z",
+                "-Z"
+              ]
             }
           }
         },
@@ -1488,6 +1517,16 @@
             },
             "spacing": {
               "$ref": "#/$defs/pos"
+            },
+            "open_dir": {
+              "enum": [
+                "+X",
+                "-X",
+                "+Y",
+                "-Y",
+                "+Z",
+                "-Z"
+              ]
             }
           }
         },
@@ -1499,12 +1538,31 @@
           "type": "object",
           "description": "หน้าตัดแผ่นลอนเมทัลชีท (ไม่ใส่ = มาตรฐาน หน้ากว้างปิดจริง 0.76 ลอนห่าง 0.19 สันลอน 0.03 สูง 0.024 ซ้อนทับ 1 ลอน วางยาวตามแนวลาด)",
           "properties": {
-            "cover": { "type": "number", "exclusiveMinimum": 0 },
-            "pitch": { "type": "number", "exclusiveMinimum": 0 },
-            "top": { "type": "number", "exclusiveMinimum": 0 },
-            "base": { "type": "number", "exclusiveMinimum": 0 },
-            "h": { "type": "number", "exclusiveMinimum": 0 },
-            "max_len": { "type": "number", "exclusiveMinimum": 0, "description": "ความยาวแผ่นสูงสุด (ม.) เกินนี้ต่อทาบตามยาว" }
+            "cover": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "pitch": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "top": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "base": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "h": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "max_len": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "description": "ความยาวแผ่นสูงสุด (ม.) เกินนี้ต่อทาบตามยาว"
+            }
           },
           "additionalProperties": false
         },
@@ -1822,6 +1880,37 @@
               }
             }
           }
+        },
+        "frame": {
+          "type": "object",
+          "description": "โครงคร่าวฝ้า (แสดง 3D ไม่ถอดปริมาณแยก — ราคาฝ้ารวมโครงแล้ว)",
+          "properties": {
+            "section": {
+              "type": "string"
+            },
+            "spacing": {
+              "type": "number",
+              "description": "ระยะรางหลัก ม."
+            },
+            "dir": {
+              "enum": [
+                "X",
+                "Y"
+              ],
+              "description": "แนวรางหลัก"
+            },
+            "cross": {
+              "type": "number",
+              "description": "ระยะโครงซอยตั้งฉาก ม."
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "section",
+            "spacing"
+          ]
         }
       }
     },
