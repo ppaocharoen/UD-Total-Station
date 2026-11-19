@@ -100,15 +100,16 @@ function bqPools(r) {
       levels: [['cat', d => bqWc(d.sheetLabel), 'ทุกหมวดใหญ่'], ['h1', d => bqWc(d.h1), 'ทุกหมวดย่อย'], ['h2', d => bqWc(d.h2), 'ทุกหมวดย่อยชั้น 2'], ['h3', d => bqWc(d.h3), 'ทุกหมวดย่อยชั้น 3']] },
   };
 }
-const BQ_TABS = { mat: [['mat', 'พาณิชย์'], ['comp', 'วัสดุมวลรวม'], ['survey', 'ราคาสืบ'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าวัสดุ']],
-  lab: [['wage', 'ค่าแรง ว480'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าแรง']],
+const BQ_TABS = { mat: [['mat', 'พาณิชย์'], ['comp', 'วัสดุมวลรวม'], ['survey', 'ราคาสืบ'], ['pct', '% ของรายการอื่น'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าวัสดุ']],
+  lab: [['wage', 'ค่าแรง ว480'], ['pctmat', '% ของค่าวัสดุ'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าแรง']],
   line: [['mat', 'ราคาพาณิชย์'], ['comp', 'วัสดุมวลรวม'], ['survey', 'ราคาสืบ']] };
 /** แท็บแรกที่เปิด: ชนิดที่ผูกไว้ → ชนิดของการผูกอัตโนมัติ → แท็บที่ชื่อรายการค้นเจอครบทุกคำ */
 function bqBestTab(r, side) {
   const cur = ((S.boq.bind || {})[r.key] || {})[side];
   if (cur && BQ_TABS[side].some(t => t[0] === cur.kind)) return cur.kind;
-  if (side === 'lab') return 'wage';
-  const k0 = r.ref && r.ref.kind; if (k0 === 'comp') return 'comp'; if (k0 === 'mat' || k0 === 'mat_find') return 'mat';
+  const k0 = r.ref && r.ref.kind;
+  if (side === 'lab') return k0 === 'pct' ? 'pctmat' : 'wage';
+  if (k0 === 'pct') return 'pct'; if (k0 === 'comp') return 'comp'; if (k0 === 'mat' || k0 === 'mat_find') return 'mat';
   const P = bqPools(r), q = (r.name || '').trim(); if (!q) return 'mat';
   for (const full of [true, false]) for (const k of ['mat', 'comp', 'survey']) { const t = P[k], x = bqSearch(t.pool, q, t.hay, { unit: r.unit, unitOf: t.unit }); if (!x.fallback && (full ? x.full : x.items.length)) return k; }
   return 'mat';
@@ -150,7 +151,7 @@ function bindOpen(key, side) {
   if (!S.db) return toast('ราคายังโหลดไม่เสร็จ');
   const r = S.priced.find(x => x.key === key); if (!r) return;
   const m = bqEl();
-  BQ.key = key; BQ.side = side; BQ.line = null; BQ.fl = {}; BQ.fprov = ''; BQ.tab = bqBestTab(r, side);
+  BQ.key = key; BQ.side = side; BQ.line = null; BQ.pct = null; BQ.fl = {}; BQ.fprov = ''; BQ.tab = bqBestTab(r, side);
   $('#bq-title', m).textContent = side === 'mat' ? 'ผูกราคาค่าวัสดุ' : 'ผูกราคาค่าแรง';
   $('#bq-label', m).innerHTML = `รายการ: <b>${esc(r.name)}</b> · หน่วย ${esc(r.unit || '—')} · ระบบแปลงหน่วยราคาให้เมื่อทำได้`;
   $('#bq-q', m).value = r.name || '';
@@ -164,7 +165,8 @@ function bqCurHtml(r, side) {
 }
 function bqList() {
   const m = $('#bind-modal'), r = bqRow(); if (!m || !r) return;
-  const side = BQ.side, q = $('#bq-q', m).value.trim(), tabs = BQ_TABS[side];
+  const side = BQ.side, q = $('#bq-q', m).value.trim(), isPct = r.ref && r.ref.kind === 'pct';
+  const tabs = side === 'lab' && isPct ? BQ_TABS.lab.filter(t => t[0] !== 'wage') : BQ_TABS[side];   // แถว % คิดค่าแรงจาก ว480 ไม่ได้ (เป็นงานเหมา)
   const tg = side === 'line' ? { key: r.key, name: BQ.line.name, unit: BQ.line.unit, ref: {} } : r, P = bqPools(tg);
   $('#bq-cur', m).innerHTML = side === 'line' ? '' : bqCurHtml(r, side);
   const cnt = k => { const t = P[k]; if (!t) return ''; if (!q) return ` (${t.pool.length})`; const x = bqSearch(t.pool, q, t.hay, { unit: tg.unit, unitOf: t.unit }); return ` (${x.fallback ? 0 : x.items.length})`; };
@@ -211,6 +213,11 @@ function bqList() {
         : `<div class="hint bq-note">${BQ.lib ? 'ยังไม่มีราคาสืบที่ใช้ได้' : 'กำลังโหลดคลังราคาสืบ…'}</div>`;
     } else html = items.map((d, i) => row(d, bqWagePath(d).join(' › '), esc(d.code), d.price !== null ? bqF2(d.price) + ' / ' + esc(d.unit) : esc(d.rawPrice || '—'), i)).join('');
     html = note + html;
+  } else if (BQ.tab === 'pct') {
+    html = pctHtml(r);
+  } else if (BQ.tab === 'pctmat') {
+    const v = cur && cur.kind === 'pctmat' ? cur.pct : (r.ref && r.ref.lab_pct !== undefined ? +(r.ref.lab_pct * 100).toFixed(2) : 30);
+    html = `<div class="bq-pad"><div class="hint" style="flex-basis:100%">ค่าแรงต่อหน่วย = % ของค่าวัสดุต่อหน่วยของรายการนี้ (หลักเกณฑ์: ค่าแรง 30% ของค่าของ)</div><label>เปอร์เซ็นต์ของค่าวัสดุ <input id="bq-lp" class="price sm" inputmode="decimal" value="${esc(v)}"> %</label> <button class="btn small primary" id="bq-lpok">ใช้การคิดนี้</button></div>`;
   } else if (BQ.tab === 'manual') {
     const v = cur && cur.kind === 'manual' ? cur.price : '';
     html = `<div class="bq-pad"><label>ราคาต่อหน่วย (บาท/${esc(r.unit || 'หน่วย')}) <input id="bq-mv" class="price" inputmode="decimal" value="${esc(v)}"></label> <button class="btn small primary" id="bq-mok">ใช้ราคานี้</button>
@@ -219,7 +226,7 @@ function bqList() {
     html = `<div class="bq-pad"><button class="btn small primary" id="bq-nok">${side === 'mat' ? 'ยืนยัน: รายการนี้ไม่มีค่าวัสดุ (ค่าแรงอย่างเดียว)' : 'ยืนยัน: รายการนี้ไม่มีค่าแรง (รวมในค่าอื่นแล้ว)'}</button></div>`;
   }
   list.innerHTML = html || '<div class="hint bq-note">ไม่พบรายการ</div>';
-  $('#bq-foot', m).innerHTML = side === 'line' ? '<span class="hint">ไม่มีในฐานข้อมูล? สืบราคาวัสดุย่อยนี้ได้ที่แท็บราคาสืบ (กลุ่ม "วัสดุย่อยในวัสดุมวลรวม") แล้วกลับมาเลือกในแท็บราคาสืบ</span>' : side === 'mat'
+  if (BQ.tab === 'pct' || BQ.tab === 'pctmat') $('#bq-foot', m).innerHTML = ''; else $('#bq-foot', m).innerHTML = side === 'line' ? '<span class="hint">ไม่มีในฐานข้อมูล? สืบราคาวัสดุย่อยนี้ได้ที่แท็บราคาสืบ (กลุ่ม "วัสดุย่อยในวัสดุมวลรวม") แล้วกลับมาเลือกในแท็บราคาสืบ</span>' : side === 'mat'
     ? `<span class="hint">ไม่มีในฐานข้อมูล?</span> <button class="btn small" data-svnew="1">+ สืบราคาใหม่</button> <button class="btn small" data-tab="manual">กรอกราคาเอง</button>`
     : `<button class="btn small" data-tab="manual">ไม่พบ — กรอกค่าแรงเอง</button>`;
   list.onclick = e => {
@@ -227,7 +234,16 @@ function bqList() {
     if (it && T) { if (side === 'line') bqPickLine(r, items[+it.dataset.i]); else bqPickItem(r, items[+it.dataset.i]); return; }
     if (e.target.id === 'bq-mok') { const v = $('#bq-mv', m).value.replace(/,/g, '').trim(); if (v === '' || !isFinite(+v) || +v < 0) return toast('ใส่ราคาเป็นตัวเลข ≥ 0'); bqSet(r, { kind: 'manual', price: r2(+v), note: $('#bq-mn', m).value.trim() }); }
     if (e.target.id === 'bq-nok') bqSet(r, { kind: 'none' });
+    if (e.target.id === 'bq-lpok') { const v = $('#bq-lp').value.trim(); if (v === '' || !(+v >= 0)) return toast('ใส่เปอร์เซ็นต์เป็นตัวเลข'); bqSet(r, { kind: 'pctmat', pct: +v }); }
+    const pa = e.target.closest('[data-pa]'); if (pa && BQ.tab === 'pct') pctAct(r, pa.dataset.pa);
   };
+  list.onchange = e => { if (BQ.tab !== 'pct') return; const t = e.target, P = BQ.pct;
+    if (t.dataset.pk) { const i = P.sel.indexOf(t.dataset.pk); if (t.checked && i < 0) P.sel.push(t.dataset.pk); if (!t.checked && i >= 0) P.sel.splice(i, 1); pctSum(r); }
+    if (t.id === 'bq-pre') { P.preset = t.value; const ps = PCT_PRESETS.find(x => x.id === t.value); if (ps) { P.pct = ps.pct; pctAuto(r); } bqList(); } };
+  list.oninput = e => { if (BQ.tab !== 'pct') return; const t = e.target;
+    if (t.id === 'bq-pv') { BQ.pct.pct = t.value; pctSum(r); }
+    if (t.id === 'bq-pf') { BQ.pct.filter = t.value; pctFilter(); } };
+  if (BQ.tab === 'pct') pctFilter();
   list.onkeydown = e => { if (e.key === 'Enter' && e.target.id === 'bq-mv') $('#bq-mok', m).click(); };
 }
 async function bqPickItem(r, d) {
@@ -369,4 +385,70 @@ async function bqPickLine(r, d) {
   }
   sc.lines[L.index] = link; if (sc.prices) delete sc.prices[L.index];
   autosave(); bqClose(); renderPR1(); renderSummary(); renderSurvey(); toast(`ผูกราคา "${L.name}" แล้ว`);
+}
+
+// ------------------------------------------------------------------ แถว % ของรายการอื่น (ก้อน 4c ตาม Cost Hub — หลักเกณฑ์งานอาคาร 2569 ข้อ 4.3–4.4)
+const UNIT_M = /^(ม\.?|เมตร|m)$/i;
+const PCT_PRESETS = (() => {
+  const lc = n => String(n || '').toLowerCase();
+  const conduit = n => /ท่อร้อยสาย|conduit|\b(imc|emt|rsc)\b|ท่อ\s*(imc|emt|rsc)/i.test(lc(n));
+  const wire = n => /สายไฟ|\b(vct|vctf|thw|nyy|cv|vaf|iec)\b/i.test(lc(n));
+  const ppr = n => /p\.?p-?r|พีพีอาร์|\bpb\b|พีบี|hdpe|เอชดีพีอี/i.test(lc(n));
+  const drain = n => /ระบาย|น้ำทิ้ง|โสโครก|น้ำเสีย|ท่อ\s*ส้วม|ระบายอากาศ/i.test(lc(n)) && !ppr(n);
+  const water = n => /ประปา|น้ำดี/i.test(lc(n)) && /pvc|พีวีซี/i.test(lc(n)) && !ppr(n);
+  const out = [
+    { id: 'e_conduit', grp: 'งานระบบไฟฟ้า', name: 'งานเบ็ดเตล็ดท่อร้อยสายไฟ', pct: 15, lab: null, of: 'ค่าท่อร้อยสายไฟ', test: conduit, hint: 'ท่อร้อยสายไฟทุกขนาด · ไม่มีค่าแรง' },
+    { id: 'e_wire', grp: 'งานระบบไฟฟ้า', name: 'งานเบ็ดเตล็ดสายไฟ', pct: 5, lab: null, of: 'ค่าสายไฟ', test: wire, hint: 'สายไฟทุกขนาด · ไม่มีค่าแรง' },
+  ];
+  [['d', 'ท่อระบายน้ำ PVC', drain, [40, 30, 10]], ['w', 'ท่อประปา PVC', water, [50, 30, 10]], ['p', 'ท่อ PP-R / PB / HDPE', ppr, [50, 20, 10]]].forEach(([k, nm, t, pc]) => {
+    [['fit', 'ข้อต่อ', pc[0]], ['sup', 'เหล็กยึด', pc[1]], ['test', 'ทดสอบ ทำความสะอาด ทาสีสัญลักษณ์', pc[2]]].forEach(([pk, pn, v]) => {
+      out.push({ id: 's_' + k + '_' + pk, grp: 'งานระบบสุขาภิบาล — ' + nm, name: 'งาน' + pn + nm, pct: v, lab: 30, of: 'ค่า' + nm, test: t, hint: 'ท่อชนิดนี้ทุกขนาด · ค่าแรง 30% ของค่าวัสดุ' });
+    });
+  });
+  return out;
+})();
+function pctInit(r) {   // ค่าเริ่ม: ที่ผูกเองไว้ → แถว % จากตัวถอดปริมาณ (ข้อต่อท่อ) → ว่าง
+  const m = ((S.boq.bind || {})[r.key] || {}).mat, a = r.ref && r.ref.kind === 'pct' ? r.ref : null;
+  BQ.pct = m && m.kind === 'pct' ? { key: r.key, sel: (m.of || []).slice(), pct: m.pct, preset: m.preset || '', filter: '' }
+    : { key: r.key, sel: a ? (a.of || []).slice() : [], pct: a ? +(a.mat * 100).toFixed(2) : '', preset: '', filter: '' };
+}
+const pctCand = r => S.priced.filter(x => x.key !== r.key && !(x.ref && x.ref.kind === 'pct'));
+function pctAuto(r) { const ps = PCT_PRESETS.find(x => x.id === BQ.pct.preset); if (ps) BQ.pct.sel = pctCand(r).filter(x => UNIT_M.test(String(x.unit || '').trim()) && ps.test(x.name)).map(x => x.key); }
+function pctSumHtml() {
+  const P = BQ.pct, by = Object.fromEntries(S.priced.map(x => [x.key, x])), pc = +P.pct || 0;
+  const base = r2(P.sel.reduce((a, k) => a + ((by[k] && by[k].mat_amt) || 0), 0)), miss = P.sel.filter(k => by[k] && by[k].mat_unit === null).length;
+  return `เลือกแล้ว ${P.sel.length} รายการ · รวมค่าวัสดุ ${bqF2(base)} บาท${pc > 0 ? ` → ${pc}% = <b>${bqF2(r2(base * pc / 100))}</b> บาท` : ''}${miss ? ` <span class="warnline" style="display:inline">${miss} รายการที่เลือกยังไม่มีราคา</span>` : ''}`;
+}
+function pctSum() { const e = $('#bq-psum'); if (e) e.innerHTML = pctSumHtml(); }
+function pctFilter() { const q = bqNorm((BQ.pct && BQ.pct.filter) || ''); document.querySelectorAll('#bq-list [data-rk]').forEach(el => { el.style.display = !q || bqNorm(el.textContent).includes(q) ? '' : 'none'; }); }
+function pctHtml(r) {
+  if (!BQ.pct || BQ.pct.key !== r.key) pctInit(r);
+  const P = BQ.pct, grps = [...new Set(PCT_PRESETS.map(x => x.grp))], ps = PCT_PRESETS.find(x => x.id === P.preset), nm = rowNums(rows());
+  const opts = '<option value="">กำหนดเอง (ไม่ใช้ชุดสำเร็จรูป)</option>' + grps.map(g => `<optgroup label="${esc(g)}">${PCT_PRESETS.filter(x => x.grp === g).map(x => `<option value="${x.id}" ${P.preset === x.id ? 'selected' : ''}>${esc(x.name)} — ${x.pct}%</option>`).join('')}</optgroup>`).join('');
+  const list = pctCand(r).map(x => { const isM = UNIT_M.test(String(x.unit || '').trim());
+    return `<label class="bq-item" data-rk="${esc(x.key)}"><input type="checkbox" data-pk="${esc(x.key)}" ${P.sel.includes(x.key) ? 'checked' : ''}><div class="bq-iname">${nm[x.key] ? nm[x.key] + '. ' : ''}${esc(x.name)}<div class="hint">${fmt(x.qty)} ${esc(x.unit || '')}${isM ? '' : ' · หน่วยไม่ใช่ ม.'}</div></div><div class="bq-iprice">${x.mat_unit === null ? '<span class="warnline" style="display:inline">ยังไม่มีราคา</span>' : bqF2(x.mat_amt) + ' บาท'}</div></label>`; }).join('');
+  return `<div class="bq-pad pct"><div class="hint" style="flex-basis:100%">ค่าวัสดุของรายการนี้ = % ของค่าวัสดุรวมของรายการที่เลือก (หลักเกณฑ์งานอาคาร 2569) · ราคาตามรายการฐานเปลี่ยนเองเมื่อรายการฐานเปลี่ยน</div>
+    <select id="bq-pre">${opts}</select> <label>เปอร์เซ็นต์ <input id="bq-pv" class="price sm" inputmode="decimal" value="${esc(P.pct)}"> %</label>
+    ${ps ? `<div class="hint" style="flex-basis:100%">${esc(ps.hint)} · ระบบเลือกรายการหน่วย ม. ที่ชื่อเข้าข่ายให้เบื้องต้น ตรวจและแก้ได้</div>` : ''}
+    <div style="flex-basis:100%;display:flex;gap:6px;flex-wrap:wrap"><input id="bq-pf" placeholder="กรองรายการด้วยชื่อ" value="${esc(P.filter)}" style="max-width:240px">${ps ? '<button class="btn small" data-pa="auto">เลือกตามชนิดท่อ/สายอัตโนมัติ</button>' : ''}<button class="btn small" data-pa="allm">เลือกทุกรายการหน่วย ม.</button><button class="btn small" data-pa="clear">ล้างที่เลือก</button></div>
+    <div class="pct-rows" style="flex-basis:100%">${list || '<div class="hint bq-note">ไม่มีรายการอื่นให้เลือก</div>'}</div>
+    <div id="bq-psum" style="flex-basis:100%">${pctSumHtml()}</div>
+    <div style="flex-basis:100%"><button class="btn small primary" data-pa="ok">ใช้การคิดนี้</button></div></div>`;
+}
+function pctAct(r, a) {
+  const P = BQ.pct;
+  if (a === 'clear') P.sel = [];
+  else if (a === 'auto') pctAuto(r);
+  else if (a === 'allm') P.sel = pctCand(r).filter(x => UNIT_M.test(String(x.unit || '').trim())).map(x => x.key);
+  else if (a === 'ok') {
+    const pc = +P.pct; if (!P.sel.length || P.pct === '' || !(pc >= 0)) return toast('เลือกรายการฐานอย่างน้อย 1 รายการ และกรอกเปอร์เซ็นต์');
+    const ps = PCT_PRESETS.find(x => x.id === P.preset), m = { kind: 'pct', of: P.sel.slice(), pct: pc };
+    if (ps) { m.preset = ps.id; m.ofLabel = ps.of; }
+    const c = (S.boq.custom_rows || []).find(x => x.key === r.key);   // รายการที่เพิ่มเอง: ตั้งชื่อ/หน่วยตามชุดสำเร็จรูป
+    if (c) { if (ps && (!c.name || c.name === 'รายการใหม่')) c.name = ps.name; if (!c.unit || c.unit === 'หน่วย') c.unit = 'งาน'; if (!(+c.qty > 0)) c.qty = 1; }
+    const b = (S.boq.bind || {})[r.key] || {};
+    if (ps && !b.lab) bindSide(r.key, 'lab', ps.lab === null ? { kind: 'none' } : { kind: 'pctmat', pct: ps.lab });
+    BQ.pct = null; return bqSet(r, m);
+  }
+  bqList();
 }

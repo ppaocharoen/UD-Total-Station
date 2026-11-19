@@ -659,3 +659,4 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 .cmp-l{padding:2px 0 2px 10px;line-height:1.6}.cmp-l .pk-link{margin-left:4px}
 .cmp-nest{margin:2px 0 4px 14px;padding-left:8px;border-left:2px solid var(--border)}
 .cmp input.price.sm{width:64px}
+.bq-pad.pct select{max-width:420px}.pct-rows{max-height:34vh;overflow:auto;border:1px solid var(--border)}.pct-rows .bq-item{align-items:center;gap:8px}

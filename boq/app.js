@@ -516,9 +516,16 @@ function surveyState() {
 }
 /** ราคาสืบที่ผูกด้วยหน้าต่างผูกราคา (target ของรายการสืบในโครงการ) */
 function svPriceOf(target) { const it = (S.boq.surveys || {})[target]; if (!it) return null; const s = Survey.summary(it); return s.price === null ? null : { price: s.price, src: Survey.srcText(it), unit: it.unit, n: s.n, name: it.name }; }
+/** ลำดับที่ของแถวตามที่แสดงใน ปร.1 (หมวด → กลุ่มตามลำดับที่พบ) — ใช้เขียน "รายการที่ …" ของแถว % */
+function rowNums(rs) {
+  const o = {}; let n = 0;
+  for (const [sc] of SECTIONS) { const inSec = rs.filter(r => sectionOf(r.group_code) === sc); [...new Set(inSec.map(r => r.group_code))].forEach(g => inSec.filter(r => r.group_code === g).forEach(r => { o[r.key] = ++n; })); }
+  return o;
+}
 /** การผูกเอง (S.boq.bind — หน้าต่างผูกราคา) ทับการผูกอัตโนมัติทีละฝั่ง แล้วคิดราคา · ป้ายที่มาของ "กรอกเอง" ใส่รายละเอียดที่ผู้ใช้เขียน */
 function priceBound(rs) {
-  const x = BoqBind.apply(rs, S.boq.bind, { overrides: S.boq.overrides, survey: surveyState(), surveyOf: svPriceOf, cmp: S.boq.cmpline, db: S.db, U: window.UDPrice });
+  const nm = rowNums(rs), pctTxt = keys => { const a = keys.map(k => nm[k]).filter(x => x !== undefined).sort((x, y) => x - y); return a.length ? 'รายการที่ ' + a.join(', ') : ''; };
+  const x = BoqBind.apply(rs, S.boq.bind, { overrides: S.boq.overrides, survey: surveyState(), surveyOf: svPriceOf, cmp: S.boq.cmpline, db: S.db, U: window.UDPrice, pctTxt });
   const pr = BoqCalc.priceRows(S.db, window.UDPrice, x.rows, { overrides: x.overrides, survey: x.survey }), B = S.boq.bind || {};
   pr.forEach(r => { const b = B[r.key]; if (!b) return;
     if (b.mat && b.mat.kind === 'manual') r.mat_src = BoqBind.label(b.mat);
@@ -534,6 +541,13 @@ function priceAll() {
 function bindBtns(r, side, b) {
   if (!S.db) return '';
   return `<span class="bq-btns no-print">${b[side] ? `<span class="pill warn" title="ผูกเอง${b.by ? ' โดย ' + esc(b.by) : ''}${b.at ? ' ' + esc(b.at) : ''}">ผูกเอง</span><button class="btn small" data-unb="${side}" title="กลับไปใช้การผูกอัตโนมัติ">↺</button>` : ''}<button class="btn small" data-bind="${side}" title="${side === 'mat' ? 'เลือกค่าวัสดุจากพาณิชย์ / มวลรวม / ราคาสืบ หรือกรอกเอง' : 'เลือกค่าแรงจาก ว480 หรือกรอกเอง'}">ผูก…</button></span>`;
+}
+/** ค่าแรงที่ผูกเองคิดต่อ ตร.ม. แต่แถวเป็นชุด/บาน → ช่องพื้นที่ต่อหน่วย (ค่าเริ่ม: ขนาดจากโมเดล หรือเดาจากชื่อ) */
+function areaBox(r, b) {
+  if (!b.lab || b.lab.kind !== 'wage' || !S.db) return '';
+  const auto = ((rows().find(x => x.key === r.key) || {}).price_ref) || {}, ai = BoqBind.areaInfo(r, b.lab, S.db, auto); if (!ai.applies) return '';
+  const w = S.db.wage(b.lab.code) || {};
+  return `<span class="src no-print">ค่าแรง ${esc(w.unit)} × พื้นที่ต่อ ${esc(r.unit)} <input class="price sm ${ai.area ? '' : 'ov'}" data-area="1" value="${esc(ai.area || '')}" inputmode="decimal" placeholder="ตร.ม."> ตร.ม. ${ai.src === 'model' ? '(ขนาดจากโมเดล)' : ai.src === 'name' ? '(เดาจากขนาดในชื่อ — แก้ได้)' : ai.src === 'user' ? '' : '<b class="warnline" style="display:inline">กรอกพื้นที่เพื่อคิดค่าแรง</b>'}</span>`;
 }
 /** ตั้ง/ลบการผูกเองฝั่งหนึ่งของแถว (v = null → กลับไปใช้การผูกอัตโนมัติ) */
 function bindSide(key, side, v) {
@@ -584,7 +598,7 @@ function _renderPR1() {
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
           <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${b.mat && b.mat.kind === 'manual' ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span>${bindBtns(r, 'mat', b)}</td>
           <td class="r c-ma" data-l="ค่าวัสดุ">${fmt(r.mat_amt)}</td>
-          <td class="r c-lu" data-l="ค่าแรง/หน่วย"><input class="price ${b.lab && b.lab.kind === 'manual' ? 'ov' : ''}" data-ov="lab" value="${r.lab_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.lab_src)}</span>${bindBtns(r, 'lab', b)}</td>
+          <td class="r c-lu" data-l="ค่าแรง/หน่วย"><input class="price ${b.lab && b.lab.kind === 'manual' ? 'ov' : ''}" data-ov="lab" value="${r.lab_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.lab_src)}</span>${areaBox(r, b)}${bindBtns(r, 'lab', b)}</td>
           <td class="r c-la" data-l="ค่าแรง">${fmt(r.lab_amt)}</td>
           <td class="r c-tot" data-l="รวม">${fmt(r.total)}</td>
           <td class="c-note"><span class="src">${esc((r.ref && r.ref.note) || r.note || '')}</span>${custom ? '<button class="btn small" data-del="1">ลบ</button>' : ''}</td></tr>`;
@@ -621,6 +635,8 @@ function _renderPR1() {
       else bindSide(key, side, { kind: 'manual', price: r2(+v), note: cur && cur.kind === 'manual' ? cur.note || '' : '' });
       renderPR1(); renderSummary(); renderSurvey();
     });
+    const ai = tr.querySelector('[data-area]');
+    if (ai) ai.onchange = () => { const l = ((S.boq.bind || {})[key] || {}).lab; if (!l) return; const v = ai.value.replace(/,/g, '').trim(); if (v === '' || !(+v > 0)) delete l.area; else l.area = r2(+v); autosave(); renderPR1(); renderSummary(); };
     const qi = tr.querySelector('[data-qov]');
     if (qi) qi.onchange = () => {
       const r = S.priced.find(x => x.key === key); if (!r) return;

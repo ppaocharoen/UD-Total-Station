@@ -61,6 +61,20 @@ chk(P.b.warns.some(w => /ค่าวัสดุ|ยังไม่มีรา
 const rw = [{ key: 'w', name: 'หน้าต่าง', unit: 'ชุด', qty: 1, price_ref: { kind: 'user', need_mat: true, no_lab: 'รวมในราคาสืบ' } }];
 const xw = BB.apply(rw, { w: { mat: { kind: 'manual', price: 3000 } } }, {}), pw = B.priceRows(db, U, xw.rows, { overrides: xw.overrides })[0];
 chk(pw.mat_unit === 3000 && !pw.warns.length, 'หน้าต่าง (ค่าแรงรวมในราคาสืบ) กรอกค่าวัสดุเอง → ไม่เตือนค่าแรง');
+// 4c) % ของรายการอื่น + ค่าแรง % ของค่าวัสดุ + ค่าแรงต่อ ตร.ม. × พื้นที่
+const run2 = (rs, bind, o) => { const x = BB.apply(rs, bind, Object.assign({ db }, o || {})); return Object.fromEntries(B.priceRows(db, U, x.rows, { overrides: x.overrides, survey: x.survey }).map(r => [r.key, r])); };
+const rp = rows.concat([{ key: 'f', name: 'ข้อต่อ', unit: 'งาน', qty: 1, price_ref: null }]);
+let Q = run2(rp, { f: { mat: { kind: 'pct', of: ['a', 'd'], pct: 40, ofLabel: 'ค่าท่อ' }, lab: { kind: 'pctmat', pct: 30 } }, d: { mat: { kind: 'manual', price: 2500 } } }, { pctTxt: k => 'รายการที่ ' + k.join(', ') });
+chk(Q.f.mat_unit === 1080 && Q.f.lab_unit === 324 && /40% ของค่าท่อ 2,700.00 \(รายการที่ a, d\)/.test(Q.f.mat_src), '4c % ของรายการอื่น: 40% × (200+2500) = 1080 · ค่าแรง 30% = 324');
+Q = run2(rows, { a: { lab: { kind: 'pctmat', pct: 30 } } });
+chk(Q.a.lab_unit === 30 && /30% ของค่าวัสดุ/.test(Q.a.lab_src), '4c ค่าแรง 30% ของค่าวัสดุ (100) = 30');
+const rd = [{ key: 'g', name: 'ประตูไม้อัด 0.80x2.00 ม.', unit: 'ชุด', qty: 2, price_ref: { kind: 'user', need_mat: true } }];
+Q = run2(rd, { g: { lab: { kind: 'wage', code: 'W3' } } });
+chk(Q.g.lab_unit === 16, '4c ค่าแรงต่อ ตร.ม. (10) แถวเป็นชุด → เดาพื้นที่จากชื่อ 0.80×2.00 = 1.6 → 16');
+Q = run2(rd, { g: { lab: { kind: 'wage', code: 'W3', area: 2.1 } } });
+chk(Q.g.lab_unit === 21, '4c กรอกพื้นที่เอง 2.1 → 21');
+Q = run2([Object.assign({}, rows[3])], { d: { lab: { kind: 'wage', code: 'W3' } } });
+chk(Q.d.lab_unit === 18, '4c พื้นที่จากโมเดล (area 1.8 ของการผูกอัตโนมัติ) มาก่อนเดาจากชื่อ → 18');
 // 10) ย้ายไฟล์เดิม
 const boq = { overrides: { a: { mat: 10 }, b: { no_mat: true, lab: 5 }, c: { code: 'X' } } };
 const n = BB.migrate(boq);
