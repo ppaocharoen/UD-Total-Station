@@ -70,7 +70,9 @@
     <div class="card">
       <h2>ข้อมูลโครงการ</h2>
       <div class="form-grid" id="proj-form">
-        <label>ประเภทงาน<select data-k="mode"><option value="reference">กำหนดราคากลาง (คณะกรรมการ)</option><option value="estimate">ประมาณราคา (ผู้ประมาณราคา)</option></select></label>
+        <label>ประเภทงาน<select data-k="mode"><option value="estimate">ประมาณราคา (ปร.4 ปัดลง)</option><option value="central">กำหนดราคากลาง (คณะกรรมการ)</option><option value="repair">ประมาณราคาจ้างซ่อมแซม (ไม่ใช้ Factor F)</option></select></label>
+        <label id="pf-round">ปร.4 ปัดลงที่หลัก<select data-k="roundTo"><option value="10000">หลักหมื่น</option><option value="1000">หลักพัน</option><option value="100">หลักร้อย</option><option value="10">หลักสิบ</option><option value="1">หลักหน่วย (ตัดสตางค์)</option></select></label>
+        <label id="pf-vat" hidden>ภาษีมูลค่าเพิ่ม<select data-k="vat"><option value="1">คิดภาษีมูลค่าเพิ่ม 7%</option><option value="0">ไม่คิดภาษีมูลค่าเพิ่ม</option></select></label>
         <label>ชื่อโครงการ<input data-k="name"></label>
         <label>สถานที่ก่อสร้าง<input data-k="location"></label>
         <label>หน่วยงานเจ้าของโครงการ<input data-k="agency"></label>
@@ -83,7 +85,11 @@
     </div>
   </div>
   <div class="cols">
-    <div class="card">
+    <div class="card" id="ff-repair" hidden>
+      <h2>งานจ้างซ่อมแซม</h2>
+      <p class="hint">ไม่ใช้ Factor F — ค่าซ่อมแซม = ค่างานต้นทุน + ภาษีมูลค่าเพิ่ม 7% (เลือกได้) · ไม่มี ปร.2 / ปร.3</p>
+    </div>
+    <div class="card" id="ff-card">
       <h2>เงื่อนไข Factor F</h2>
       <div class="form-grid">
         <label>เงินค่าจ้างล่วงหน้า<select id="ff-adv"><option>0</option><option>5</option><option>10</option><option selected>15</option></select></label>
@@ -221,12 +227,13 @@
 
 <!-- ================================================================ ปร.2 / ปร.3 -->
 <section class="page" id="page-pr23">
-  <div class="card">
+  <div class="card pr23-repair" hidden><p class="hint">งานจ้างซ่อมแซมไม่มี ปร.2 / ปร.3 — รายการที่กรอกไว้เก็บไว้ แต่ไม่นำไปรวมและไม่ส่งออก</p></div>
+  <div class="card pr23-body">
     <h2>ปร.2 ค่าครุภัณฑ์จัดซื้อ <span class="hint">(ราคาผู้ผลิต/ผู้จำหน่าย ยังไม่รวม VAT — ไม่คูณ Factor F)</span></h2>
     <div class="table-wrap"><table class="boq" id="pr2-table"></table></div>
     <button class="btn small" id="b-add-pr2">+ เพิ่มครุภัณฑ์</button>
   </div>
-  <div class="card">
+  <div class="card pr23-body">
     <h2>ปร.3 ค่าใช้จ่ายพิเศษตามข้อกำหนด <span class="hint">(รวม VAT แล้วถ้ารายการนั้นต้องเสีย)</span></h2>
     <div class="table-wrap"><table class="boq" id="pr3-table"></table></div>
     <button class="btn small" id="b-add-pr3">+ เพิ่มรายการ</button>

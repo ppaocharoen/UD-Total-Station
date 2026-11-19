@@ -25,7 +25,18 @@ function newBoq() {
     overrides: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
 /** คำเรียกตามประเภทงาน: กำหนดราคากลาง → ราคากลาง · ประมาณราคา → ราคาประมาณการ */
-const RG = () => (S.boq && S.boq.project && S.boq.project.mode === 'estimate' ? 'ราคาประมาณการ' : 'ราคากลาง');
+const RG = () => (isCentral() ? 'ราคากลาง' : isRepair() ? 'ประมาณราคาค่าซ่อมแซม' : 'ราคาประมาณการ');
+// ประเภทงาน (ตาม UD Cost Hub): estimate ประมาณราคา (ปร.4 ปัดลง) · central กำหนดราคากลาง (ไม่ปัด) · repair ประมาณราคาจ้างซ่อมแซม (ไม่ใช้ Factor F, VAT 7% เลือกได้, ไม่มี ปร.2/ปร.3)
+const isCentral = () => !!(S.boq && S.boq.project && S.boq.project.mode === 'central');
+const isRepair = () => !!(S.boq && S.boq.project && S.boq.project.mode === 'repair');
+const RT_LABEL = [[10000, 'หลักหมื่น'], [1000, 'หลักพัน'], [100, 'หลักร้อย'], [10, 'หลักสิบ'], [1, 'หลักหน่วย (ตัดสตางค์)']];
+const roundTo = () => (+S.boq.project.roundTo > 0 ? +S.boq.project.roundTo : 1000);
+const roundDownTo = (x, rt) => Math.floor(r2(x) / rt + 1e-9) * rt;
+function normProject() {   // ไฟล์เดิม: ค่า 'reference' ของช่องประเภทงาน = กำหนดราคากลาง (ส่งออก Excel เดิมอ่านเป็นประมาณราคา — แก้ 6.49)
+  const p = S.boq.project;
+  if (p.mode === 'reference') p.mode = 'central';
+  if (!['estimate', 'central', 'repair'].includes(p.mode)) p.mode = 'estimate';
+}
 function newPlan() { return { start: '', workdays: [1, 2, 3, 4, 5, 6], holidays: [], durations: {}, inst: { n: 4, mode: 'auto', assign: {} } }; }
 
 // ------------------------------------------------------------------ util
@@ -96,7 +107,7 @@ function loadModel(json, name) {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem('udboq:' + name) || 'null'); } catch (e) { /* */ }
   S.boq = saved && saved.format === 'ud-boq' ? Object.assign(newBoq(), saved) : newBoq();
-  S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
+  S.boq.plan = Object.assign(newPlan(), S.boq.plan || {}); normProject();
   if (name === 'sample-building.bm.json' && S.boq.factor && +S.boq.factor.advance === 15 && +S.boq.factor.retention === 10) S.boq.factor = { advance: 0, retention: 0, loanPct: 0 };   // ค่าเริ่มต้นเดิมของตัวอย่าง → 0
   S.boq.model_file = name;
   const p = S.boq.project;
@@ -132,7 +143,7 @@ function renderAll() {
 function people() {
   const p = S.boq.project; p.mode = p.mode || 'estimate';
   let L = p.people || [];
-  if (p.mode === 'estimate') { const e = L.find(x => x.role === 'ผู้ประมาณราคา') || L[0] || {}; L = [{ role: 'ผู้ประมาณราคา', name: e.name || '', pos: e.pos || '' }]; }
+  if (p.mode !== 'central') { const e = L.find(x => x.role === 'ผู้ประมาณราคา') || L[0] || {}; L = [{ role: 'ผู้ประมาณราคา', name: e.name || '', pos: e.pos || '' }]; }
   else {
     const ch = L.find(x => x.role === 'ประธานกรรมการ') || (L[0] && L[0].role === 'ผู้ประมาณราคา' ? L[0] : null) || {};
     const mem = L.filter(x => x.role === 'กรรมการ');
@@ -142,21 +153,29 @@ function people() {
   p.people = L; return L;
 }
 function renderPeople() {
-  const p = S.boq.project, L = people(), est = p.mode === 'estimate';
+  const p = S.boq.project, L = people(), est = p.mode !== 'central', me = S.me || null;
+  if (me && me.name && !L[0].name && !p.me_filled) { L[0].name = me.name; L[0].pos = me.position || ''; p.me_filled = true; autosave(); }   // ใส่ชื่อจากบัญชีให้ครั้งแรก (แก้เป็นชื่ออื่นได้)
   if ($('#lbl-calc')) $('#lbl-calc').textContent = `คำนวณ${RG()}เมื่อวันที่`;
   $('#people-title').textContent = est ? 'ผู้ประมาณราคา' : `คณะกรรมการกำหนดราคากลาง (${L.length} คน)`;
   $('#people').innerHTML = L.map((x, i) => `<div class="ppl-row"><span class="ppl-role">${x.role}</span><input data-pp="${i}" data-pf="name" placeholder="ชื่อ-สกุล" value="${esc(x.name)}"><input data-pp="${i}" data-pf="pos" placeholder="ตำแหน่ง" value="${esc(x.pos)}">${!est && i >= 3 ? `<button class="btn small" data-ppdel="${i}">ลบ</button>` : ''}</div>`).join('') +
-    (est ? '' : `<button class="btn small" id="pp-add">+ เพิ่มกรรมการ</button>`);
+    (est ? '' : `<button class="btn small" id="pp-add">+ เพิ่มกรรมการ</button>`) +
+    (me && me.name ? ` <button class="btn small" id="pp-me" title="ใส่ชื่อและตำแหน่งจากข้อมูลผู้ใช้ที่ล็อกอิน">ใช้ชื่อและตำแหน่งของฉัน</button>` : '');
   $$('#people [data-pp]').forEach(el => el.onchange = () => { L[+el.dataset.pp][el.dataset.pf] = el.value; autosave(); renderSummary(); });
   $$('#people [data-ppdel]').forEach(b => b.onclick = () => { L.splice(+b.dataset.ppdel, 1); autosave(); renderPeople(); renderSummary(); });
   const add = $('#pp-add'); if (add) add.onclick = () => { L.push({ role: 'กรรมการ', name: '', pos: '' }); autosave(); renderPeople(); };
+  const mb = $('#pp-me'); if (mb) mb.onclick = () => { L[0].name = me.name; L[0].pos = me.position || ''; autosave(); renderPeople(); renderSummary(); };
 }
 function sigHtml() {   // ส่วนลงนามท้ายแบบฟอร์ม (หน้าตาจริงรอแบบฟอร์มหน่วยงาน)
-  const L = people(), est = S.boq.project.mode === 'estimate';
+  const L = people(), est = S.boq.project.mode !== 'central';
   return `<div class="sig">${L.map(x => `<div class="sig-b"><div>ลงชื่อ ......................................... ${est ? 'ผู้ประมาณราคา' : x.role}</div><div>(${esc(x.name || '.........................................')})</div><div>${esc(x.pos || 'ตำแหน่ง .........................................')}</div></div>`).join('')}</div>`;
 }
 function renderProject() {
-  $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? (el.dataset.k === 'mode' ? 'estimate' : ''); });
+  normProject();
+  const DEF = { mode: 'estimate', roundTo: '1000', vat: '1' };
+  $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? (DEF[el.dataset.k] || ''); });
+  $('#pf-round').hidden = isCentral(); $('#pf-vat').hidden = !isRepair();
+  $('#ff-card').hidden = isRepair(); $('#ff-repair').hidden = !isRepair();
+  $$('.pr23-repair').forEach(x => { x.hidden = !isRepair(); }); $$('.pr23-body').forEach(x => { x.hidden = isRepair(); });
   renderPeople();
   $('#ff-adv').value = S.boq.factor.advance; $('#ff-ret').value = S.boq.factor.retention; $('#ff-loan').value = S.boq.factor.loanPct;
   $('#ff-src').textContent = FactorF.SOURCE;
@@ -590,7 +609,6 @@ function _renderPR23() {
   });
   t3.querySelectorAll('[data-del3]').forEach(b => b.onclick = () => { S.boq.pr3.splice(+b.dataset.del3, 1); autosave(); renderPR23(); renderSummary(); });
 }
-const roundDown1000 = x => Math.floor(r2(x) / 1000 + 1e-9) * 1000;
 const pr3Total = () => r2(S.boq.pr3.reduce((a, r) => a + r2(+r.amount || 0), 0));
 
 // ------------------------------------------------------------------ สรุป ปร.1(ก) ปร.2(ก) ปร.4
@@ -599,25 +617,31 @@ function _renderSummary() {
   const box = $('#summary');
   if (!S.model) { box.innerHTML = '<div class="card hint">เปิดโมเดลก่อน</div>'; return; }
   const T = totals(), pr = T.pr, p = S.boq.project, fc = S.boq.factor;
-  const { secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand } = T;
+  const { secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, pr4, est, repair, vat, vatSum } = T;
   const head = `<div class="head"><span>ชื่อโครงการ ${esc(p.name)}</span><span>สถานที่ก่อสร้าง ${esc(p.location)}</span>
     <span>แบบเลขที่ ${esc(p.drawing_no || '-')}</span><span>หน่วยงาน ${esc(p.agency)}</span><span>คำนวณ${RG()}เมื่อวันที่ ${esc(p.calc_date)}</span><span>หน่วย : บาท</span></div>`;
-  return renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box });
+  return renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, pr4, est, repair, vat, vatSum, head, box });
 }
 function totals() {
   const pr = priceAll();
   const fc = S.boq.factor;
   const secs = SECTIONS.map(([c, n]) => ({ c, n, cost: r2(pr.filter(r => sectionOf(r.group_code) === c).reduce((a, r) => a + r.total, 0)) })).filter(s => s.cost);
   const cost = r2(secs.reduce((a, s) => a + s.cost, 0));
-  const ff = FactorF.compute(cost, { advance: +fc.advance, retention: +fc.retention, loanShare: (+fc.loanPct || 0) / 100 });
-  secs.forEach(s => { s.build = r2(s.cost * ff.F); });
-  const build = r2(secs.reduce((a, s) => a + s.build, 0));
-  const p2 = S.boq.pr2.map(pr2Row);
+  const { ff, build, repair, vat, vatSum } = buildUp(secs, cost, fc);
+  const p2 = repair ? [] : S.boq.pr2.map(pr2Row);   // งานซ่อมแซมไม่มี ปร.2 / ปร.3
   const eq = r2(p2.reduce((a, c) => a + c.eq, 0)), eqV = r2(p2.reduce((a, c) => a + c.eqVat, 0));
   const ins = r2(p2.reduce((a, c) => a + c.inst, 0)), insV = r2(p2.reduce((a, c) => a + c.instVat, 0));
-  const eqTotal = r2(eq + eqV + ins + insV), sp = pr3Total();
+  const eqTotal = r2(eq + eqV + ins + insV), sp = repair ? 0 : pr3Total();
   const grand = r2(build + eqTotal + sp);
-  return { pr, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand };
+  const est = !isCentral(), pr4 = est ? roundDownTo(grand, roundTo()) : grand;   // คิดเพียง: ประมาณราคา/ซ่อมแซม ปัดลงตามหลักที่เลือก · ราคากลางไม่ปัด
+  return { pr, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, pr4, est, repair, vat, vatSum };
+}
+/** ค่างานต้นทุนรายหมวด → ค่าก่อสร้าง: × Factor F (s.build) · งานซ่อมแซม: + VAT 7% รายหมวด (เลือกได้) แทน Factor F */
+function buildUp(secs, cost, fc) {
+  const repair = isRepair(), vat = repair && S.boq.project.vat !== '0';
+  const ff = repair ? { F: null, detail: [] } : FactorF.compute(cost, { advance: +fc.advance, retention: +fc.retention, loanShare: (+fc.loanPct || 0) / 100 });
+  secs.forEach(s => { s.vat = vat ? r2(s.cost * 0.07) : 0; s.build = repair ? r2(s.cost + s.vat) : r2(s.cost * ff.F); });
+  return { ff, repair, vat, build: r2(secs.reduce((a, s) => a + s.build, 0)), vatSum: r2(secs.reduce((a, s) => a + s.vat, 0)) };
 }
 // ---------------------------------------------------------------- ส่งออก Excel ตามแบบฟอร์มหน่วยงาน (lib/formxlsx.js + boq/form_template.xlsx)
 const EXCELJS = { src: 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js', sri: 'sha384-Pqp51FUN2/qzfxZxBCtF0stpc9ONI6MYZpVqmo8m20SoaQCzf+arZvACkLkirlPz' };
@@ -632,9 +656,10 @@ function formData() {
     return { code: c, name: n, groups: codes.map(g => { const gr = inSec.filter(r => r.group_code === g);
       return { code: g, name: gr[0].group || '', rows: gr.map(r => ({ name: r.name, qty: r.qty, unit: r.unit, mat: r.mat_unit, lab: r.lab_unit })) }; }) };
   }).filter(s => s.groups.length);
-  return { mode: p.mode || 'estimate', project: p, people: people(), sections,
+  const repair = isRepair();
+  return { mode: p.mode || 'estimate', vat: repair ? T.vat : undefined, roundTo: roundTo(), project: p, people: people(), sections,
     factor: { F: T.ff.F, advance: +fc.advance || 0, retention: +fc.retention || 0, loanShare: (+fc.loanPct || 0) / 100, table: FactorF.TABLES[`adv${+fc.advance || 0}_ret${+fc.retention || 0}`] || [] },
-    pr2: S.boq.pr2, pr3: S.boq.pr3, expect: T.grand };
+    pr2: repair ? [] : S.boq.pr2, pr3: repair ? [] : S.boq.pr3, expect: T.grand };
 }
 async function exportXlsx() {
   if (!S.model) { toast('เปิดโมเดลก่อน'); return; }
@@ -645,39 +670,47 @@ async function exportXlsx() {
     const buf = await (await fetch('form_template.xlsx', { cache: 'no-cache' })).arrayBuffer();
     const o = await FormXlsx.build(window.ExcelJS, buf, formData());
     const out = await o.wb.xlsx.writeBuffer();
-    const nm = (S.boq.project.mode === 'central' ? 'ราคากลาง_' : 'ประมาณราคา_') + (S.boq.project.name || 'โครงการ').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60) + '.xlsx';
+    const nm = (isCentral() ? 'ราคากลาง_' : isRepair() ? 'ประมาณราคาซ่อมแซม_' : 'ประมาณราคา_') + (S.boq.project.name || 'โครงการ').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60) + '.xlsx';
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     a.download = nm; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     toast('ส่งออก ' + nm);
   } catch (e) { console.error(e); toast('ส่งออก Excel ไม่สำเร็จ: ' + e.message); }
 }
-function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, head, box }) {
-  const est = p.mode === 'estimate', show = est ? roundDown1000(grand) : grand;   // คิดเพียง เฉพาะประมาณราคา · ราคากลางไม่ปัด
-  const sig = sigHtml();
-  box.innerHTML = `<div class="kpis no-print">${kpiHtml({ pr, cost, ff, grand }, S.plan)}</div>
-  <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุปค่าก่อสร้าง ค่างานต้นทุน</h3>${head}
-    <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>Factor F</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
+function renderSummaryDoc({ pr, p, fc, secs, cost, ff, build, eq, eqV, ins, insV, eqTotal, sp, grand, pr4, est, repair, vat, vatSum, head, box }) {
+  const show = pr4, rtl = (RT_LABEL.find(x => x[0] === roundTo()) || [0, ''])[1];   // คิดเพียง เฉพาะประมาณราคา/ซ่อมแซม (ปัดลงตามหลักที่เลือก) · ราคากลางไม่ปัด
+  const sig = sigHtml(), BUILD = repair ? 'ค่าซ่อมแซม' : 'ค่าก่อสร้าง';
+  const pr1a = repair
+    ? `<tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>ภาษีมูลค่าเพิ่ม</th><th>ค่าซ่อมแซม</th><th>หมายเหตุ</th></tr>
+    ${secs.map((s, i) => `<tr><td class="r">${i + 1}</td><td>${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.cost)}</td><td class="r">${vat ? fmt(s.vat) : '-'}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
+    <tr class="total"><td></td><td>รวมค่าซ่อมแซม</td><td class="r">${fmt(cost)}</td><td class="r">${vat ? fmt(vatSum) : '-'}</td><td class="r">${fmt(build)}</td><td></td></tr>`
+    : `<tr><th>ลำดับที่</th><th>รายการ</th><th>ค่างานต้นทุน</th><th>Factor F</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
     ${secs.map((s, i) => `<tr><td class="r">${i + 1}</td><td>${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.cost)}</td><td class="r">${ff.F.toFixed(4)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
-    <tr class="total"><td></td><td>รวมค่าก่อสร้าง</td><td class="r">${fmt(cost)}</td><td></td><td class="r">${fmt(build)}</td><td></td></tr></table></div>
-    <p class="hint" style="margin-top:8px">เงื่อนไขการใช้ตาราง Factor F: เงินค่าจ้างล่วงหน้า ${fc.advance}% · เงินประกันผลงาน ${fc.retention}% · ดอกเบี้ยเงินกู้ ${ff.interest}% · ภาษีมูลค่าเพิ่ม ${ff.vat}%${ff.loanShare ? ` · เงินกู้ไม่เสีย VAT ${+(ff.loanShare * 100).toFixed(2)}%` : ''}</p>
+    <tr class="total"><td></td><td>รวมค่าก่อสร้าง</td><td class="r">${fmt(cost)}</td><td></td><td class="r">${fmt(build)}</td><td></td></tr>`;
+  box.innerHTML = `<div class="kpis no-print">${kpiHtml({ pr, cost, ff, grand, repair, vat }, S.plan)}</div>
+  <div class="sum-doc"><h3>แบบ ปร.1 (ก) แบบสรุป${repair ? 'ประมาณราคาค่าซ่อมแซม' : 'ค่าก่อสร้าง ค่างานต้นทุน'}</h3>${head}
+    <div class="table-wrap"><table class="boq">${pr1a}</table></div>
+    ${repair ? `<p class="hint" style="margin-top:8px">งานจ้างซ่อมแซม: ไม่ใช้ Factor F · ${vat ? 'คิดภาษีมูลค่าเพิ่ม 7% รายหมวด' : 'ไม่คิดภาษีมูลค่าเพิ่ม'}</p>`
+    : `<p class="hint" style="margin-top:8px">เงื่อนไขการใช้ตาราง Factor F: เงินค่าจ้างล่วงหน้า ${fc.advance}% · เงินประกันผลงาน ${fc.retention}% · ดอกเบี้ยเงินกู้ ${ff.interest}% · ภาษีมูลค่าเพิ่ม ${ff.vat}%${ff.loanShare ? ` · เงินกู้ไม่เสีย VAT ${+(ff.loanShare * 100).toFixed(2)}%` : ''}</p>`}
     ${p.area ? `<p class="hint">ขนาดหรือเนื้อที่อาคาร ${fmt(p.area)} ตร.ม. · เฉลี่ย ${fmt(r2(build / p.area))} บาท/ตร.ม.</p>` : ''}${sig}</div>
-  <div class="sum-doc"><h3>รายละเอียดการหาค่า Factor F</h3>
+  ${repair ? '' : `<div class="sum-doc"><h3>รายละเอียดการหาค่า Factor F</h3>
     <p class="hint">ค่างานต้นทุนทั้งโครงการ ${fmt(cost)} บาท = ${(cost / 1e6).toFixed(6)} ล้านบาท</p>
     ${ff.detail.map(d => `<p class="mono" style="font-size:13px;margin-top:4px">${esc(d)}</p>`).join('')}
-    <p class="hint" style="margin-top:6px">ตามเล่มหลักเกณฑ์อาคาร 2569 ข้อ 9.3 · ทศนิยม 4 ตำแหน่งแบบตัดทิ้ง · ${esc(FactorF.SOURCE)}</p></div>
-  ${S.boq.pr2.length ? `<div class="sum-doc"><h3>แบบ ปร.2 (ก) แบบสรุปค่าครุภัณฑ์จัดซื้อ</h3>${head}
+    <p class="hint" style="margin-top:6px">ตามเล่มหลักเกณฑ์อาคาร 2569 ข้อ 9.3 · ทศนิยม 4 ตำแหน่งแบบตัดทิ้ง · ${esc(FactorF.SOURCE)}</p></div>`}
+  ${!repair && S.boq.pr2.length ? `<div class="sum-doc"><h3>แบบ ปร.2 (ก) แบบสรุปค่าครุภัณฑ์จัดซื้อ</h3>${head}
     <div class="table-wrap"><table class="boq"><tr><th>รายการ</th><th>ค่าครุภัณฑ์</th><th>VAT</th><th>จำนวนเงิน</th><th>ค่าติดตั้ง</th><th>VAT</th><th>จำนวนเงิน</th><th>รวมค่าครุภัณฑ์จัดซื้อ</th></tr>
     <tr><td>ครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eq)}</td><td class="r">${fmt(eqV)}</td><td class="r">${fmt(r2(eq + eqV))}</td><td class="r">${fmt(ins)}</td><td class="r">${fmt(insV)}</td><td class="r">${fmt(r2(ins + insV))}</td><td class="r">${fmt(eqTotal)}</td></tr></table></div>${sig}</div>` : ''}
-  <div class="sum-doc"><h3>แบบ ปร.4 แบบสรุป${RG()}งานก่อสร้างอาคาร</h3>${head}
-    <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>ค่าก่อสร้าง</th><th>หมายเหตุ</th></tr>
-    <tr><td class="r">1</td><td>ค่างานต้นทุน</td><td class="r">${fmt(build)}</td><td></td></tr>
+  <div class="sum-doc"><h3>แบบ ปร.4 แบบสรุป${repair ? 'ประมาณราคาค่าซ่อมแซม' : RG() + 'งานก่อสร้างอาคาร'}</h3>${head}
+    <div class="table-wrap"><table class="boq"><tr><th>ลำดับที่</th><th>รายการ</th><th>${BUILD}</th><th>หมายเหตุ</th></tr>
+    ${repair ? `<tr><td class="r">1</td><td>ค่าซ่อมแซมตาม ปร.1 (ก) (${vat ? 'รวมภาษีมูลค่าเพิ่ม 7%' : 'ไม่คิดภาษีมูลค่าเพิ่ม'})</td><td class="r">${fmt(build)}</td><td></td></tr>
+    ${secs.map(s => `<tr><td></td><td>&nbsp;&nbsp;- ${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}`
+    : `<tr><td class="r">1</td><td>ค่างานต้นทุน</td><td class="r">${fmt(build)}</td><td></td></tr>
     ${secs.map(s => `<tr><td></td><td>&nbsp;&nbsp;- ${s.c} ${esc(s.n)}</td><td class="r">${fmt(s.build)}</td><td></td></tr>`).join('')}
     <tr><td class="r">2</td><td>ค่าครุภัณฑ์จัดซื้อ</td><td class="r">${fmt(eqTotal)}</td><td></td></tr>
-    <tr><td class="r">3</td><td>ค่าใช้จ่ายพิเศษตามข้อกำหนด (ถ้ามี)</td><td class="r">${fmt(sp)}</td><td></td></tr>
-    <tr class="total"><td></td><td>รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง</td><td class="r">${fmt(grand)}</td><td></td></tr>
+    <tr><td class="r">3</td><td>ค่าใช้จ่ายพิเศษตามข้อกำหนด (ถ้ามี)</td><td class="r">${fmt(sp)}</td><td></td></tr>`}
+    <tr class="total"><td></td><td>${repair ? 'รวมค่าซ่อมแซมทั้งโครงการ' : 'รวมค่าก่อสร้างทั้งโครงการงานก่อสร้าง'}</td><td class="r">${fmt(grand)}</td><td></td></tr>
     ${est ? `<tr class="total"><td></td><td>คิดเพียง</td><td class="r">${fmt(show)}</td><td></td></tr>` : ''}</table></div>
-    ${est ? `<p class="hint" style="text-align:right;margin-top:8px">รวม ${fmt(grand)} บาท · คิดเพียง (ปัดลงหลักพัน)</p>` : ''}
+    ${est ? `<p class="hint" style="text-align:right;margin-top:8px">รวม ${fmt(grand)} บาท · คิดเพียง (ปัดลง${rtl})</p>` : ''}
     <p class="bigtotal" style="margin-top:${est ? 2 : 12}px">${est ? 'คิดเพียง' : RG()} ${fmt(show)} บาท</p>
     <p style="text-align:right">(${esc(BoqCalc.bahtText(show))})</p>${sig}</div>`;
 }
@@ -828,9 +861,8 @@ function totalsFor(model) {
     .concat(S.boq.custom_rows || []);
   const pr = BoqCalc.priceRows(S.db, window.UDPrice, rs, { overrides: S.boq.overrides });
   const fc = S.boq.factor, cost = r2(pr.reduce((a, r) => a + r.total, 0));
-  const ff = FactorF.compute(cost, { advance: +fc.advance, retention: +fc.retention, loanShare: (+fc.loanPct || 0) / 100 });
-  const secs = SECTIONS.map(([c]) => r2(r2(pr.filter(r => sectionOf(r.group_code) === c).reduce((a, r) => a + r.total, 0)) * ff.F));
-  const build = r2(secs.reduce((a, b) => a + b, 0));
+  const secs = SECTIONS.map(([c]) => ({ cost: r2(pr.filter(r => sectionOf(r.group_code) === c).reduce((a, r) => a + r.total, 0)) }));
+  const { ff, build } = buildUp(secs, cost, fc);
   const T = totals(), grand = r2(build + T.eqTotal + T.sp);
   const plan = Schedule.build(pr, model, planCfg());
   return { pr, cost, F: ff.F, build, grand, plan };
@@ -846,7 +878,7 @@ function renderDiff() {
   const ch = R.filter(r => r.status !== 'same');
   const el = [...E.added.map(e => ['เพิ่ม', e]), ...E.removed.map(e => ['ลบ', e]), ...E.changed.map(e => ['แก้', e])];
   const stale = [S.old.model, S.model].filter(m => m.quantities && m.quantities.stale).length;
-  out.innerHTML = `<div class="kpis">${k('ค่างานต้นทุน', A.cost, B.cost, 'บ.')}${k(RG(), A.grand, B.grand, 'บ.')}${k('Factor F', A.F, B.F, '', 4)}${k('ระยะเวลา', A.plan.calDays, B.plan.calDays, 'วัน', 0)}</div>
+  out.innerHTML = `<div class="kpis">${k('ค่างานต้นทุน', A.cost, B.cost, 'บ.')}${k(RG(), A.grand, B.grand, 'บ.')}${isRepair() ? '' : k('Factor F', A.F, B.F, '', 4)}${k('ระยะเวลา', A.plan.calDays, B.plan.calDays, 'วัน', 0)}</div>
   ${stale ? '<p class="alert">มีโมเดลที่ปริมาณเก่า (แก้โมเดลหลังถอดปริมาณ) — ถอดปริมาณใหม่ก่อนเทียบ</p>' : ''}
   <div class="card"><h2>ชิ้นส่วนที่เปลี่ยน (${el.length})</h2>${el.length ? `<div class="table-wrap"><table class="boq"><tr><th>สถานะ</th><th>ประเภท</th><th>id</th><th>สิ่งที่เปลี่ยน</th></tr>${el.map(([t, e]) =>
     `<tr class="row" data-id="${esc(e.id)}"><td><span class="pill ${t === 'เพิ่ม' ? 'ok' : t === 'ลบ' ? 'err' : 'warn'}">${t}</span></td><td>${esc(BmDiff.SETS[e.set])}</td><td class="mono">${esc(e.id)}</td><td>${e.fields ? e.fields.map(f => `<b>${esc(f)}</b> ${e.before && f in e.before ? `<span class="mono">${esc(JSON.stringify(e.before[f]))} → ${esc(JSON.stringify(e.after[f]))}</span>` : ''}`).join('<br>') : ''}</td></tr>`).join('')}</table></div>` : '<p class="hint">ไม่มีชิ้นส่วนที่เปลี่ยน</p>'}</div>
@@ -945,7 +977,7 @@ function kpiHtml(T, plan) {
   const area = +S.boq.project.area || 0;
   const k = (l, v, u, hot) => `<div class="kpi ${hot ? 'hot' : ''}"><span>${l}</span><b>${v}${u ? `<small>${u}</small>` : ''}</b></div>`;
   return k('ค่าวัสดุ', fmt(mat, 0), 'บ.') + k('ค่าแรง', fmt(lab, 0), 'บ.') + k('ค่างานต้นทุน', fmt(T.cost, 0), 'บ.') +
-    k(`${RG()} (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
+    k(T.repair ? `${RG()} (${T.vat ? 'รวม VAT 7%' : 'ไม่คิด VAT'})` : `${RG()} (F ${T.ff.F.toFixed(4)})`, fmt(T.grand, 0), 'บ.', true) + (area ? k(`ต่อพื้นที่ ${fmt(area)} ตร.ม.`, fmt(r2(T.grand / area), 0), 'บ./ตร.ม.') : '') +
     (plan ? k('ระยะเวลา', plan.calDays, 'วัน') : '');
 }
 function renderFitSum() {   // ตารางนับข้อต่อท่อในเมนูข้าง (นับจากโมเดล 3D)
@@ -1608,7 +1640,7 @@ function bind() {
       const svimg = b.svimg || {}; delete b.svimg;
       Object.entries(svimg).forEach(([id, d]) => { if (Survey.safeImg(d)) { S.img[id] = d; Survey.imgPut(id, d); } });   // รับเฉพาะภาพจริง
       S.boq = Object.assign(newBoq(), b);
-      S.boq.plan = Object.assign(newPlan(), S.boq.plan || {});
+      S.boq.plan = Object.assign(newPlan(), S.boq.plan || {}); normProject();
       if (S.model && b.model_file && b.model_file !== S.modelName) toast(`หมายเหตุ: ไฟล์ BOQ นี้ทำกับ ${b.model_file}`);
       applySurvey(); autosave(); renderAll(); toast('เปิดงาน BOQ แล้ว');
     } catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); }
@@ -1629,12 +1661,14 @@ function bind() {
   $$('#proj-form [data-k]').forEach(el => el.onchange = () => {
     S.boq.project[el.dataset.k] = el.type === 'number' ? (+el.value || '') : el.value;
     if (el.dataset.k === 'name') $('#meta-proj').textContent = el.value;
-    if (el.dataset.k === 'mode') { renderPeople(); $('#lbl-calc').textContent = `คำนวณ${RG()}เมื่อวันที่`; renderAll(); }
+    if (el.dataset.k === 'mode' || el.dataset.k === 'vat' || el.dataset.k === 'roundTo') { renderAll(); }
     autosave(); renderSummary(); renderPR1();
   });
   [['#ff-adv', 'advance'], ['#ff-ret', 'retention'], ['#ff-loan', 'loanPct']].forEach(([s, k]) => $(s).onchange = () => {
     S.boq.factor[k] = +$(s).value || 0; autosave(); renderSummary();
   });
+  { const meHook = () => UDAuth.on(st => { const was = S.me && S.me.name; S.me = st.profile || null; if (S.boq && (S.me && S.me.name) !== was) renderPeople(); });
+    if (window.UDAuth) meHook(); else window.addEventListener('udauth-loaded', meHook); }   // ชื่อ/ตำแหน่งจากข้อมูลผู้ใช้ (บัญชีเดียวกับ UD Cost Hub)
   $('#b-addrow').onclick = addCustomRow;
   $('#b-add-pr2').onclick = () => { S.boq.pr2.push({ id: Survey.uid('e'), name: '', qty: 1, unit: 'ชุด', price: 0, install: 0 }); autosave(); renderPR23(); };
   $$('[data-xlsx]').forEach(b => b.onclick = exportXlsx);
