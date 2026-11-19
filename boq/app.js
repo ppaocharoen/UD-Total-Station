@@ -22,7 +22,7 @@ const S = {
 };
 function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 0, retention: 0, loanPct: 0 },
-    overrides: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
+    overrides: {}, bind: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
 /** คำเรียกตามประเภทงาน: กำหนดราคากลาง → ราคากลาง · ประมาณราคา → ราคาประมาณการ */
 const RG = () => (isCentral() ? 'ราคากลาง' : isRepair() ? 'ประมาณราคาค่าซ่อมแซม' : 'ราคาประมาณการ');
@@ -110,6 +110,7 @@ function loadModel(json, name) {
   S.boq.plan = Object.assign(newPlan(), S.boq.plan || {}); normProject();
   if (name === 'sample-building.bm.json' && S.boq.factor && +S.boq.factor.advance === 15 && +S.boq.factor.retention === 10) S.boq.factor = { advance: 0, retention: 0, loanPct: 0 };   // ค่าเริ่มต้นเดิมของตัวอย่าง → 0
   S.boq.model_file = name;
+  if (BoqBind.migrate(S.boq)) autosave();   // ไฟล์เดิม: ราคาที่พิมพ์ในช่อง / ไม่มีค่าวัสดุ → การผูกเอง (6.52)
   const p = S.boq.project;
   p.name = p.name || m.meta.name || '';
   p.location = p.location || [m.meta.district, m.meta.province].filter(Boolean).join(' ');
@@ -450,7 +451,7 @@ function bindSurvey() {
     const tid = card.dataset.svi, t = { target: tid, name: card.querySelector('.sv-head b').textContent, unit: (card.querySelector('.sv-head .hint').textContent.match(/\[(.*)\]/) || [])[1] || '' };
     const it = S.boq.surveys[tid] || svItem(t);
     if (e.target.dataset.subskip) { const k = e.target.dataset.subskip, m = S.boq.subSkip = S.boq.subSkip || {}; if (m[k]) delete m[k]; else m[k] = true; autosave(); applySurvey(); priceAll(); renderSurvey(); renderPR1(); renderSummary(); toast(m[k] ? 'ไม่คิดราคาวัสดุย่อยนี้ — วัสดุมวลรวมคิดจากวัสดุที่เหลือ' : 'กลับมาคิดราคาวัสดุย่อยนี้'); return; }
-    if (e.target.dataset.nomat) { const k = e.target.dataset.nomat; S.boq.overrides[k] = Object.assign(S.boq.overrides[k] || {}, { no_mat: true }); autosave(); renderSurvey(); renderPR1(); renderSummary(); toast('ตั้งเป็นค่าแรงอย่างเดียวแล้ว — ยกเลิกได้ที่ ปร.1'); return; }
+    if (e.target.dataset.nomat) { bindSide(e.target.dataset.nomat, 'mat', { kind: 'none' }); renderSurvey(); renderPR1(); renderSummary(); toast('ตั้งเป็นค่าแรงอย่างเดียวแล้ว — ยกเลิกได้ที่ ปร.1'); return; }
     if (e.target.closest('[data-svtoggle]')) { S.svOpen = S.svOpen === tid ? null : tid; renderSurvey(); if (S.svOpen) setTimeout(() => { const c = $(`[data-svi="${CSS.escape(tid)}"]`); if (c) { svLibHint(c, it); c.scrollIntoView({ block: 'start', behavior: 'smooth' }); } }, 50); return; }
     if (e.target.dataset.qadd) { it.quotes.push({ id: Survey.uid('q'), channel: 'web', shop: '', contact: '', date: new Date().toISOString().slice(0, 10), price: '', qunit: it.unit, factor: 1, vat: true, note: '', imgs: [] }); svSave(it); renderSurvey(); return; }
     const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q);
@@ -513,11 +514,34 @@ function surveyState() {
   Object.values(S.boq.surveys || {}).forEach(it => { if (it.target && it.target.startsWith('row:')) { const p = Survey.summary(it).price; if (p !== null) out[it.target.slice(4)] = { price: p, src: Survey.srcText(it) }; } });
   return out;
 }
+/** ราคาสืบที่ผูกด้วยหน้าต่างผูกราคา (target ของรายการสืบในโครงการ) */
+function svPriceOf(target) { const it = (S.boq.surveys || {})[target]; if (!it) return null; const p = Survey.summary(it).price; return p === null ? null : { price: p, src: Survey.srcText(it) }; }
+/** การผูกเอง (S.boq.bind — หน้าต่างผูกราคา) ทับการผูกอัตโนมัติทีละฝั่ง แล้วคิดราคา · ป้ายที่มาของ "กรอกเอง" ใส่รายละเอียดที่ผู้ใช้เขียน */
+function priceBound(rs) {
+  const x = BoqBind.apply(rs, S.boq.bind, { overrides: S.boq.overrides, survey: surveyState(), surveyOf: svPriceOf });
+  const pr = BoqCalc.priceRows(S.db, window.UDPrice, x.rows, { overrides: x.overrides, survey: x.survey }), B = S.boq.bind || {};
+  pr.forEach(r => { const b = B[r.key]; if (!b) return;
+    if (b.mat && b.mat.kind === 'manual') r.mat_src = BoqBind.label(b.mat);
+    if (b.lab && b.lab.kind === 'manual') r.lab_src = BoqBind.label(b.lab); });
+  return pr;
+}
 function priceAll() {
-  S.priced = BoqCalc.priceRows(S.db, window.UDPrice, rows(), { overrides: S.boq.overrides, survey: surveyState() });
+  S.priced = priceBound(rows());
   return S.priced;
 }
 
+/** ปุ่มผูกราคาในช่องราคา ปร.1 (บนจอเท่านั้น) */
+function bindBtns(r, side, b) {
+  if (!S.db) return '';
+  return `<span class="bq-btns no-print">${b[side] ? `<span class="pill warn" title="ผูกเอง${b.by ? ' โดย ' + esc(b.by) : ''}${b.at ? ' ' + esc(b.at) : ''}">ผูกเอง</span><button class="btn small" data-unb="${side}" title="กลับไปใช้การผูกอัตโนมัติ">↺</button>` : ''}<button class="btn small" data-bind="${side}" title="${side === 'mat' ? 'เลือกค่าวัสดุจากพาณิชย์ / มวลรวม / ราคาสืบ หรือกรอกเอง' : 'เลือกค่าแรงจาก ว480 หรือกรอกเอง'}">ผูก…</button></span>`;
+}
+/** ตั้ง/ลบการผูกเองฝั่งหนึ่งของแถว (v = null → กลับไปใช้การผูกอัตโนมัติ) */
+function bindSide(key, side, v) {
+  const B = S.boq.bind = S.boq.bind || {};
+  if (v) { const b = B[key] = B[key] || {}; b[side] = v; b.by = (S.me && S.me.name) || b.by || ''; b.at = new Date().toISOString().slice(0, 10); }
+  else if (B[key]) { delete B[key][side]; if (!B[key].mat && !B[key].lab) delete B[key]; }
+  autosave();
+}
 function qtyOvMark(r) {   // เครื่องหมายปริมาณที่แก้เอง — no-print (แสดงบนจอเท่านั้น)
   const o = r.qty_ov, t = [`ถอดได้ ${fmt(r.qty_take)}`, o.orig !== r.qty_take ? `ตอนแก้ถอดได้ ${fmt(o.orig)}` : '', o.by ? `แก้โดย ${o.by}` : '', o.at || '', o.note ? `เหตุผล: ${o.note}` : ''].filter(Boolean).join(' · ');
   return `<span class="qov no-print" title="${esc(t)}">✎ ถอดได้ ${fmt(r.qty_take)}${o.note ? ` · ${esc(o.note)}` : ''} <button class="btn small" data-qrst="1" title="คืนปริมาณตามตัวถอด">↺</button></span>` +
@@ -546,7 +570,7 @@ function _renderPR1() {
       h += `<tr class="sub"><td></td><td colspan="9">${esc(g)} ${esc(gr[0].group || '')}</td></tr>`;
       for (const r of gr) {
         n++;
-        const o = S.boq.overrides[r.key] || {};
+        const b = (S.boq.bind || {})[r.key] || {};
         if (r.warns.length) warn++;
         if (r.qty_ov) { nov++; if (r.qty_stale) nstale++; }
         const custom = r.key.startsWith('custom_');
@@ -555,12 +579,12 @@ function _renderPR1() {
           <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste && !r.qty_ov ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
             ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
-            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${o.no_mat ? `<span class="src">ค่าแรงอย่างเดียว <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
+            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${b.mat && b.mat.kind === 'none' ? `<span class="src">ค่าแรงอย่างเดียว (กำหนดเอง) <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
           <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : `<input class="price ${r.qty_ov ? 'ov' : ''}" data-qov="1" value="${esc(r.qty)}" inputmode="decimal">${r.qty_ov ? qtyOvMark(r) : ''}`}</td>
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
-          <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${o.mat !== undefined ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span></td>
+          <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${b.mat && b.mat.kind === 'manual' ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span>${bindBtns(r, 'mat', b)}</td>
           <td class="r c-ma" data-l="ค่าวัสดุ">${fmt(r.mat_amt)}</td>
-          <td class="r c-lu" data-l="ค่าแรง/หน่วย"><input class="price ${o.lab !== undefined ? 'ov' : ''}" data-ov="lab" value="${r.lab_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.lab_src)}</span></td>
+          <td class="r c-lu" data-l="ค่าแรง/หน่วย"><input class="price ${b.lab && b.lab.kind === 'manual' ? 'ov' : ''}" data-ov="lab" value="${r.lab_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.lab_src)}</span>${bindBtns(r, 'lab', b)}</td>
           <td class="r c-la" data-l="ค่าแรง">${fmt(r.lab_amt)}</td>
           <td class="r c-tot" data-l="รวม">${fmt(r.total)}</td>
           <td class="c-note"><span class="src">${esc((r.ref && r.ref.note) || r.note || '')}</span>${custom ? '<button class="btn small" data-del="1">ลบ</button>' : ''}</td></tr>`;
@@ -574,8 +598,9 @@ function _renderPR1() {
   tb.innerHTML = h;
   $('#pr1-alert').textContent = [warn ? `มี ${warn} รายการที่ยังไม่มีราคาหรือมีคำเตือน (แถบสีส้ม) — แก้ราคาในช่องได้โดยตรง` : '',
     nov ? `แก้ปริมาณเอง ${nov} รายการ (✎)${nstale ? ` — ${nstale} รายการถอดปริมาณใหม่แล้วค่าเปลี่ยน ตรวจอีกครั้ง` : ''}` : ''].filter(Boolean).join(' · ');
-  tb.querySelectorAll('[data-nomat],[data-unnomat]').forEach(b => b.onclick = e => { e.stopPropagation(); const k = b.dataset.nomat || b.dataset.unnomat;
-    S.boq.overrides[k] = Object.assign(S.boq.overrides[k] || {}, { no_mat: !!b.dataset.nomat }); if (!b.dataset.nomat) delete S.boq.overrides[k].no_mat; autosave(); renderPR1(); renderSummary(); renderSurvey(); });
+  tb.querySelectorAll('[data-nomat],[data-unnomat]').forEach(b => b.onclick = e => { e.stopPropagation(); bindSide(b.dataset.nomat || b.dataset.unnomat, 'mat', b.dataset.nomat ? { kind: 'none' } : null); renderPR1(); renderSummary(); renderSurvey(); });
+  tb.querySelectorAll('[data-bind]').forEach(b => b.onclick = e => { e.stopPropagation(); bindOpen(b.closest('tr').dataset.key, b.dataset.bind); });
+  tb.querySelectorAll('[data-unb]').forEach(b => b.onclick = e => { e.stopPropagation(); bindSide(b.closest('tr').dataset.key, b.dataset.unb, null); renderPR1(); renderSummary(); renderSurvey(); toast('กลับไปใช้การผูกอัตโนมัติแล้ว'); });
   tb.querySelectorAll('[data-svgo]').forEach(b => b.onclick = e => { e.stopPropagation(); S.svOpen = 'row:' + b.dataset.svgo; S.svf = 'all'; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'survey').click(); renderSurvey(); setTimeout(() => { const c = $(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) { c.scrollIntoView({ block: 'start' }); svLibHint(c, S.boq.surveys[S.svOpen] || svItem({ target: S.svOpen, name: c.querySelector('.sv-head b').textContent, unit: '' })); } }, 80); });
   tb.querySelectorAll('tr.row').forEach(tr => {
     const key = tr.dataset.key;
@@ -585,12 +610,12 @@ function _renderPR1() {
       tb.querySelectorAll('tr.row').forEach(x => x.classList.toggle('sel', x.dataset.key === key));
       if (S.viewer && r) { S.viewer.highlight(r.from || []); toast(`ไฮไลต์ ${(r.from || []).length} ชิ้นส่วนในแท็บโมเดล 3D`); }
     });
-    tr.querySelectorAll('[data-ov]').forEach(inp => inp.onchange = () => {
-      const o = S.boq.overrides[key] = S.boq.overrides[key] || {};
-      const v = inp.value.trim();
-      if (v === '') delete o[inp.dataset.ov]; else o[inp.dataset.ov] = +v;
-      if (!Object.keys(o).length) delete S.boq.overrides[key];
-      autosave(); renderPR1(); renderSummary();
+    tr.querySelectorAll('[data-ov]').forEach(inp => inp.onchange = () => {   // พิมพ์ราคาในช่อง = ผูกแบบ "กรอกเอง" (ลบค่าในช่องที่กรอกเอง = กลับไปใช้การผูกอัตโนมัติ)
+      const side = inp.dataset.ov, v = inp.value.replace(/,/g, '').trim(), cur = ((S.boq.bind || {})[key] || {})[side];
+      if (v === '') { if (cur && cur.kind === 'manual') bindSide(key, side, null); }
+      else if (!isFinite(+v) || +v < 0) { toast('ราคาต้องเป็นตัวเลข ≥ 0'); }
+      else bindSide(key, side, { kind: 'manual', price: r2(+v), note: cur && cur.kind === 'manual' ? cur.note || '' : '' });
+      renderPR1(); renderSummary(); renderSurvey();
     });
     const qi = tr.querySelector('[data-qov]');
     if (qi) qi.onchange = () => {
@@ -612,7 +637,7 @@ function _renderPR1() {
       autosave(); renderPR1(); renderSummary();
     });
     const del = tr.querySelector('[data-del]');
-    if (del) del.onclick = () => { S.boq.custom_rows = S.boq.custom_rows.filter(x => x.key !== key); delete S.boq.overrides[key]; autosave(); renderPR1(); renderSummary(); };
+    if (del) del.onclick = () => { S.boq.custom_rows = S.boq.custom_rows.filter(x => x.key !== key); delete S.boq.overrides[key]; if (S.boq.bind) delete S.boq.bind[key]; autosave(); renderPR1(); renderSummary(); };
   });
 }
 
@@ -928,7 +953,7 @@ function totalsFor(model) {
   let rs = PriceMap.bindAll(((model.quantities && model.quantities.items) || []).map(r => (r.price_ref || !ref[r.key]) ? r : Object.assign({}, r, { price_ref: ref[r.key] })), S.pmap);
   if (model === S.model) rs = applyQtyOv(rs);   // ปริมาณที่แก้เองใช้กับรุ่นปัจจุบันเท่านั้น
   rs = rs.concat(S.boq.custom_rows || []);
-  const pr = BoqCalc.priceRows(S.db, window.UDPrice, rs, { overrides: S.boq.overrides });
+  const pr = priceBound(rs);
   const fc = S.boq.factor, cost = r2(pr.reduce((a, r) => a + r.total, 0));
   const secs = SECTIONS.map(([c]) => ({ cost: r2(pr.filter(r => sectionOf(r.group_code) === c).reduce((a, r) => a + r.total, 0)) }));
   const { ff, build } = buildUp(secs, cost, fc);

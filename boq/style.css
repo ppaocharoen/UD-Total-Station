@@ -640,3 +640,17 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 #model-side>h2.sec-head{cursor:pointer;user-select:none}#model-side>h2.sec-head::before{content:'▾ ';font-size:.8em;opacity:.6}#model-side>h2.sec-head.shut::before{content:'▸ '}
 
 @media(min-width:801px){body.on-model main{max-width:none;padding:0}}
+/* หน้าต่างผูกราคา (bind.js) */
+.bind-box{max-width:860px;max-height:88vh;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.bind-box #bq-q{width:100%}
+.bq-cur{font-size:12px;color:var(--text2)}.bq-cur .btn.small{margin:0 0 0 4px}
+.bq-tabs{display:flex;flex-wrap:wrap;gap:6px}.bq-tabs .chip.on{color:#000;background:var(--green);border-color:var(--green)}
+.bq-filt{display:flex;flex-wrap:wrap;gap:6px}.bq-filt select{max-width:260px;font-size:12px}
+.bq-list{overflow:auto;flex:1;min-height:180px;border:1px solid var(--border)}
+.bq-item{display:flex;justify-content:space-between;gap:12px;padding:7px 10px;border-bottom:1px solid var(--border);cursor:pointer}
+.bq-item:hover{background:rgba(0,255,65,.08)}.bq-item.cur{background:rgba(0,255,65,.12)}
+.bq-iname{min-width:0;font-size:13px}.bq-iname .hint{font-size:11px}
+.bq-iprice{white-space:nowrap;font-family:var(--f-mono);font-size:12px;text-align:right}
+.bq-note{padding:6px 10px}.bq-pad{padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}.bq-pad label.wide{flex-basis:100%}.bq-pad label.wide input{width:100%}
+.bq-foot{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bq-btns{display:block;white-space:nowrap}.bq-btns .btn.small{padding:0 6px;margin:2px 3px 0 0;font-size:11px}
