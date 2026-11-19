@@ -22,7 +22,7 @@ const S = {
 };
 function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 0, retention: 0, loanPct: 0 },
-    overrides: {}, bind: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
+    overrides: {}, bind: {}, cmpline: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
 }
 /** คำเรียกตามประเภทงาน: กำหนดราคากลาง → ราคากลาง · ประมาณราคา → ราคาประมาณการ */
 const RG = () => (isCentral() ? 'ราคากลาง' : isRepair() ? 'ประมาณราคาค่าซ่อมแซม' : 'ราคาประมาณการ');
@@ -515,10 +515,10 @@ function surveyState() {
   return out;
 }
 /** ราคาสืบที่ผูกด้วยหน้าต่างผูกราคา (target ของรายการสืบในโครงการ) */
-function svPriceOf(target) { const it = (S.boq.surveys || {})[target]; if (!it) return null; const p = Survey.summary(it).price; return p === null ? null : { price: p, src: Survey.srcText(it) }; }
+function svPriceOf(target) { const it = (S.boq.surveys || {})[target]; if (!it) return null; const s = Survey.summary(it); return s.price === null ? null : { price: s.price, src: Survey.srcText(it), unit: it.unit, n: s.n, name: it.name }; }
 /** การผูกเอง (S.boq.bind — หน้าต่างผูกราคา) ทับการผูกอัตโนมัติทีละฝั่ง แล้วคิดราคา · ป้ายที่มาของ "กรอกเอง" ใส่รายละเอียดที่ผู้ใช้เขียน */
 function priceBound(rs) {
-  const x = BoqBind.apply(rs, S.boq.bind, { overrides: S.boq.overrides, survey: surveyState(), surveyOf: svPriceOf });
+  const x = BoqBind.apply(rs, S.boq.bind, { overrides: S.boq.overrides, survey: surveyState(), surveyOf: svPriceOf, cmp: S.boq.cmpline, db: S.db, U: window.UDPrice });
   const pr = BoqCalc.priceRows(S.db, window.UDPrice, x.rows, { overrides: x.overrides, survey: x.survey }), B = S.boq.bind || {};
   pr.forEach(r => { const b = B[r.key]; if (!b) return;
     if (b.mat && b.mat.kind === 'manual') r.mat_src = BoqBind.label(b.mat);
@@ -579,7 +579,7 @@ function _renderPR1() {
           <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste && !r.qty_ov ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
             ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
-            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${b.mat && b.mat.kind === 'none' ? `<span class="src">ค่าแรงอย่างเดียว (กำหนดเอง) <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
+            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${r.ref && r.ref.kind === 'comp' && S.db ? cmpPanel(r) : ''}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${b.mat && b.mat.kind === 'none' ? `<span class="src">ค่าแรงอย่างเดียว (กำหนดเอง) <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
           <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : `<input class="price ${r.qty_ov ? 'ov' : ''}" data-qov="1" value="${esc(r.qty)}" inputmode="decimal">${r.qty_ov ? qtyOvMark(r) : ''}`}</td>
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
           <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${b.mat && b.mat.kind === 'manual' ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span>${bindBtns(r, 'mat', b)}</td>
@@ -596,8 +596,12 @@ function _renderPR1() {
   }
   h += `<tr class="total"><td></td><td colspan="7">รวมค่างานต้นทุนทั้งหมด</td><td class="r c-tot">${fmt(r2(grand))}</td><td></td></tr></tbody>`;
   tb.innerHTML = h;
+  const nAcc = cmpAcceptable(pr);
   $('#pr1-alert').textContent = [warn ? `มี ${warn} รายการที่ยังไม่มีราคาหรือมีคำเตือน (แถบสีส้ม) — แก้ราคาในช่องได้โดยตรง` : '',
     nov ? `แก้ปริมาณเอง ${nov} รายการ (✎)${nstale ? ` — ${nstale} รายการถอดปริมาณใหม่แล้วค่าเปลี่ยน ตรวจอีกครั้ง` : ''}` : ''].filter(Boolean).join(' · ');
+  if (nAcc.length) $('#pr1-alert').insertAdjacentHTML('beforeend', ` <button class="btn small no-print" id="cmp-accall" title="รวมราคาเฉพาะวัสดุย่อยที่มีราคา (ที่ขาดคิดเป็น 0) และระบุในที่มาของราคา">ยอมรับราคามวลรวมไม่ครบ ${nAcc.length} รายการ</button>`);
+  const ab = $('#cmp-accall'); if (ab) ab.onclick = () => cmpAcceptAll(nAcc);
+  cmpBindEvents(tb);
   tb.querySelectorAll('[data-nomat],[data-unnomat]').forEach(b => b.onclick = e => { e.stopPropagation(); bindSide(b.dataset.nomat || b.dataset.unnomat, 'mat', b.dataset.nomat ? { kind: 'none' } : null); renderPR1(); renderSummary(); renderSurvey(); });
   tb.querySelectorAll('[data-bind]').forEach(b => b.onclick = e => { e.stopPropagation(); bindOpen(b.closest('tr').dataset.key, b.dataset.bind); });
   tb.querySelectorAll('[data-unb]').forEach(b => b.onclick = e => { e.stopPropagation(); bindSide(b.closest('tr').dataset.key, b.dataset.unb, null); renderPR1(); renderSummary(); renderSurvey(); toast('กลับไปใช้การผูกอัตโนมัติแล้ว'); });

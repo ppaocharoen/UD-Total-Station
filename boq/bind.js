@@ -101,7 +101,8 @@ function bqPools(r) {
   };
 }
 const BQ_TABS = { mat: [['mat', 'พาณิชย์'], ['comp', 'วัสดุมวลรวม'], ['survey', 'ราคาสืบ'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าวัสดุ']],
-  lab: [['wage', 'ค่าแรง ว480'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าแรง']] };
+  lab: [['wage', 'ค่าแรง ว480'], ['manual', 'กรอกเอง'], ['none', 'ไม่มีค่าแรง']],
+  line: [['mat', 'ราคาพาณิชย์'], ['comp', 'วัสดุมวลรวม'], ['survey', 'ราคาสืบ']] };
 /** แท็บแรกที่เปิด: ชนิดที่ผูกไว้ → ชนิดของการผูกอัตโนมัติ → แท็บที่ชื่อรายการค้นเจอครบทุกคำ */
 function bqBestTab(r, side) {
   const cur = ((S.boq.bind || {})[r.key] || {})[side];
@@ -143,12 +144,13 @@ function bqEl() {
   return m;
 }
 const bqRow = () => S.priced.find(x => x.key === BQ.key);
+function bqLineCur(r) { const root = cmpRootR(r.key); if (!root || !BQ.line) return null; return ((BoqBind.scopeOf(root, BQ.line.sub).lines) || {})[BQ.line.index] || null; }
 function bqClose() { const m = $('#bind-modal'); if (m) m.classList.remove('on'); BQ.key = null; }
 function bindOpen(key, side) {
   if (!S.db) return toast('ราคายังโหลดไม่เสร็จ');
   const r = S.priced.find(x => x.key === key); if (!r) return;
   const m = bqEl();
-  BQ.key = key; BQ.side = side; BQ.fl = {}; BQ.fprov = ''; BQ.tab = bqBestTab(r, side);
+  BQ.key = key; BQ.side = side; BQ.line = null; BQ.fl = {}; BQ.fprov = ''; BQ.tab = bqBestTab(r, side);
   $('#bq-title', m).textContent = side === 'mat' ? 'ผูกราคาค่าวัสดุ' : 'ผูกราคาค่าแรง';
   $('#bq-label', m).innerHTML = `รายการ: <b>${esc(r.name)}</b> · หน่วย ${esc(r.unit || '—')} · ระบบแปลงหน่วยราคาให้เมื่อทำได้`;
   $('#bq-q', m).value = r.name || '';
@@ -162,13 +164,14 @@ function bqCurHtml(r, side) {
 }
 function bqList() {
   const m = $('#bind-modal'), r = bqRow(); if (!m || !r) return;
-  const side = BQ.side, q = $('#bq-q', m).value.trim(), P = bqPools(r), tabs = BQ_TABS[side];
-  $('#bq-cur', m).innerHTML = bqCurHtml(r, side);
-  const cnt = k => { const t = P[k]; if (!t) return ''; if (!q) return ` (${t.pool.length})`; const x = bqSearch(t.pool, q, t.hay, { unit: r.unit, unitOf: t.unit }); return ` (${x.fallback ? 0 : x.items.length})`; };
+  const side = BQ.side, q = $('#bq-q', m).value.trim(), tabs = BQ_TABS[side];
+  const tg = side === 'line' ? { key: r.key, name: BQ.line.name, unit: BQ.line.unit, ref: {} } : r, P = bqPools(tg);
+  $('#bq-cur', m).innerHTML = side === 'line' ? '' : bqCurHtml(r, side);
+  const cnt = k => { const t = P[k]; if (!t) return ''; if (!q) return ` (${t.pool.length})`; const x = bqSearch(t.pool, q, t.hay, { unit: tg.unit, unitOf: t.unit }); return ` (${x.fallback ? 0 : x.items.length})`; };
   $('#bq-tabs', m).innerHTML = tabs.map(([k, l]) => `<span class="chip ${BQ.tab === k ? 'on' : ''}" data-tab="${k}">${l}${cnt(k)}</span>`).join('');
   const T = P[BQ.tab], list = $('#bq-list', m), filt = $('#bq-filt', m);
   $('#bq-q', m).style.display = T ? '' : 'none'; filt.innerHTML = '';
-  const cur = ((S.boq.bind || {})[r.key] || {})[side];
+  const cur = side === 'line' ? bqLineCur(r) : ((S.boq.bind || {})[r.key] || {})[side];
   let html = '', items = [];
   if (T) {
     let pool = T.pool, fh = '';
@@ -186,8 +189,9 @@ function bqList() {
     if (provs.length > 1) fh += `<select data-flt="prov"><option value="">ทุกจังหวัด</option>${provs.map(c => `<option value="${esc(c)}" ${BQ.fprov === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select>`;
     filt.innerHTML = fh;
     if (BQ.fprov && T.prov) pool = pool.filter(d => T.prov(d) === BQ.fprov);
-    const res = bqSearch(pool, q, T.hay, { unit: r.unit, unitOf: T.unit });
-    const curId = cur && (cur.kind === 'survey' ? 'p:' + cur.key : cur.code), autoId = cur ? '' : bqAutoId(r, BQ.tab);
+    if (side === 'line' && BQ.tab === 'comp') { const self = BQ.line.sub || (r.ref && r.ref.code); pool = pool.filter(d => d.sub !== self); }   // ไม่ให้เลือกมวลรวมตัวเองซ้อนตัวเอง
+    const res = bqSearch(pool, q, T.hay, { unit: tg.unit, unitOf: T.unit });
+    const curId = cur && (cur.kind === 'survey' ? 'p:' + cur.key : cur.code), autoId = cur || side === 'line' ? '' : bqAutoId(r, BQ.tab);
     items = res.items;
     const pin = [curId, autoId].map(id => id && T.pool.find(d => T.id(d) === id)).filter(Boolean);
     if (pin.length) items = pin.concat(items.filter(d => !pin.includes(d)));
@@ -215,12 +219,12 @@ function bqList() {
     html = `<div class="bq-pad"><button class="btn small primary" id="bq-nok">${side === 'mat' ? 'ยืนยัน: รายการนี้ไม่มีค่าวัสดุ (ค่าแรงอย่างเดียว)' : 'ยืนยัน: รายการนี้ไม่มีค่าแรง (รวมในค่าอื่นแล้ว)'}</button></div>`;
   }
   list.innerHTML = html || '<div class="hint bq-note">ไม่พบรายการ</div>';
-  $('#bq-foot', m).innerHTML = side === 'mat'
+  $('#bq-foot', m).innerHTML = side === 'line' ? '<span class="hint">ไม่มีในฐานข้อมูล? สืบราคาวัสดุย่อยนี้ได้ที่แท็บราคาสืบ (กลุ่ม "วัสดุย่อยในวัสดุมวลรวม") แล้วกลับมาเลือกในแท็บราคาสืบ</span>' : side === 'mat'
     ? `<span class="hint">ไม่มีในฐานข้อมูล?</span> <button class="btn small" data-svnew="1">+ สืบราคาใหม่</button> <button class="btn small" data-tab="manual">กรอกราคาเอง</button>`
     : `<button class="btn small" data-tab="manual">ไม่พบ — กรอกค่าแรงเอง</button>`;
   list.onclick = e => {
     const it = e.target.closest('.bq-item');
-    if (it && T) { bqPickItem(r, items[+it.dataset.i]); return; }
+    if (it && T) { if (side === 'line') bqPickLine(r, items[+it.dataset.i]); else bqPickItem(r, items[+it.dataset.i]); return; }
     if (e.target.id === 'bq-mok') { const v = $('#bq-mv', m).value.replace(/,/g, '').trim(); if (v === '' || !isFinite(+v) || +v < 0) return toast('ใส่ราคาเป็นตัวเลข ≥ 0'); bqSet(r, { kind: 'manual', price: r2(+v), note: $('#bq-mn', m).value.trim() }); }
     if (e.target.id === 'bq-nok') bqSet(r, { kind: 'none' });
   };
@@ -257,4 +261,112 @@ function bqSurveyNew() {   // สืบราคาใหม่ของแถ�
   b.mat = { kind: 'survey', key: item.target, label: 'ราคาสืบ ' + r.name }; autosave(); bqClose();
   S.svOpen = item.target; S.svf = 'all'; $$('#tabs .nav-tab').find(x => x.dataset.tab === 'survey').click(); renderSurvey();
   setTimeout(() => { const c = $(`[data-svi="${CSS.escape(item.target)}"]`); if (c) { c.scrollIntoView({ block: 'start' }); svLibHint(c, item); } }, 80);
+}
+
+// ------------------------------------------------------------------ มวลรวมผูกทีละบรรทัด (ก้อน 4b ตาม Cost Hub)
+// S.boq.cmpline[แถว] = {code, lines, prices, qty, accept, sub} (lib/boqbind.js) · ใช้ทั้งแถวที่ผูกมวลรวมอัตโนมัติและผูกเอง
+const cmpCtx = () => ({ db: S.db, U: window.UDPrice, surveyOf: svPriceOf });
+function cmpRootR(key) { const r = S.priced.find(x => x.key === key), C = S.boq.cmpline || {}, sc = C[key]; return r && sc && r.ref && sc.code === r.ref.code ? sc : null; }
+function cmpRootW(key) {   // ขอบเขตรากสำหรับเขียน (รหัสมวลรวมเปลี่ยน → เริ่มใหม่)
+  const r = S.priced.find(x => x.key === key); if (!r || !r.ref || r.ref.kind !== 'comp') return null;
+  const C = S.boq.cmpline = S.boq.cmpline || {};
+  if (!C[key] || C[key].code !== r.ref.code) C[key] = { code: r.ref.code, lines: {}, prices: {}, qty: {} };
+  return C[key];
+}
+function cmpScopeW(root, sub) { if (!sub || sub === root.code) return root; root.sub = root.sub || {}; return (root.sub[sub] = root.sub[sub] || {}); }
+const CMP_SRC = { commerce: 'พาณิชย์', 'commerce-fallback': 'พาณิชย์ (รหัสสำรอง)', fixed: 'ราคาคงที่', 'sub-comp': 'ส่วนผสม', user: 'กรอกเอง' };
+function cmpPanel(r) {
+  const root = cmpRootR(r.key) || { code: r.ref.code };
+  return `<div class="cmp no-print" data-ck="${esc(r.key)}">${cmpBlock(r, root, root, 0)}</div>`;
+}
+function cmpBlock(r, root, sc, depth) {
+  const ctx = cmpCtx(), all = BoqBind.cmpLines(S.db, sc.code); if (!all.length) return '';
+  const sub = sc === root ? '' : sc.code, st = BoqBind.cmpState(ctx, root, sc, depth), uq = BoqBind.cmpQty(sc) || {};
+  const noQ = l => l.qty === null && uq[l.index] === undefined;
+  const miss = st ? st.missing : [], nQ = miss.filter(i => { const l = all.find(x => x.index === i); return l && noQ(l); }).length, nP = Math.max(0, miss.length - nQ);
+  const missTxt = [nP ? `ยังไม่มีราคา ${nP} รายการ` : '', nQ ? `ยังไม่มีปริมาณ ${nQ} รายการ` : ''].filter(Boolean).join(' · ');
+  const dk = r.key + '|' + sc.code, open = (S.cmpOpen && S.cmpOpen[dk] !== undefined) ? S.cmpOpen[dk] : !!(miss.length && !(st && st.acc));
+  let stat;
+  if (!miss.length) stat = ' <span class="ok">(ราคาครบ)</span>';
+  else if (st && st.acc) stat = ` <span class="warn">ยอมรับราคาไม่ครบ (${missTxt.replace(/ยังไม่มี/g, 'ขาด')}) = ${fmt(st.pp.price)}</span> <a class="pk-link" data-cact="unacc" data-s="${esc(sub)}">ยกเลิกการยอมรับ</a>`;
+  else stat = ` <span class="warn">(${missTxt})</span>${st && st.pp.price ? ` <span class="hint">ราคาชั่วคราว ${fmt(st.pp.price)} — ยังไม่รวมในยอด</span> <a class="pk-link" data-cact="acc" data-s="${esc(sub)}">ยอมรับราคานี้ (ขาด ${miss.length})</a>` : ''}${st && st.stale ? ' <span class="warn">รายการที่ขาดเปลี่ยนไป ยืนยันใหม่</span>' : ''}`;
+  const unitC = (S.db.findComp(sc.code) || {}).unit || 'หน่วย';
+  return `<details class="cmp-b" data-dk="${esc(dk)}" ${open ? 'open' : ''}><summary>วัสดุในมวลรวม ${esc(sc.code)}${stat}</summary>` + all.map(l => {
+    const x = BoqBind.cmpLineInfo(ctx, root, sc, l, depth), lk = (sc.lines || {})[l.index], pr = (sc.prices || {})[l.index], missP = (l.warnings || []).includes('missing_price');
+    let s;
+    if (x) s = x.state === 'ok' ? `<b class="ok">${esc(x.src)} ${fmt(x.price)} บ./${esc(l.unit)}</b> <span class="hint">(${esc(x.label)}${x.n !== undefined ? ` · ${x.n} เจ้า${x.n < Survey.MIN_Q ? ' ไม่ครบ ' + Survey.MIN_Q : ''}` : ''})</span>` : `<span class="warn">${esc(x.warn)}</span>`;
+    else if (pr !== undefined) s = `<span class="hint">ราคาที่กรอกไว้ ${fmt(pr)} บ./${esc(l.unit)}</span>`;
+    else if (!missP) s = `<span class="hint">${esc(CMP_SRC[l.source] || l.source || '')}${l.source === 'sub-comp' ? ' ' + esc(l.subComp || '') : l.province ? ' ' + esc(l.province) : ''} ${fmt(l.unitPrice)} บ./${esc(l.unit)}</span>`;
+    else s = '<span class="warn">ยังไม่มีราคา</span>';
+    const nest = lk && lk.kind === 'comp' && depth < 3 ? `<div class="cmp-nest">${cmpBlock(r, root, BoqBind.scopeOf(root, lk.code), depth + 1)}</div>` : '';
+    const qh = l.qty !== null ? `<span class="hint">× ${esc(l.qty)} ${esc(l.unit)}</span>`
+      : `<span class="hint">×</span> <input class="price sm ${uq[l.index] === undefined ? 'ov' : ''}" data-cqty="1" data-s="${esc(sub)}" data-i="${l.index}" value="${esc(uq[l.index] ?? '')}" placeholder="ปริมาณ" title="ข้อมูลมวลรวมไม่ระบุปริมาณบรรทัดนี้ — กรอกปริมาณต่อ 1 ${esc(unitC)} (ใช้เฉพาะโครงการนี้)"> <span class="hint">${esc(l.unit)}</span>${uq[l.index] === undefined ? ' <span class="warn">ยังไม่มีปริมาณ</span>' : ''}`;
+    return `<div class="cmp-l"><span>${esc(l.name)} ${qh}</span> ${s} <a class="pk-link" data-cact="pick" data-s="${esc(sub)}" data-i="${l.index}">${lk ? 'เปลี่ยน' : missP ? 'เลือกราคา' : 'เปลี่ยนที่มาราคา'}</a>${lk || pr !== undefined ? ` <a class="pk-link" data-cact="unlink" data-s="${esc(sub)}" data-i="${l.index}">เลิกผูก</a>` : ''}</div>${nest}`;
+  }).join('') + '</details>';
+}
+function cmpRefresh() { autosave(); renderPR1(); renderSummary(); renderSurvey(); }
+function cmpBindEvents(tb) {
+  tb.querySelectorAll('.cmp details').forEach(d => d.addEventListener('toggle', () => { S.cmpOpen = S.cmpOpen || {}; S.cmpOpen[d.dataset.dk] = d.open; }));
+  tb.querySelectorAll('.cmp').forEach(box => {
+    const key = box.dataset.ck;
+    box.addEventListener('click', e => {
+      e.stopPropagation();
+      const a = e.target.closest('[data-cact]'); if (!a) return;
+      const root = cmpRootW(key); if (!root) return; const sub = a.dataset.s, sc = cmpScopeW(root, sub), i = a.dataset.i;
+      if (a.dataset.cact === 'acc') { if (BoqBind.cmpAccept(cmpCtx(), root, sub ? BoqBind.scopeOf(root, sub) : root, sub ? 1 : 0)) { if (sub) Object.assign(sc, { accept: BoqBind.scopeOf(root, sub).accept }); cmpRefresh(); } }
+      else if (a.dataset.cact === 'unacc') { delete sc.accept; cmpRefresh(); }
+      else if (a.dataset.cact === 'unlink') { if (sc.lines) delete sc.lines[i]; if (sc.prices) delete sc.prices[i]; cmpRefresh(); }
+      else if (a.dataset.cact === 'pick') {
+        const ln = BoqBind.cmpLines(S.db, sub || root.code).find(l => String(l.index) === String(i)); if (ln) bindLineOpen(key, sub, ln);
+      }
+    });
+    box.addEventListener('change', e => {
+      const t = e.target; if (!t.dataset.cqty) return;
+      const root = cmpRootW(key); if (!root) return; const sc = cmpScopeW(root, t.dataset.s); sc.qty = sc.qty || {};
+      const v = t.value.replace(/,/g, '').trim();
+      if (v === '' || !(+v > 0)) delete sc.qty[t.dataset.i]; else sc.qty[t.dataset.i] = +v;
+      cmpRefresh();
+    });
+  });
+}
+/** แถวมวลรวมที่ราคายังไม่ครบและยังไม่ได้ยอมรับ */
+function cmpAcceptable(pr) {
+  if (!S.db) return [];
+  const ctx = cmpCtx();
+  return pr.filter(r => r.ref && r.ref.kind === 'comp' && r.mat_unit === null).filter(r => { const root = cmpRootR(r.key) || { code: r.ref.code }; const st = BoqBind.cmpState(ctx, root, root, 0); return st && !st.complete && !st.acc; }).map(r => r.key);
+}
+function cmpAcceptAll(keys) {
+  if (!confirm(`ยอมรับราคาไม่ครบ ${keys.length} รายการ?\nราคาจะรวมเฉพาะวัสดุย่อยที่มีราคาแล้ว (ที่ขาดคิดเป็น 0) และระบุในที่มาของราคา — ตรวจแต่ละแถวได้ภายหลัง`)) return;
+  keys.forEach(k => { const root = cmpRootW(k); if (root) BoqBind.cmpAccept(cmpCtx(), root, root, 0); });
+  cmpRefresh(); toast(`ยอมรับราคาไม่ครบ ${keys.length} รายการแล้ว`);
+}
+/** หน้าต่างเลือกราคาของบรรทัดในมวลรวม: พาณิชย์ / มวลรวม / ราคาสืบ */
+function bindLineOpen(key, sub, ln) {
+  if (!S.db) return;
+  const r = S.priced.find(x => x.key === key); if (!r) return;
+  const m = bqEl();
+  BQ.key = key; BQ.side = 'line'; BQ.line = { sub, index: ln.index, name: ln.name, unit: ln.unit, itemCode: ln.itemCode || '' }; BQ.fl = {}; BQ.fprov = '';
+  const fake = { key, name: ln.name, unit: ln.unit, ref: {} }, P = bqPools(fake);
+  BQ.tab = 'mat';
+  for (const k of ['mat', 'comp', 'survey']) { const t = P[k], x = bqSearch(t.pool, ln.name, t.hay, { unit: ln.unit, unitOf: t.unit }); if (!x.fallback && x.full) { BQ.tab = k; break; } }
+  $('#bq-title').textContent = 'เลือกราคาวัสดุในมวลรวม';
+  $('#bq-label').innerHTML = `วัสดุ: <b>${esc(ln.name)}</b> · หน่วย ${esc(ln.unit || '—')} · ในมวลรวม ${esc(sub || r.ref.code)} ของรายการ "${esc(r.name)}" · ระบบแปลงหน่วยให้เมื่อทำได้`;
+  $('#bq-q').value = ln.name || '';
+  m.classList.add('on'); bqList(); $('#bq-q').focus(); $('#bq-q').select();
+  if (!BQ.lib) Survey.libAll().then(a => { BQ.lib = a || []; if (BQ.key && BQ.tab === 'survey') bqList(); }).catch(() => { BQ.lib = []; });
+}
+const lineSubKey = L => L.itemCode ? 'sub:' + L.itemCode : 'subn:' + String(L.name || '').replace(/\s+/g, ' ').trim() + '|' + (L.unit || '');
+async function bqPickLine(r, d) {
+  const L = BQ.line, root = cmpRootW(r.key); if (!root) return;
+  const sc = cmpScopeW(root, L.sub); sc.lines = sc.lines || {};
+  let link;
+  if (BQ.tab === 'mat') link = { kind: 'mat', code: d.code, label: d.name };
+  else if (BQ.tab === 'comp') { if (d.sub === (L.sub || root.code)) return toast('เลือกมวลรวมตัวเองซ้อนตัวเองไม่ได้'); link = { kind: 'comp', code: d.sub, label: d.sub + ' ' + d.name }; }
+  else if (d.src === 'prj') link = { kind: 'survey', key: d.it.target, label: d.it.name };
+  else {   // จากคลัง → รายการสืบของวัสดุย่อยนี้ในโครงการ ผูกกับรายการในคลัง (ไม่สร้างรายการใหม่ในคลัง)
+    const item = svItem({ target: lineSubKey(L), name: L.name, unit: L.unit, ref: L.itemCode ? 'c:' + L.itemCode : '' });
+    await libUse(item, d.x); link = { kind: 'survey', key: item.target, label: d.x.name };
+  }
+  sc.lines[L.index] = link; if (sc.prices) delete sc.prices[L.index];
+  autosave(); bqClose(); renderPR1(); renderSummary(); renderSurvey(); toast(`ผูกราคา "${L.name}" แล้ว`);
 }

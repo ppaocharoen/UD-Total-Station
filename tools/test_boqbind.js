@@ -68,4 +68,46 @@ chk(n === 3 && boq.bind.a.mat.price === 10 && boq.bind.b.mat.kind === 'none' && 
 // 11) ไม่แก้ข้อมูลต้นทาง
 const ov = { a: { mat: 1 } }; BB.apply(rows, { a: { mat: { kind: 'none' } } }, { overrides: ov });
 chk(ov.a.mat === 1 && rows[0].price_ref.code === 'C1', 'apply ไม่แก้ overrides/rows ต้นทาง');
+// ---------------------------------------------------------------- 4b มวลรวมผูกทีละบรรทัด (ใช้ DB จริงของ UD Cost Hub: PRICING=<path pricing-v1.js>)
+const PP = process.env.PRICING || require('path').join(__dirname, '../../udmaterial-price/lib/pricing-v1.js');
+let UP = null; try { UP = require(PP); } catch (e) { console.log('SKIP 4b — ไม่พบ pricing-v1.js (ตั้ง PRICING=…)'); }
+if (UP) {
+  const D = new UP.DB({
+    materials: [{ code: '0001000000000001', name: 'ปูนซีเมนต์ บรรจุ 50 กก./ถุง', unit: 'ถุง', price: 150, province: 'อุดรธานี' }, { code: '0001000000000002', name: 'น้ำ', unit: 'ลบ.ม.', price: 20, province: 'อุดรธานี' },
+      { code: '0001000000000003', name: 'ทรายหยาบ', unit: 'ลบ.ม.', price: 450, province: 'อุดรธานี' }],
+    compList: [{ id: '1', group: '7', sub: '7.9', name: 'ปูนทดสอบ', unit: 'ลบ.ม.' }, { id: '2', group: '7', sub: '7.8', name: 'ปูนซ้อน', unit: 'ลบ.ม.' }],
+    compItems: [
+      { compId: '1', seq: '1', itemCode: 'A', itemName: 'ปูนซีเมนต์', qty: 10, unit: 'ถุง', commodityCode: '0001000000000001', fixedPrice: null },
+      { compId: '1', seq: '2', itemCode: 'B', itemName: 'ทรายหยาบ', qty: 1, unit: 'ลบ.ม.', commodityCode: '', fixedPrice: null },
+      { compId: '1', seq: '3', itemCode: 'C', itemName: 'น้ำ', qty: null, unit: 'ลบ.ม.', commodityCode: '0001000000000002', fixedPrice: null },
+      { compId: '2', seq: '1', itemCode: 'D', itemName: 'หินฝุ่น', qty: 2, unit: 'ลบ.ม.', commodityCode: '', fixedPrice: null },
+    ],
+  });
+  const ctx = { db: D, U: UP, surveyOf: k => (k === 'sub:B' ? { price: 500, unit: 'ลบ.ม.', name: 'ทรายหยาบ', src: 'ราคาสืบ', n: 3 } : k === 'sub:D' ? { price: 300, unit: 'ลบ.ม.', name: 'หินฝุ่น', src: 'ราคาสืบ', n: 3 } : null) };
+  const rc = [{ key: 'p', name: 'ปูนฉาบ', unit: 'ลบ.ม.', qty: 2, price_ref: { kind: 'comp', code: '7.9', wage_code: 'W1' } }];
+  const pr = cmp => { const x = BB.apply(rc, {}, { cmp, db: D, U: UP, surveyOf: ctx.surveyOf }); return B.priceRows(D, UP, x.rows, { overrides: x.overrides })[0]; };
+  let p0 = pr({});
+  chk(p0.mat_unit === null && /คิดไม่ครบ/.test(p0.warns.join()), '4b มวลรวมขาดราคาทราย + ปริมาณน้ำ → ยังไม่มีราคา');
+  let st = BB.cmpState(ctx, { code: '7.9' }, { code: '7.9' }, 0);
+  chk(st && st.missing.join() === '1,2' && !st.complete, '4b สถานะ: ขาดบรรทัด 1 (ราคา) และ 2 (ปริมาณ)');
+  const S1 = { code: '7.9', lines: { 1: { kind: 'survey', key: 'sub:B' } }, qty: { 2: 0.3 } };
+  let p1 = pr({ p: S1 });
+  chk(p1.mat_unit === 2006 && !p1.warns.some(w => /มวลรวม/.test(w)), '4b ผูกทราย = ราคาสืบ 500 + น้ำ × 0.3 → 10×150 + 500 + 0.3×20 = 2006');
+  const S2 = { code: '7.9', lines: { 1: { kind: 'mat', code: '0001000000000003' } }, qty: { 2: 0.3 } };
+  chk(pr({ p: S2 }).mat_unit === 1956, '4b ผูกทรายกับพาณิชย์ M3 (450) → 1956');
+  // ยอมรับราคาไม่ครบ
+  const S3 = { code: '7.9', qty: { 2: 0.3 } }; const n = BB.cmpAccept(ctx, S3, S3, 0);
+  let p3 = pr({ p: S3 });
+  chk(n === 1 && S3.accept.join() === '1' && p3.mat_unit === 1506 && /ไม่ครบ ผู้ใช้ยอมรับ/.test(p3.mat_src), '4b ยอมรับราคาไม่ครบ (ขาดทราย) → 1506 และระบุในที่มา');
+  delete S3.qty;   // ชุดที่ขาดเปลี่ยน → ไม่ใช้ราคาที่ยอมรับ
+  st = BB.cmpState(ctx, S3, S3, 0); p3 = pr({ p: S3 });
+  chk(st.stale && !st.acc && p3.mat_unit === null, '4b ยอมรับไว้แล้วรายการที่ขาดเปลี่ยน → stale ไม่คิดราคา');
+  // มวลรวมซ้อน
+  const S4 = { code: '7.9', lines: { 1: { kind: 'comp', code: '7.8' } }, qty: { 2: 0.3 } };
+  chk(pr({ p: S4 }).mat_unit === null, '4b บรรทัดทรายผูกมวลรวม 7.8 ที่ยังขาดราคา → ยังไม่มีราคา');
+  S4.sub = { '7.8': { lines: { 0: { kind: 'survey', key: 'sub:D' } } } };
+  chk(pr({ p: S4 }).mat_unit === 2106, '4b ผูกบรรทัดในมวลรวมซ้อน (หินฝุ่น 2×300) → 1500 + 600 + 6 = 2106');
+  // รหัสมวลรวมไม่ตรง → ไม่ใช้
+  chk(pr({ p: { code: '7.8', lines: { 1: { kind: 'mat', code: '0001000000000003' } }, qty: { 2: 0.3 } } }).mat_unit === null, '4b การผูกบรรทัดของมวลรวมอื่น (รหัสไม่ตรงแถว) ไม่ถูกใช้');
+}
 console.log(ok ? 'ทั้งหมดผ่าน' : 'มีข้อไม่ผ่าน'); process.exit(ok ? 0 : 1);
