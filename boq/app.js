@@ -119,7 +119,7 @@ function loadModel(json, name) {
     const sl = (m.slabs || []).reduce((a, s) => a + polyArea(s.polygon), 0);
     if (sl) p.area = r2(sl);
   }
-  $('#meta-proj').textContent = p.name; restoreImgs();
+  $('#meta-proj').textContent = p.name; restoreImgs(); setTimeout(() => svRelink().catch(() => {}), 1500);
   $('#file-status').innerHTML = `เปิด <b>${esc(name)}</b>${saved ? ' · ดึงงาน BOQ ที่บันทึกไว้ในเบราว์เซอร์นี้' : ''}`;
   if (window.RebarTk) RebarTk.applyExtras(m);   // พลาสติกรองพื้น บันได กำแพงกันดิน (คิดในเว็บเหมือน takeoff.py)
   if (typeof dsgOnLoad === 'function' && dsgOnLoad()) return;   // ใส่ผลออกแบบที่เคยเขียนแล้ว render ให้เอง
@@ -282,7 +282,7 @@ function svCard({ t, it, s }) {
   let h = `<div class="card sv-card ${open ? 'open' : ''}" data-svi="${esc(t.target)}">
     <div class="sv-head" data-svtoggle="1"><div><b>${esc(t.name)}</b> <span class="hint">[${esc(t.unit)}]</span>${t.qty ? ` <span class="hint">· ใช้ ${fmt(t.qty)} ${esc(t.unit)}</span>` : ''}
       <div class="hint">${esc(t.why || '')}</div></div>
-      <div class="sv-sum">${t.group === 'sub' && (s.status === 'none' || s.status === 'skip') ? `<button class="btn small" data-subskip="${esc(t.target)}" title="ไม่ใส่ราคาวัสดุย่อยนี้ — วัสดุมวลรวมคิดราคาจากวัสดุที่เหลือ">${s.status === 'skip' ? 'กลับมาคิดราคา' : 'ไม่คิดราคา'}</button> ` : ''}${t.group === 'pr1' && s.status === 'none' ? `<button class="btn small" data-nomat="${esc(t.key)}" title="งานที่มีแต่ค่าแรง เช่น รื้อถอน ขุดดิน">ไม่มีค่าวัสดุ</button> ` : ''}<span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
+      <div class="sv-sum">${t.group === 'sub' && (s.status === 'none' || s.status === 'skip') ? `<button class="btn small" data-subskip="${esc(t.target)}" title="ไม่ใส่ราคาวัสดุย่อยนี้ — วัสดุมวลรวมคิดราคาจากวัสดุที่เหลือ">${s.status === 'skip' ? 'กลับมาคิดราคา' : 'ไม่คิดราคา'}</button> ` : ''}${t.group === 'pr1' && s.status === 'none' ? `<button class="btn small" data-nomat="${esc(t.key)}" title="งานที่มีแต่ค่าแรง เช่น รื้อถอน ขุดดิน">ไม่มีค่าวัสดุ</button> ` : ''}${it && it.lib ? `<span class="pill" title="ผูกกับรายการในคลัง: ${esc(it.libName || '')}">คลัง</span>` : ''}<span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
   if (open) h += svEditor(t, it || svItem(t));
   return h + '</div>';
 }
@@ -319,38 +319,78 @@ function svSave(it) {   // บันทึก + สำรองเข้าค�
   it.updated = new Date().toISOString(); applyPr23Survey(); autosave(); applySurvey(); priceAll(); if (/^pr[23]:/.test(it.target)) renderPR23();
   clearTimeout(svSave._t); svSave._t = setTimeout(() => {
     const imgs = {}; (it.quotes || []).forEach(q => (q.imgs || []).forEach(id => { if (S.img[id]) imgs[id] = S.img[id]; }));
-    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(Survey.libKey(it.name, it.unit), { key: Survey.libKey(it.name, it.unit), name: it.name, unit: it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '', ref: it.ref || '' })
+    if (it.libConv) return;   // ดึงจากคลังแต่หน่วยต่างกัน (แก้ตัวแปลงหน่วยในโครงการ) — ไม่บันทึกกลับคลัง
+    // ผูกกับรายการในคลังแล้ว (it.lib) → บันทึกกลับรายการเดิม ไม่สร้างรายการใหม่ตามชื่อแถว BOQ (Earth 19 พ.ย. 2569)
+    const key = it.lib || Survey.libKey(it.name, it.unit);
+    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(key, { key, name: it.lib ? (it.libName || it.name) : it.name, unit: it.lib ? (it.libUnit || it.unit) : it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '', ref: it.lib ? (it.libRef || '') : (it.ref || '') })
       .then(() => { if (Survey.remote()) libStatus('บันทึกเข้าคลังกลางแล้ว'); })
       .catch(er => { libStatus('บันทึกเข้าคลังกลางไม่ได้: ' + er.message + ' (เก็บในเครื่องไว้ก่อน)', true); });
   }, 800);
 }
 async function svLibHint(card, it) {   // คลังราคาสืบของรายการนี้: ตรงแน่ / อาจตรงกับ / ค้นเอง
   const el = card.querySelector('[data-libhint]'); if (!el) return;
-  const all = await Survey.libAll(), own = Survey.libKey(it.name, it.unit), f = Survey.libFind(all, it);
+  const all = await Survey.libAll(), own = it.lib || Survey.libKey(it.name, it.unit), f = Survey.libFind(all, it);
   const mine = x => x.key === own && (it.quotes || []).length;
+  const linked = it.lib && all.find(x => x.key === it.lib);
+  let lk = '';
+  if (it.lib) {
+    const newer = linked && (linked.updated || '') > (it.updated || '');
+    lk = `<div>ผูกกับคลัง: <b>${esc(it.libName || it.lib)}</b> [${esc(it.libUnit || '')}]${it.libConv ? ' <span class="pill warn">หน่วยต่างกัน — แก้ในโครงการนี้เท่านั้น ไม่บันทึกกลับคลัง</span>' : ''}${!linked ? ' <span class="pill err">ไม่พบในคลังแล้ว (ถูกลบ)</span>' : ''}${newer ? ` <span class="pill warn">คลังมีราคาใหม่กว่า</span> <a class="pk-link" data-libref="1">อัปเดตจากคลัง</a>` : ''} · <a class="pk-link" data-libun="1">เลิกผูก</a></div>`;
+  }
   const ent = [];
   if (f.hit && !mine(f.hit)) ent.push({ x: f.hit, tag: f.how, sure: true });
   f.maybe.forEach(o => { if (!mine(o.x)) ent.push({ x: o.x, tag: 'อาจตรงกับ', sure: false }); });
   const line = (e, i) => { const a = Survey.ageDays(e.x.updated); return `${e.sure ? '' : '<span class="pill warn">อาจตรงกับ</span> '}<a class="pk-link" data-libuse="${i}" title="${esc(e.tag)}">${esc(e.x.name)} [${esc(e.x.unit)}] · ${(e.x.quotes || []).length} เจ้า · ${a} วันก่อน${e.x.project ? ' (' + esc(e.x.project) + ')' : ''}</a>${a > 90 ? ' <span class="pill warn">เกิน 90 วัน</span>' : ''}`; };
-  el.innerHTML = (ent.length ? 'คลังราคาสืบ: ' + ent.map(line).join(' · ') + ' · ' : '') + '<a class="pk-link" data-libsearch="1">ค้นในคลัง…</a><div data-libres="1"></div>';
-  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = () => { const e = ent[+a.dataset.libuse]; if (!e.sure && !confirm(`ใช้ราคาสืบของ "${e.x.name}" กับ "${it.name}"?\nระบบจะจำว่าเป็นวัสดุเดียวกันสำหรับโครงการต่อไป`)) return; libUse(it, e.x, !e.sure); });
+  el.innerHTML = lk + (ent.length ? 'คลังราคาสืบ: ' + ent.map(line).join(' · ') + ' · ' : '') + '<a class="pk-link" data-libsearch="1">ค้นในคลัง…</a><div data-libres="1"></div>';
+  el.querySelectorAll('[data-libuse]').forEach(a => a.onclick = () => { const e = ent[+a.dataset.libuse]; if (!e.sure && !confirm(`ใช้ราคาสืบของ "${e.x.name}" กับ "${it.name}"?\nระบบจะผูกกับรายการนี้ในคลัง และจำว่าเป็นวัสดุเดียวกันสำหรับโครงการต่อไป`)) return; libUse(it, e.x); });
+  const rf = el.querySelector('[data-libref]'); if (rf) rf.onclick = () => libUse(it, linked);
+  const un = el.querySelector('[data-libun]'); if (un) un.onclick = () => { if (!confirm(`เลิกผูก "${it.name}" กับ "${it.libName}" ในคลัง?\nราคาที่มีอยู่ยังเก็บไว้ในโครงการ — ถ้าแก้ราคาภายหลัง ระบบจะบันทึกเป็นรายการใหม่ในคลังตามชื่อนี้`)) return; ['lib', 'libName', 'libUnit', 'libRef', 'libConv'].forEach(k => delete it[k]); autosave(); svLibHint(card, it); };
   el.querySelector('[data-libsearch]').onclick = () => {
     const q = prompt('ค้นในคลังราคาสืบ (พิมพ์บางส่วนของชื่อ)', it.name); if (!q) return;
     const res = Survey.libSearch(all, q, it.unit), box = el.querySelector('[data-libres]');
     box.innerHTML = res.length ? res.map((x, i) => `<div><a class="pk-link" data-libpick="${i}">${esc(x.name)} [${esc(x.unit)}] · ${(x.quotes || []).length} เจ้า · ${Survey.ageDays(x.updated)} วันก่อน</a></div>`).join('') : '<span class="hint">ไม่พบในคลัง</span>';
-    box.querySelectorAll('[data-libpick]').forEach(a => a.onclick = () => libUse(it, res[+a.dataset.libpick], true));
+    box.querySelectorAll('[data-libpick]').forEach(a => a.onclick = () => libUse(it, res[+a.dataset.libpick]));
   };
 }
-/** ดึงราคาสืบจากคลังมาใช้ · remember = จำชื่อนี้เป็นชื่ออื่นของรายการในคลัง (โครงการต่อไปจับคู่ให้เอง) */
-async function libUse(it, x, remember) {
+/** ผูกรายการสืบของโครงการกับรายการในคลัง (แทนการคัดลอกแล้วสร้างรายการใหม่ — Earth 19 พ.ย. 2569)
+ *  หน่วยเดียวกัน: ใช้ราคาทุกเจ้าของคลัง + เจ้าที่โครงการนี้สืบเพิ่มเอง · แก้/เพิ่มเจ้าแล้วบันทึกกลับรายการเดิมในคลัง · จำชื่อแถวเป็นชื่ออื่นของรายการคลัง
+ *  หน่วยต่างกัน: คัดลอกมาแก้ตัวแปลงหน่วยในโครงการนี้เท่านั้น (libConv) ไม่บันทึกกลับคลัง */
+const fromLibQ = q => /จากคลัง/.test(q.note || '');
+function linkQuotes(it, x) {   // ราคาของคลัง + เจ้าที่โครงการสืบเอง (ไม่นับเจ้าที่เคยคัดลอกมาจากคลัง)
+  const sig = new Set((x.quotes || []).map(Survey.quoteSig));
+  const own = (it.quotes || []).filter(q => +q.price > 0 && !fromLibQ(q) && !sig.has(Survey.quoteSig(q)));
+  return { quotes: (x.quotes || []).map(q => Object.assign({}, q, { imgs: (q.imgs || []).slice() })).concat(own), own };
+}
+function linkSet(it, x) { it.lib = x.key; it.libName = x.name; it.libUnit = x.unit; it.libRef = x.ref || ''; }
+async function libUse(it, x) {
   toast('กำลังดึงจากคลัง…');
   for (const [id, v] of Object.entries(x.imgs || {})) { const d = await Survey.libImg(v).catch(() => null); if (d) { S.img[id] = d; Survey.imgPut(id, d); } }
-  it.quotes = (it.quotes || []).concat((x.quotes || []).map(q => Object.assign({}, q, { id: Survey.uid('q'), note: (q.note ? q.note + ' · ' : '') + 'จากคลัง' })));
-  if (!it.reason && x.reason) it.reason = x.reason;
   const sameUnit = Survey.normUnit(x.unit) === Survey.normUnit(it.unit);
-  if (remember && sameUnit && x.key !== Survey.libKey(it.name, it.unit)) Survey.libAlias(x.key, it.name, it.unit).catch(er => libStatus('จำชื่ออื่นไม่สำเร็จ: ' + er.message, true));
-  svSave(it); renderSurvey(); renderPR1(); renderSummary();
-  toast(sameUnit ? `ดึง ${(x.quotes || []).length} เจ้าจากคลังแล้ว — ตรวจวันที่สืบ` : `ดึงแล้ว แต่หน่วยต่างกัน (${x.unit} → ${it.unit}) — แก้ตัวแปลงหน่วยของแต่ละเจ้า`);
+  if (sameUnit) {
+    const { quotes, own } = linkQuotes(it, x);
+    it.quotes = quotes; if (x.reason) it.reason = x.reason;
+    linkSet(it, x); delete it.libConv; it.updated = x.updated || it.updated;
+    if (x.key !== Survey.libKey(it.name, it.unit)) Survey.libAlias(x.key, it.name, it.unit).catch(er => libStatus('จำชื่ออื่นไม่สำเร็จ: ' + er.message, true));
+    if (own.length) svSave(it); else { applyPr23Survey(); autosave(); applySurvey(); priceAll(); }
+  } else {
+    it.quotes = (it.quotes || []).filter(q => !fromLibQ(q)).concat((x.quotes || []).map(q => Object.assign({}, q, { id: Survey.uid('q'), note: (q.note ? q.note + ' · ' : '') + 'จากคลัง' })));
+    if (!it.reason && x.reason) it.reason = x.reason;
+    linkSet(it, x); it.libConv = true; svSave(it);
+  }
+  renderSurvey(); renderPR1(); renderSummary(); if (/^pr[23]:/.test(it.target)) renderPR23();
+  toast(sameUnit ? `ผูกกับ "${x.name}" ในคลังแล้ว (${(x.quotes || []).length} เจ้า) — แก้หรือเพิ่มเจ้าจะบันทึกกลับรายการนี้ในคลัง ไม่สร้างรายการใหม่` : `ดึงแล้ว แต่หน่วยต่างกัน (${x.unit} → ${it.unit}) — แก้ตัวแปลงหน่วยของแต่ละเจ้า (ใช้ในโครงการนี้เท่านั้น ไม่บันทึกกลับคลัง)`);
+}
+/** รายการสืบในโครงการที่เว็บรุ่นก่อน 6.51 คัดลอกมาจากคลัง → ผูกกับรายการต้นฉบับในคลังให้เอง (ไม่สร้างรายการซ้ำอีก) */
+async function svRelink() {
+  const items = Object.values(S.boq.surveys || {}).filter(it => !it.lib && (it.quotes || []).some(fromLibQ)); if (!items.length) return;
+  const all = await Survey.libAll().catch(() => []); if (!all.length) return;
+  let n = 0;
+  items.forEach(it => {
+    const o = Survey.libOrigin(all, { key: Survey.libKey(it.name, it.unit), unit: it.unit, quotes: it.quotes }); if (!o) return;
+    linkSet(it, o.orig); n++;
+    if (o.sameUnit) { it.quotes = linkQuotes(it, o.orig).quotes; it.updated = o.orig.updated || it.updated; } else it.libConv = true;
+  });
+  if (n) { autosave(); applySurvey(); renderSurvey(); renderPR1(); renderSummary(); libStatus(`ผูกรายการสืบที่เคยคัดลอกจากคลัง ${n} รายการกับต้นฉบับในคลังแล้ว (ไม่สร้างรายการซ้ำอีก)`); }
 }
 /** ป้ายในรายการ: มีในคลัง / อาจมีในคลัง (เฉพาะรายการที่ยังไม่ได้สืบ) */
 async function libBadges(box, tmap) {
