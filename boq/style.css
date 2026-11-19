@@ -100,6 +100,8 @@ table.boq tr.warn td:first-child{box-shadow:inset 3px 0 0 var(--amber)}
 .warnline{display:block;font-size:11px;color:var(--amber)}
 input.price{width:96px;text-align:right;padding:3px 6px;font-size:12px}
 input.price.ov{border-color:var(--amber);color:var(--amber)}
+.qov{display:block;font-size:11px;color:var(--amber);white-space:normal;text-align:right}
+.qov .btn.small{padding:0 5px;margin-left:2px}
 input.price.sm{width:56px}.dsg-bored{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12px}.dsg-bored .g{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}.dsg-bored input.price.sm{width:56px!important;min-width:0;flex:0 0 56px}
 input.cell{width:100%;padding:3px 6px;font-size:13px;font-family:var(--f-th)}
 input.days{width:56px;text-align:right;padding:3px 6px;font-size:12px}
@@ -276,7 +278,7 @@ table.pk-q tr[data-pk-row]{cursor:pointer}table.pk-q tr[data-pk-row]:hover td{ba
   .print-head{display:block;margin-bottom:6px}
   table.boq th,table.boq td{border:1px solid #000;color:#000!important;background:#fff!important;font-family:'Sarabun',sans-serif}
   table.boq tr.grp td,table.boq tr.sub td,table.boq tr.total td{background:#eee!important}
-  input.price{border:none;background:none;color:#000;width:auto}
+  input.price,input.price.ov{border:none;background:none;color:#000;width:auto}
   .src,.warnline{display:none}
   .sum-doc{page-break-after:always}
   .gantt text,.scurve text{fill:#000}
