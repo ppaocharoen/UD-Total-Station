@@ -219,7 +219,7 @@
 <section class="page" id="page-pr1">
   <div class="toolbar">
     <div id="pr1-alert" class="alert"></div>
-    <div class="btn-row"><button class="btn" id="b-addrow">+ เพิ่มรายการ</button><button class="btn" onclick="window.print()">พิมพ์</button><button class="btn" data-xlsx>ส่งออก Excel (แบบฟอร์ม)</button></div>
+    <div class="btn-row"><button class="btn" id="b-addrow">+ เพิ่มรายการ</button><button class="btn" id="b-linkx" title="ความจำการผูกราคาตามชื่อรายการ (ใช้ร่วมกับ UD Cost Hub) — ส่งออกไปใช้เครื่องอื่น">ส่งออกความจำการผูก</button><label class="btn" title="นำเข้าความจำการผูกจากไฟล์ (ของ Total Station หรือ Cost Hub)">นำเข้าความจำการผูก<input type="file" id="b-linki" accept=".json,application/json" hidden></label><button class="btn" onclick="window.print()">พิมพ์</button><button class="btn" data-xlsx>ส่งออก Excel (แบบฟอร์ม)</button></div>
   </div>
   <div class="print-head" id="pr1-head"></div>
   <div class="table-wrap"><table class="boq" id="pr1-table"></table></div>
@@ -299,6 +299,8 @@
 <script src="../lib/version.js"></script>
 <script src="../lib/pricemap.js"></script>
 <script src="../lib/boqbind.js"></script>
+<script src="../lib/boqsuggest.js"></script>
+<script src="../lib/boqimport.js"></script>
 <script src="../lib/survey.js"></script>
 <script src="../lib/diff.js"></script>
 <script src="../lib/clash.js"></script>

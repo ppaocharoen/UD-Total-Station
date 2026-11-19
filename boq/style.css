@@ -660,3 +660,4 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 .cmp-nest{margin:2px 0 4px 14px;padding-left:8px;border-left:2px solid var(--border)}
 .cmp input.price.sm{width:64px}
 .bq-pad.pct select{max-width:420px}.pct-rows{max-height:34vh;overflow:auto;border:1px solid var(--border)}.pct-rows .bq-item{align-items:center;gap:8px}
+.sug{font-size:12px;color:var(--cyan,#40c4ff);margin-top:3px}.sug .pk-link{margin:0 2px}

@@ -593,7 +593,7 @@ function _renderPR1() {
           <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste && !r.qty_ov ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
             ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
-            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${r.ref && r.ref.kind === 'comp' && S.db ? cmpPanel(r) : ''}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${b.mat && b.mat.kind === 'none' ? `<span class="src">ค่าแรงอย่างเดียว (กำหนดเอง) <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
+            ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${r.ref && r.ref.kind === 'comp' && S.db ? cmpPanel(r) : ''}${S.db ? sugHtml(r) : ''}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${b.mat && b.mat.kind === 'none' ? `<span class="src">ค่าแรงอย่างเดียว (กำหนดเอง) <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
           <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : `<input class="price ${r.qty_ov ? 'ov' : ''}" data-qov="1" value="${esc(r.qty)}" inputmode="decimal">${r.qty_ov ? qtyOvMark(r) : ''}`}</td>
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
           <td class="r c-mu" data-l="ค่าวัสดุ/หน่วย"><input class="price ${b.mat && b.mat.kind === 'manual' ? 'ov' : ''}" data-ov="mat" value="${r.mat_unit ?? ''}" inputmode="decimal"><span class="src">${esc(r.mat_src)}</span>${bindBtns(r, 'mat', b)}</td>
@@ -615,7 +615,10 @@ function _renderPR1() {
     nov ? `แก้ปริมาณเอง ${nov} รายการ (✎)${nstale ? ` — ${nstale} รายการถอดปริมาณใหม่แล้วค่าเปลี่ยน ตรวจอีกครั้ง` : ''}` : ''].filter(Boolean).join(' · ');
   if (nAcc.length) $('#pr1-alert').insertAdjacentHTML('beforeend', ` <button class="btn small no-print" id="cmp-accall" title="รวมราคาเฉพาะวัสดุย่อยที่มีราคา (ที่ขาดคิดเป็น 0) และระบุในที่มาของราคา">ยอมรับราคามวลรวมไม่ครบ ${nAcc.length} รายการ</button>`);
   const ab = $('#cmp-accall'); if (ab) ab.onclick = () => cmpAcceptAll(nAcc);
-  cmpBindEvents(tb);
+  cmpBindEvents(tb); sugBindEvents(tb); linkLibWarm();
+  const nSug = S.db ? sugRows().length : 0;
+  if (nSug) $('#pr1-alert').insertAdjacentHTML('beforeend', ` <button class="btn small no-print" id="sug-all" title="ใช้คำแนะนำกับทุกแถวที่ยังไม่มีราคาและยังไม่ได้ผูกเอง">ใช้คำแนะนำทั้งหมด (${nSug})</button>`);
+  const sb = $('#sug-all'); if (sb) sb.onclick = sugApplyAll;
   tb.querySelectorAll('[data-nomat],[data-unnomat]').forEach(b => b.onclick = e => { e.stopPropagation(); bindSide(b.dataset.nomat || b.dataset.unnomat, 'mat', b.dataset.nomat ? { kind: 'none' } : null); renderPR1(); renderSummary(); renderSurvey(); });
   tb.querySelectorAll('[data-bind]').forEach(b => b.onclick = e => { e.stopPropagation(); bindOpen(b.closest('tr').dataset.key, b.dataset.bind); });
   tb.querySelectorAll('[data-unb]').forEach(b => b.onclick = e => { e.stopPropagation(); bindSide(b.closest('tr').dataset.key, b.dataset.unb, null); renderPR1(); renderSummary(); renderSurvey(); toast('กลับไปใช้การผูกอัตโนมัติแล้ว'); });
@@ -1784,6 +1787,8 @@ function bind() {
   { const meHook = () => UDAuth.on(st => { const was = S.me && S.me.name; S.me = st.profile || null; if (S.boq && (S.me && S.me.name) !== was) renderPeople(); });
     if (window.UDAuth) meHook(); else window.addEventListener('udauth-loaded', meHook); }   // ชื่อ/ตำแหน่งจากข้อมูลผู้ใช้ (บัญชีเดียวกับ UD Cost Hub)
   $('#b-addrow').onclick = addCustomRow;
+  $('#b-linkx').onclick = () => linkExport();
+  $('#b-linki').onchange = async e => { try { const f = await readFile(e.target), r = linkImport(JSON.parse(f.text)); toast(`นำเข้าความจำการผูก ${r.nA} รายการ (ใหม่ ${r.added})`); renderPR1(); } catch (er) { alert('นำเข้าไม่ได้: ' + er.message); } e.target.value = ''; };
   $('#b-add-pr2').onclick = () => { S.boq.pr2.push({ id: Survey.uid('e'), name: '', qty: 1, unit: 'ชุด', price: 0, install: 0 }); autosave(); renderPR23(); };
   $$('[data-xlsx]').forEach(b => b.onclick = exportXlsx);
   $('#b-add-pr3').onclick = () => { S.boq.pr3.push({ id: Survey.uid('x'), name: '', qty: 1, unit: 'งาน', amount: 0, note: '' }); autosave(); renderPR23(); };

@@ -195,7 +195,9 @@ function bqList() {
     const res = bqSearch(pool, q, T.hay, { unit: tg.unit, unitOf: T.unit });
     const curId = cur && (cur.kind === 'survey' ? 'p:' + cur.key : cur.code), autoId = cur || side === 'line' ? '' : bqAutoId(r, BQ.tab);
     items = res.items;
+    const pref = linkPrefIds(tg.name, side, BQ.tab);
     const pin = [curId, autoId].map(id => id && T.pool.find(d => T.id(d) === id)).filter(Boolean);
+    T.pool.filter(d => pref.has(T.id(d)) && !pin.includes(d)).forEach(d => pin.push(d));
     if (pin.length) items = pin.concat(items.filter(d => !pin.includes(d)));
     const fullAt = (!res.fallback && q && res.full > 0 && res.full < items.length) ? res.full + pin.filter(d => !res.items.slice(0, res.full).includes(d)).length : -1;
     const total = items.length; items = items.slice(0, BQ_MAXROWS);
@@ -203,7 +205,7 @@ function bqList() {
       + (res.fallback ? `<div class="hint bq-note">ไม่พบรายการที่มีคำของ "${esc(q)}" — แสดงทั้งหมดในแท็บนี้ (ลองพิมพ์คำเดียว หรือเลือกหมวด)</div>` : '')
       + (total > BQ_MAXROWS ? `<div class="hint bq-note">แสดง ${BQ_MAXROWS} จาก ${total} รายการ — พิมพ์เพิ่มหรือเลือกหมวดเพื่อกรอง</div>` : '');
     const row = (d, name, meta, price, i) => (i === fullAt ? '<div class="hint bq-note">ตรงบางคำเท่านั้น</div>' : '')
-      + `<div class="bq-item ${(curId || autoId) && [curId, autoId].includes(T.id(d)) ? 'cur' : ''}" data-i="${i}"><div class="bq-iname">${esc(name)}${curId && T.id(d) === curId ? ' <span class="pill ok">ผูกอยู่</span>' : autoId && T.id(d) === autoId ? ' <span class="pill">ผูกอัตโนมัติอยู่</span>' : ''}<div class="hint">${meta}</div></div><div class="bq-iprice">${price}</div></div>`;
+      + `<div class="bq-item ${(curId || autoId) && [curId, autoId].includes(T.id(d)) ? 'cur' : ''}" data-i="${i}"><div class="bq-iname">${esc(name)}${curId && T.id(d) === curId ? ' <span class="pill ok">ผูกอยู่</span>' : autoId && T.id(d) === autoId ? ' <span class="pill">ผูกอัตโนมัติอยู่</span>' : pref.has(T.id(d)) ? ' <span class="pill warn">เคยผูกไว้</span>' : ''}<div class="hint">${meta}</div></div><div class="bq-iprice">${price}</div></div>`;
     if (BQ.tab === 'mat') html = items.map((d, i) => row(d, d.name, esc([d.code, d.catName, d.province].filter(Boolean).join(' · ')), d.price !== null ? bqF2(d.price) + ' / ' + esc(d.unit) : '—', i)).join('');
     else if (BQ.tab === 'comp') {
       const G = COMP_GROUPS();
@@ -262,6 +264,7 @@ async function bqPickItem(r, d) {
 function bqSet(r, v) {
   const B = S.boq.bind = S.boq.bind || {}, b = B[r.key] = B[r.key] || {};
   b[BQ.side] = v; b.by = (S.me && S.me.name) || b.by || ''; b.at = new Date().toISOString().slice(0, 10);
+  linkRemember(r.name, BQ.side, v);
   autosave(); bqClose(); renderPR1(); renderSummary(); renderSurvey();
   toast(`ผูก${BQ.side === 'mat' ? 'ค่าวัสดุ' : 'ค่าแรง'} "${r.name}" แล้ว`);
 }
@@ -384,6 +387,7 @@ async function bqPickLine(r, d) {
     await libUse(item, d.x); link = { kind: 'survey', key: item.target, label: d.x.name };
   }
   sc.lines[L.index] = link; if (sc.prices) delete sc.prices[L.index];
+  linkRemember(L.name, 'mat', link);
   autosave(); bqClose(); renderPR1(); renderSummary(); renderSurvey(); toast(`ผูกราคา "${L.name}" แล้ว`);
 }
 
@@ -452,3 +456,133 @@ function pctAct(r, a) {
   }
   bqList();
 }
+
+// ------------------------------------------------------------------ ความจำการผูก + คำแนะนำ (ก้อน 4d ตาม Cost Hub)
+// จำการผูกที่ผู้ใช้เลือกเองตามชื่อรายการ — ที่เก็บเดียวกับ UD Cost Hub (localStorage โดเมนเดียวกัน → ผูกในเว็บหนึ่ง อีกเว็บจำด้วย)
+// {mat: {ชื่อ: {kind:'mat'|'comp'|'survey'|'none', code|key, label}}, lab: {ชื่อ: {kind:'wage'|'none', code, label}}} · survey.key = คีย์รายการในคลังราคาสืบ
+// ใช้เป็นคำแนะนำ + ปักบนสุดในหน้าต่างผูกราคาเท่านั้น ไม่ทับการผูกอัตโนมัติ (Earth 19 พ.ย. 2569)
+const LINK_KEY = 'udCostHub_boqlink_v1';
+const linkNorm = n => BoqImport.norm(n).toLowerCase();
+function linkMem() { try { const m = JSON.parse(localStorage.getItem(LINK_KEY)); return m && typeof m === 'object' ? { mat: m.mat || {}, lab: m.lab || {} } : { mat: {}, lab: {} }; } catch (e) { return { mat: {}, lab: {} }; } }
+function linkRemember(name, side, v) {
+  try {
+    if (!name || !v || !['mat', 'comp', 'survey', 'none', 'wage'].includes(v.kind)) return;
+    let val = { kind: v.kind, label: v.label || '' };
+    if (v.kind === 'survey') { const it = (S.boq.surveys || {})[v.key]; if (!it || !it.lib) return; val.key = it.lib; val.label = it.libName || val.label; }   // จำเป็นคีย์คลัง (ใช้ข้ามโครงการ/ข้ามเว็บ)
+    else if (v.kind !== 'none') val.code = v.code;
+    const m = linkMem(), b = side === 'lab' ? 'lab' : 'mat'; m[b][linkNorm(name)] = val;
+    const ks = Object.keys(m[b]); if (ks.length > 1500) delete m[b][ks[0]];
+    localStorage.setItem(LINK_KEY, JSON.stringify(m));
+  } catch (e) { /* ไม่มี storage */ }
+}
+/** การผูกที่เคยจำไว้ของชื่อนี้ (ตรงกัน หรือคล้าย ≥ 0.72 และตัวเลขในชื่อตรงกัน) */
+function linkFind(name, side) {
+  const mem = linkMem()[side === 'lab' ? 'lab' : 'mat'], k0 = linkNorm(name || ''); if (!k0) return [];
+  if (mem[k0]) return [mem[k0]];
+  return Object.keys(mem).map(k => ({ k, s: BoqImport.similar(name, k) })).filter(o => o.s >= 0.72).sort((a, b) => b.s - a.s).slice(0, 3).map(o => mem[o.k]);
+}
+/** id ของรายการที่เคยผูกไว้ในแท็บนี้ (ปักบนสุด) */
+function linkPrefIds(name, side, tab) {
+  const want = tab === 'wage' ? 'wage' : tab, out = new Set();
+  linkFind(name, side === 'line' ? 'mat' : side).filter(v => v.kind === want).forEach(v => {
+    if (v.kind === 'survey') { out.add('l:' + v.key); Object.values(S.boq.surveys || {}).filter(it => it.lib === v.key).forEach(it => out.add('p:' + it.target)); }
+    else out.add(v.code);
+  });
+  return out;
+}
+function linkExport() {
+  const m = linkMem(), n = Object.keys(m.mat).length + Object.keys(m.lab).length;
+  if (!n) return toast('ยังไม่มีความจำการผูก — เมื่อผูกวัสดุ/ค่าแรงเอง ระบบจะจำไว้ให้');
+  const d = new Date();
+  download(`UD-ความจำการผูกBOQ_${d.getFullYear() + 543}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.json`, JSON.stringify({ format: 'ud-costhub-boqlink', version: 1, exportedAt: d.toISOString(), mat: m.mat, lab: m.lab }));
+  toast(`ส่งออกความจำการผูก ${n} รายการ`);
+}
+/** รวมความจำการผูกจากไฟล์ (รูปแบบเดียวกับ Cost Hub) — ตรวจชนิด/ตัดความยาว ไม่เชื่อไฟล์ */
+function linkImport(d) {
+  if (!d || d.format !== 'ud-costhub-boqlink') throw new Error('ไม่ใช่ไฟล์ความจำการผูก BOQ');
+  const str = v => typeof v === 'string' ? v.slice(0, 300) : '';
+  const clean = (o, kinds) => { const out = {}; Object.keys(o && typeof o === 'object' ? o : {}).slice(0, 5000).forEach(k => {
+    const v = o[k]; if (!v || typeof v !== 'object' || !kinds.includes(v.kind)) return;
+    const c = { kind: v.kind }; if (v.kind === 'survey') c.key = str(v.key); else if (v.kind !== 'none') c.code = str(v.code);
+    if (v.kind !== 'none' && !(c.key || c.code)) return; c.label = str(v.label); out[str(k).toLowerCase()] = c; }); return out; };
+  const add = { mat: clean(d.mat, ['mat', 'comp', 'survey', 'none']), lab: clean(d.lab, ['wage', 'none']) };
+  const nA = Object.keys(add.mat).length + Object.keys(add.lab).length; if (!nA) throw new Error('ไม่พบรายการที่ใช้ได้ในไฟล์');
+  const cur = linkMem(), added = Object.keys(add.mat).filter(k => !cur.mat[k]).length + Object.keys(add.lab).filter(k => !cur.lab[k]).length;
+  localStorage.setItem(LINK_KEY, JSON.stringify({ mat: Object.assign({}, cur.mat, add.mat), lab: Object.assign({}, cur.lab, add.lab) }));
+  return { nA, added };
+}
+
+/** คำแนะนำของแถวที่ยังไม่มีราคาฝั่งนั้นและยังไม่ได้ผูกเอง: ความจำการผูก → พจนานุกรมงานทั่วไป (boqsuggest) */
+function sugResolve(r) {
+  if (!S.db || !r || !String(r.name || '').trim()) return null;
+  const b = (S.boq.bind || {})[r.key] || {}, ref = r.ref || {};
+  const needMat = !b.mat && r.mat_unit === null && !r.lab_only && ref.kind !== 'pct' && !(ref.kind === 'comp');
+  const needLab = !b.lab && r.lab_unit === null && !ref.lab_none && !ref.no_lab && ref.kind !== 'pct';
+  if (!needMat && !needLab) return null;
+  const out = { why: '' };
+  const okMem = v => {
+    if (v.kind === 'none') return { kind: 'none', label: 'ไม่มี (รวมในค่าอื่นแล้ว)' };
+    if (v.kind === 'mat') { const d = S.db.material(v.code); return d && d.price !== null ? { kind: 'mat', code: d.code, label: `พาณิชย์ ${d.code} ${d.name}` } : null; }
+    if (v.kind === 'comp') { const c = S.db.findComp(v.code); return c ? { kind: 'comp', code: c.sub, label: `วัสดุมวลรวม ${c.sub} ${c.name}` } : null; }
+    if (v.kind === 'survey') { const x = (BQ.lib || []).find(y => y.key === v.key); return x && Survey.summary(x).price !== null ? { kind: 'survey', libx: x, label: 'ราคาสืบ ' + x.name } : null; }
+    if (v.kind === 'wage') { const w = S.db.wage(v.code); return w && w.price !== null ? { kind: 'wage', code: w.code, label: `ว480 ${w.code} ${bqWn(w)}` } : null; }
+    return null;
+  };
+  const fromMem = side => { for (const v of linkFind(r.name, side)) { const x = okMem(v); if (x) return x; } return null; };
+  if (needMat) { const x = fromMem('mat'); if (x) { out.mat = x; out.why = 'เคยผูกชื่อนี้ไว้'; } }
+  if (needLab) { const x = fromMem('lab'); if (x && x.kind !== 'mat') { out.lab = x; out.why = 'เคยผูกชื่อนี้ไว้'; } }
+  if ((needMat && !out.mat) || (needLab && !out.lab)) {
+    const sg = window.BoqSuggest && BoqSuggest.suggest({ name: r.name, unit: r.unit, qty: r.qty });
+    if (sg) {
+      const pick = a => a.find(d => /อุดร/.test(d.province || '')) || a[0];
+      if (needMat && !out.mat) {
+        if (sg.mat && sg.mat.kind === 'mat') {
+          let c = null;
+          if (sg.mat.codes) { for (const code of sg.mat.codes) { const d = S.db.material(code); if (d && d.price !== null) { c = d; break; } } }
+          else if (sg.mat.re) { try { const re = new RegExp(sg.mat.re); const a = S.db.materials.filter(d => d.price !== null && re.test(d.name || '')); if (a.length) c = pick(a); } catch (e) { /* */ } }
+          if (c) out.mat = { kind: 'mat', code: c.code, label: `พาณิชย์ ${c.code} ${c.name}` };
+        } else if (sg.mat && sg.mat.kind === 'comp') { const c = S.db.findComp(sg.mat.code); if (c) out.mat = { kind: 'comp', code: c.sub, label: `วัสดุมวลรวม ${c.sub} ${c.name}` }; }
+        else if (sg.lab_none_mat) out.mat = { kind: 'none', label: 'ไม่มี (รวมในค่าอื่นแล้ว)' };
+      }
+      if (needLab && !out.lab) {
+        if (sg.lab && sg.lab.kind === 'none') out.lab = { kind: 'none', label: 'ไม่มี (รวมในค่าอื่นแล้ว)' };
+        else if (sg.lab && sg.lab.kind === 'wage') { const w = S.db.wage(sg.lab.code); if (w && w.price !== null) out.lab = { kind: 'wage', code: w.code, label: `ว480 ${w.code} ${bqWn(w)}` }; }
+      }
+      if (out.mat || out.lab) out.why = out.why || sg.why || 'พจนานุกรมงานทั่วไป';
+      if (sg.matNote) out.note = sg.matNote;
+    }
+  }
+  return out.mat || out.lab ? out : null;
+}
+function sugHtml(r) {
+  const s = sugResolve(r); if (!s) return '';
+  const bits = [];
+  if (s.mat) bits.push(`วัสดุ: ${esc(s.mat.label)} <a class="pk-link" data-sug="mat">ใช้</a>`);
+  if (s.lab) bits.push(`ค่าแรง: ${esc(s.lab.label)} <a class="pk-link" data-sug="lab">ใช้</a>`);
+  return `<div class="sug no-print">แนะนำ (${esc(s.why)}): ${bits.join(' · ')}${s.note ? `<div class="hint">${esc(s.note)}</div>` : ''}</div>`;
+}
+async function sugApply(r, which) {
+  const s = sugResolve(r); if (!s) return 0; let n = 0;
+  for (const side of ['mat', 'lab']) {
+    if ((which !== side && which !== 'all') || !s[side]) continue;
+    let v = s[side];
+    if (v.kind === 'survey') { const item = svItem({ target: 'row:' + r.key, name: r.name, unit: r.unit, ref: refOfRow(r) }); await libUse(item, v.libx); v = { kind: 'survey', key: item.target, label: v.label }; }
+    else v = Object.assign({}, v);
+    bindSide(r.key, side, v); linkRemember(r.name, side, v); n++;
+  }
+  return n;
+}
+function sugRows() { return (S.priced || []).filter(r => sugResolve(r)); }
+async function sugApplyAll() {
+  const list = sugRows(); if (!list.length) return toast('ไม่มีคำแนะนำที่ใช้ได้');
+  if (!confirm(`ใช้คำแนะนำกับ ${list.length} รายการ (เฉพาะช่องที่ยังไม่มีราคาและยังไม่ได้ผูกเอง)?\nควรตรวจแต่ละแถวอีกครั้ง — ยกเลิกทีละแถวได้ด้วยปุ่ม ↺`)) return;
+  let n = 0; for (const r of list) n += await sugApply(r, 'all');
+  renderPR1(); renderSummary(); renderSurvey(); toast(`ใช้คำแนะนำแล้ว ${n} ช่อง`);
+}
+function sugBindEvents(tb) {
+  tb.querySelectorAll('.sug [data-sug]').forEach(a => a.onclick = async e => {
+    e.stopPropagation(); const key = a.closest('tr').dataset.key, r = S.priced.find(x => x.key === key); if (!r) return;
+    if (await sugApply(r, a.dataset.sug)) { renderPR1(); renderSummary(); renderSurvey(); toast('ใช้คำแนะนำแล้ว — ยกเลิกได้ด้วยปุ่ม ↺'); }
+  });
+}
+function linkLibWarm() { if (!BQ.lib && !BQ.libLoading && window.Survey) { BQ.libLoading = true; Survey.libAll().then(a => { BQ.lib = a || []; BQ.libLoading = false; if (Object.keys(linkMem().mat).length) renderPR1(); }).catch(() => { BQ.lib = []; BQ.libLoading = false; }); } }

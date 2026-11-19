@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path');
 const ch = process.argv[2];
 if (!ch) { console.log('ใช้: node tools/check_shared.js <โฟลเดอร์ UDmaterial-price>'); process.exit(2); }
-const SHARED = ['boqcalc', 'factorf', 'formxlsx', 'survey', 'auth'];
+const SHARED = ['boqcalc', 'factorf', 'formxlsx', 'survey', 'auth', 'boqsuggest', 'boqimport'];   // boqimport: ใช้เฉพาะ norm/similar (จำการผูกตามชื่อ ร่วมกับ Cost Hub)
 let bad = 0;
 for (const n of SHARED) {
   const a = fs.readFileSync(path.join(__dirname, '..', 'lib', n + '.js')), b = fs.readFileSync(path.join(ch, 'lib', n + '-v1.js'));
