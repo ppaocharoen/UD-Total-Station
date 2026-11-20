@@ -55,7 +55,7 @@
   }
   function onState(s) { const was = st.user && st.user.uid; st = s; if (s.user && s.user.uid !== was) { rows = null; render(); reload(); } else { if (!s.user) rows = null; render(); } }
   const hook = () => { if (window.UDAuth) UDAuth.on(onState); };
-  window.acctFail = () => { fail = true; render(); };
+  window.acctFail = () => { fail = true; window.acctFailed = true; render(); if (typeof svMode === 'function') svMode(); };
   window.acctRender = render;
   if (window.UDAuth) hook(); else window.addEventListener('udauth-loaded', hook);
   document.addEventListener('DOMContentLoaded', render); render();

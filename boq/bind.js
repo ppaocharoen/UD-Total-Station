@@ -79,10 +79,10 @@ const bqF2 = n => (n === null || n === undefined || n === '') ? '—' : (+n).toL
 // ------------------------------------------------------------------ แหล่งราคา
 const COMP_GROUPS = () => (window.UDPrice && UDPrice.CONFIG && UDPrice.CONFIG.COMP_GROUPS) || {};
 function bqSurveyPool(r) {   // ราคาสืบในโครงการ (มีราคาแล้ว) + คลังราคาสืบ
-  const prj = Object.values(S.boq.surveys || {}).filter(it => Survey.summary(it).price !== null)
+  const prj = Object.values(S.boq.surveys || {}).filter(it => svCatOf(it) === 'mat' && Survey.summary(it).price !== null)   // ค่าวัสดุผูกได้เฉพาะชนิดวัสดุ (ครุภัณฑ์/ค่าใช้จ่ายพิเศษอยู่ ปร.2/ปร.3)
     .map(it => ({ src: 'prj', id: 'p:' + it.target, it, name: it.name, unit: it.unit, s: Survey.summary(it) }));
   const linked = new Set(prj.map(x => x.it.lib).filter(Boolean));
-  const lib = (BQ.lib || []).filter(x => !linked.has(x.key) && Survey.summary(x).price !== null)
+  const lib = (BQ.lib || []).filter(x => libCat(x) === 'mat' && !linked.has(x.key) && Survey.summary(x).price !== null)
     .map(x => ({ src: 'lib', id: 'l:' + x.key, x, name: x.name, unit: x.unit, s: Survey.summary(x) }));
   return prj.concat(lib);
 }

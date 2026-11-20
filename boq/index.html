@@ -122,8 +122,14 @@
         <label class="btn small">นำเข้าคลัง<input type="file" id="sv-libi" accept=".json" hidden></label>
       </div>
     </div>
+    <div class="sv-addbox" id="sv-addbox" hidden>
+      <label>ชื่อรายการ / สเปก<input id="sv-an" autocomplete="off" placeholder="เช่น โครงทีบาร์ ตัวเมน 24x32 มม. ยาว 3.60 ม."></label>
+      <label>หน่วย (ตามใน ปร.)<input id="sv-au" autocomplete="off" placeholder="เช่น เส้น"></label>
+      <label>ชนิด<select id="sv-ac"><option value="mat">วัสดุ</option><option value="eq">ครุภัณฑ์</option><option value="sp">ค่าใช้จ่ายพิเศษ</option></select></label>
+      <button class="btn small primary" id="sv-aok">เพิ่ม</button>
+    </div>
     <div class="hint" id="sv-stat"></div>
-    <div class="hint" id="sv-libst"></div>
+    <div class="sv-libst" id="sv-libst"></div>
   </div>
   <div id="sv-list"></div>
   <div id="sv-printout" class="sv-printout"></div>

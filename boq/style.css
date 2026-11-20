@@ -661,3 +661,11 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 .cmp input.price.sm{width:64px}
 .bq-pad.pct select{max-width:420px}.pct-rows{max-height:34vh;overflow:auto;border:1px solid var(--border)}.pct-rows .bq-item{align-items:center;gap:8px}
 .sug{font-size:12px;color:var(--cyan,#40c4ff);margin-top:3px}.sug .pk-link{margin:0 2px}
+
+/* ราคาสืบ: แถบสถานะคลังกลาง + กล่องเพิ่มรายการ (M2 ก้อน 5b) */
+.sv-libst{margin-top:6px;padding:6px 10px;border:1px solid var(--border2);border-left-width:3px;border-radius:var(--radius-sm);font-size:12px;color:var(--text2);line-height:1.7}
+.sv-libst.ok{border-left-color:var(--green)}.sv-libst.warn{border-left-color:var(--amber)}.sv-libst.err{border-left-color:var(--red)}
+.sv-libst .btn.small{margin:0 0 0 4px}
+.sv-addbox{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin:8px 0;font-size:12px}
+.sv-addbox[hidden]{display:none}.sv-addbox label{display:flex;flex-direction:column;gap:3px}
+@media (max-width:700px){.sv-addbox{grid-template-columns:1fr 1fr}}

@@ -252,7 +252,7 @@ function _renderSurvey() {
   if (!S.model) { box.innerHTML = '<div class="card hint">เปิดโมเดลก่อน</div>'; return; }
   migrateSurvey();
   const tg = surveyTargets(), have = new Set(tg.map(t => t.target));
-  const manual = Object.values(S.boq.surveys).filter(it => !have.has(it.target) && (it.quotes || []).length).map(it => ({ group: 'manual', target: it.target, name: it.name, unit: it.unit, why: it.target.startsWith('manual') ? 'เพิ่มเอง' : 'ไม่ได้ใช้ในงานนี้แล้ว (เก็บไว้เป็นหลักฐาน)' }));
+  const manual = Object.values(S.boq.surveys).filter(it => !have.has(it.target) && ((it.quotes || []).length || String(it.target).startsWith('manual'))).map(it => ({ group: 'manual', target: it.target, name: it.name, unit: it.unit, why: it.target.startsWith('manual') ? 'เพิ่มเอง' : 'ไม่ได้ใช้ในงานนี้แล้ว (เก็บไว้เป็นหลักฐาน)' }));   // รายการที่เพิ่มเองแสดงแม้ยังไม่มีเจ้า
   const all = tg.concat(manual).map(t => ({ t, it: S.boq.surveys[t.target], s: t.skip ? { status: 'skip', n: 0, price: null } : S.boq.surveys[t.target] ? Survey.summary(S.boq.surveys[t.target]) : { status: 'none', n: 0, price: null } }));
   const f = S.svf || 'todo';
   const rel = all.filter(x => x.t.group !== 'sub' || x.t.inProject || (x.it && (x.it.quotes || []).length));   // นับเฉพาะที่ใช้ในโครงการนี้
@@ -277,13 +277,19 @@ function _renderSurvey() {
   const tmap = {}; all.forEach(x => { tmap[x.t.target] = x.t; }); libBadges(box, tmap);
   if (S.svOpen) { const c = box.querySelector(`[data-svi="${CSS.escape(S.svOpen)}"]`); if (c) c.classList.add('open'); }
 }
+/* ชนิดรายการสืบ (ตรง Cost Hub): mat=วัสดุ · eq=ครุภัณฑ์ · sp=ค่าใช้จ่ายพิเศษ — ขึ้นคลังกลางเป็นฟิลด์ cat
+ * แถว ปร.2 → ครุภัณฑ์ · ปร.3 → ค่าใช้จ่ายพิเศษ · แถว ปร.1/วัสดุย่อย → วัสดุ · รายการที่เพิ่มเองเลือกได้ */
+const SV_CATS = { mat: 'วัสดุ', eq: 'ครุภัณฑ์', sp: 'ค่าใช้จ่ายพิเศษ' };
+const svCatOf = it => { const t = String((it && it.target) || ''); if (t.startsWith('pr2:')) return 'eq'; if (t.startsWith('pr3:')) return 'sp'; return t.startsWith('manual') && SV_CATS[it.cat] ? it.cat : 'mat'; };
+const libCat = x => SV_CATS[x && x.cat] ? x.cat : 'mat';
+const libOfCat = (all, cat) => (all || []).filter(x => libCat(x) === cat);
 const SVST = { ok: ['ครบ 3 เจ้า', 'ok'], few: ['ไม่ครบ 3 เจ้า', 'warn'], none: ['ยังไม่สืบ', 'err'], skip: ['ไม่คิดราคา', ''] };
 function svCard({ t, it, s }) {
   const open = S.svOpen === t.target;
   let h = `<div class="card sv-card ${open ? 'open' : ''}" data-svi="${esc(t.target)}">
     <div class="sv-head" data-svtoggle="1"><div><b>${esc(t.name)}</b> <span class="hint">[${esc(t.unit)}]</span>${t.qty ? ` <span class="hint">· ใช้ ${fmt(t.qty)} ${esc(t.unit)}</span>` : ''}
       <div class="hint">${esc(t.why || '')}</div></div>
-      <div class="sv-sum">${t.group === 'sub' && (s.status === 'none' || s.status === 'skip') ? `<button class="btn small" data-subskip="${esc(t.target)}" title="ไม่ใส่ราคาวัสดุย่อยนี้ — วัสดุมวลรวมคิดราคาจากวัสดุที่เหลือ">${s.status === 'skip' ? 'กลับมาคิดราคา' : 'ไม่คิดราคา'}</button> ` : ''}${t.group === 'pr1' && s.status === 'none' ? `<button class="btn small" data-nomat="${esc(t.key)}" title="งานที่มีแต่ค่าแรง เช่น รื้อถอน ขุดดิน">ไม่มีค่าวัสดุ</button> ` : ''}${it && it.lib ? `<span class="pill" title="ผูกกับรายการในคลัง: ${esc(it.libName || '')}">คลัง</span>` : ''}<span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
+      <div class="sv-sum">${t.group === 'sub' && (s.status === 'none' || s.status === 'skip') ? `<button class="btn small" data-subskip="${esc(t.target)}" title="ไม่ใส่ราคาวัสดุย่อยนี้ — วัสดุมวลรวมคิดราคาจากวัสดุที่เหลือ">${s.status === 'skip' ? 'กลับมาคิดราคา' : 'ไม่คิดราคา'}</button> ` : ''}${t.group === 'pr1' && s.status === 'none' ? `<button class="btn small" data-nomat="${esc(t.key)}" title="งานที่มีแต่ค่าแรง เช่น รื้อถอน ขุดดิน">ไม่มีค่าวัสดุ</button> ` : ''}${svCatOf(it || t) !== 'mat' ? `<span class="pill">${SV_CATS[svCatOf(it || t)]}</span>` : ''}${it && it.lib ? `<span class="pill" title="ผูกกับรายการในคลัง: ${esc(it.libName || '')}">คลัง</span>` : ''}<span class="pill ${SVST[s.status][1]}">${SVST[s.status][0]}${s.n ? ' · ' + s.n : ''}</span>${s.price !== null ? `<b>${fmt(s.price)}</b><small>บ./${esc(t.unit)}</small>` : ''}</div></div>`;
   if (open) h += svEditor(t, it || svItem(t));
   return h + '</div>';
 }
@@ -312,6 +318,7 @@ function svEditor(t, it) {
         <label class="btn small">+ แนบภาพ (แคปจอ/ใบเสนอราคา)<input type="file" accept="image/*" multiple data-qimg="1" hidden></label></div>
     </div>`;
   });
+  if (String(it.target).startsWith('manual')) h += `<label class="sv-reason">ชนิดรายการ<select data-svcat="1">${Object.entries(SV_CATS).map(([k, v]) => `<option value="${k}" ${svCatOf(it) === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>`;
   h += `<div class="btn-row"><button class="btn small primary" data-qadd="1">+ เพิ่มเจ้า</button><span class="hint" data-libhint="1"></span></div>`;
   if (s.status !== 'ok') h += `<label class="sv-reason">เหตุผลที่สืบได้ไม่ครบ 3 เจ้า<input data-reason="1" value="${esc(it.reason || '')}" placeholder="เช่น มีจำหน่ายในพื้นที่เพียง 2 ร้าน"></label>`;
   return h + '</div>';
@@ -323,16 +330,16 @@ function svSave(it) {   // บันทึก + สำรองเข้าค�
     if (it.libConv) return;   // ดึงจากคลังแต่หน่วยต่างกัน (แก้ตัวแปลงหน่วยในโครงการ) — ไม่บันทึกกลับคลัง
     // ผูกกับรายการในคลังแล้ว (it.lib) → บันทึกกลับรายการเดิม ไม่สร้างรายการใหม่ตามชื่อแถว BOQ (Earth 19 พ.ย. 2569)
     const key = it.lib || Survey.libKey(it.name, it.unit);
-    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(key, { key, name: it.lib ? (it.libName || it.name) : it.name, unit: it.lib ? (it.libUnit || it.unit) : it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '', ref: it.lib ? (it.libRef || '') : (it.ref || '') })
-      .then(() => { if (Survey.remote()) libStatus('บันทึกเข้าคลังกลางแล้ว'); })
-      .catch(er => { libStatus('บันทึกเข้าคลังกลางไม่ได้: ' + er.message + ' (เก็บในเครื่องไว้ก่อน)', true); });
+    if ((it.quotes || []).some(q => +q.price > 0)) Survey.libPut(key, { key, name: it.lib ? (it.libName || it.name) : it.name, unit: it.lib ? (it.libUnit || it.unit) : it.unit, quotes: it.quotes, reason: it.reason, imgs, updated: it.updated, project: S.boq.project.name || '', ref: it.lib ? (it.libRef || '') : (it.ref || ''), cat: svCatOf(it) })
+      .then(() => { if (S.libMode === 'central') libStatus('บันทึกเข้าคลังกลางแล้ว'); else { S.libPend = (S.libPend || 0) + 1; libStatus('บันทึกในเครื่องนี้แล้ว — ยังไม่ขึ้นคลังกลาง'); } })
+      .catch(er => { svMode(); libStatus('บันทึกเข้าคลังกลางไม่ได้: ' + er.message + ' (เก็บในเครื่องไว้ก่อน)', true); });
   }, 800);
 }
 async function svLibHint(card, it) {   // คลังราคาสืบของรายการนี้: ตรงแน่ / อาจตรงกับ / ค้นเอง
   const el = card.querySelector('[data-libhint]'); if (!el) return;
-  const all = await Survey.libAll(), own = it.lib || Survey.libKey(it.name, it.unit), f = Survey.libFind(all, it);
+  const all = libOfCat(await Survey.libAll(), svCatOf(it)), own = it.lib || Survey.libKey(it.name, it.unit), f = Survey.libFind(all, it);
   const mine = x => x.key === own && (it.quotes || []).length;
-  const linked = it.lib && all.find(x => x.key === it.lib);
+  const linked = it.lib && (await Survey.libAll()).find(x => x.key === it.lib);
   let lk = '';
   if (it.lib) {
     const newer = linked && (linked.updated || '') > (it.updated || '');
@@ -398,7 +405,7 @@ async function libBadges(box, tmap) {
   const lib = await Survey.libAll().catch(() => []); if (!lib.length) return;
   box.querySelectorAll('[data-svi]').forEach(c => {
     const t = tmap[c.dataset.svi], it = S.boq.surveys[c.dataset.svi]; if (!t || (it && (it.quotes || []).length)) return;
-    const f = Survey.libFind(lib, { name: t.name, unit: t.unit, ref: t.ref || (it && it.ref) }), sum = c.querySelector('.sv-sum'); if (!sum || sum.querySelector('.libb')) return;
+    const f = Survey.libFind(libOfCat(lib, svCatOf(it || t)), { name: t.name, unit: t.unit, ref: t.ref || (it && it.ref) }), sum = c.querySelector('.sv-sum'); if (!sum || sum.querySelector('.libb')) return;
     let h = '';
     if (f.hit) { const a = Survey.ageDays(f.hit.updated); h = `<span class="pill ${a > 90 ? 'warn' : 'ok'} libb" title="${esc(f.how)}">มีในคลัง · ${(f.hit.quotes || []).length} เจ้า · ${a} วัน</span>`; }
     else if (f.maybe.length) h = `<span class="pill warn libb" title="${esc(f.maybe[0].x.name)}">อาจมีในคลัง</span>`;
@@ -413,18 +420,73 @@ function showImg(d) {
     document.addEventListener('keydown', e => { if (e.key === 'Escape') m.classList.remove('on'); }); }
   m.querySelector('img').src = d; m.classList.add('on');
 }
+/** โหมดคลังกลาง (ตรง Cost Hub): central = เขียนได้ (รหัสทีม หรือบัญชีที่อนุมัติ editor/admin) · pending = รออนุมัติ (อ่านได้ เก็บในเครื่องก่อน)
+ *  public = ไม่ล็อกอิน (เห็นราคาแต่ไม่เห็นร้าน/ติดต่อ/ภาพ) · offline = ติดต่อคลังไม่ได้ · local = ไม่ได้ตั้งคลังกลาง */
+const LIBMODE = {
+  central: ['ok', 'เชื่อมคลังกลางแล้ว — ราคาที่สืบบันทึกเข้าคลังกลางอัตโนมัติ'],
+  pending: ['warn', 'บัญชีนี้รอผู้ดูแลอนุมัติ — ดูคลังกลางได้ แต่ราคาที่สืบเก็บเฉพาะเครื่องนี้ก่อน (อนุมัติแล้วกด "ส่งที่ค้างขึ้นคลังกลาง")'],
+  public: ['warn', 'ดูคลังกลางแบบสาธารณะ — เห็นราคาและจำนวนเจ้า แต่ไม่เห็นชื่อร้าน ช่องทางติดต่อ และภาพ · เข้าสู่ระบบด้วย Google (แถบบัญชี) หรือใส่รหัสทีมเพื่อบันทึกเข้าคลังกลาง'],
+  offline: ['err', 'ติดต่อคลังกลางไม่ได้ — ใช้สำเนาในเครื่องนี้ ราคาที่สืบเก็บในเครื่องก่อน'],
+  local: ['', 'ใช้คลังในเครื่องนี้เท่านั้น (ยังไม่ได้ตั้งคลังกลาง)'],
+  wait: ['', 'กำลังตรวจสิทธิ์คลังกลาง…'],
+};
+let svAuth = { ready: false, user: null };
+async function svMode(force) {
+  const run = (svMode._n = (svMode._n || 0) + 1);
+  let mode = 'local', err = '', who = null;
+  Survey.setAccess({ writable: false });
+  if (Survey.remote()) {
+    if (Survey.cfg().team) {
+      try { const r = await Survey.ping(); mode = r && r.ok ? 'central' : 'offline'; if (!(r && r.ok)) err = (r && r.error) || ''; } catch (e) { mode = 'offline'; err = e.message; }
+    } else if (svAuth.user) {   // ล็อกอินด้วย Google: ตรวจสิทธิ์กับคลังกลาง (ผู้ใช้ชุดเดียวกับ Cost Hub)
+      try {
+        const r = await Survey.whoami();
+        if (r && r.ok && r.user) { who = r.user; mode = r.user.status === 'approved' && ['editor', 'admin'].includes(r.user.role) ? 'central' : 'pending'; }
+        else { mode = 'offline'; err = (r && r.error) || ''; }
+      } catch (e) { mode = 'offline'; err = e.message; }
+    } else mode = svAuth.ready || svAuth.late || window.acctFailed ? 'public' : 'wait';
+  }
+  if (run !== svMode._n) return;   // มีการตรวจรอบใหม่กว่าแล้ว
+  S.libMode = mode; S.libErr = err; S.libWho = who; Survey.setAccess({ writable: mode === 'central' });
+  S.libPend = mode === 'central' || mode === 'pending' ? (await svPendingList(force)).length : 0;
+  if (run !== svMode._n) return;
+  if (typeof BQ !== 'undefined') BQ.lib = null; libStatus(); renderSurvey();
+}
+/** รายการในเครื่องที่ยังไม่ขึ้นคลังกลาง: มีราคา และ (ไม่มีในคลังกลาง หรือในเครื่องใหม่กว่า) — ไม่นับรายการที่ถูกลบจากคลังกลางหลังสืบ */
+async function svPendingList(force) {
+  if (!Survey.remote()) return [];
+  let cen; try { cen = await Survey.libAll(force); } catch (e) { return []; }
+  const by = {}; (cen || []).forEach(x => { by[x.key] = x; });
+  const gone = {}; Survey.libDeleted().forEach(d => { if (d && d.key && (d.at || '') > (gone[d.key] || '')) gone[d.key] = d.at || ''; });
+  return ((await Survey.localAll()) || []).filter(x => x && x.key && (x.quotes || []).some(q => +q.price > 0)
+    && (by[x.key] ? (x.updated || '') > (by[x.key].updated || '') : !(gone[x.key] !== undefined && (x.updated || '') <= gone[x.key])));
+}
+async function svPushPending() {
+  const list = await svPendingList(true); if (!list.length) { toast('ไม่มีรายการค้าง'); return svMode(); }
+  let ok = 0, bad = 0, last = '';
+  libStatus(`กำลังส่ง ${list.length} รายการขึ้นคลังกลาง…`);
+  for (const x of list) { try { await Survey.libPut(x.key, x); ok++; } catch (er) { bad++; last = er.message; } }
+  toast(bad ? `ส่งสำเร็จ ${ok} · ไม่สำเร็จ ${bad} (${last})` : `ส่งขึ้นคลังกลางแล้ว ${ok} รายการ`);
+  await svMode(true);
+}
 function libStatus(msg, err) {
-  const c = Survey.cfg();
-  $('#sv-libst').innerHTML = (c.url ? `คลังราคาสืบ: <b style="color:var(--green)">คลังกลาง (Google Sheet)</b>${c.team ? '' : ' · <span style="color:var(--amber)">ยังไม่ใส่รหัสทีม — กด ตั้งค่าคลังกลาง เพื่อเปิดดู/บันทึก (ตอนนี้ใช้คลังในเครื่อง)</span>'}` : 'คลังราคาสืบ: เก็บในเครื่องนี้ (ยังไม่ได้ตั้งคลังกลาง)')
+  const m = S.libMode || 'wait', [cls, txt] = LIBMODE[m] || LIBMODE.local, w = S.libWho;
+  const n = S.libPend || 0;
+  $('#sv-libst').className = 'sv-libst ' + cls;
+  $('#sv-libst').innerHTML = `<b>คลังราคาสืบ:</b> ${esc(txt)}${m === 'offline' && S.libErr ? ` (${esc(S.libErr)})` : ''}`
+    + (Survey.cfg().team ? ' <span class="pill">ใช้รหัสทีม</span>' : w ? ` <span class="pill">${esc(w.name || w.email || '')}${w.role === 'admin' ? ' · ผู้ดูแลระบบ' : ''}</span>` : '')
+    + (n && (m === 'central' || m === 'pending') ? ` <span style="color:var(--amber)">· ค้างในเครื่องนี้ ${n} รายการ</span>` : '')
+    + (n && m === 'central' ? ` <button class="btn small" data-libact="push">ส่งที่ค้างขึ้นคลังกลาง (${n})</button>` : '')
+    + (m === 'offline' ? ' <button class="btn small" data-libact="retry">ลองเชื่อมใหม่</button>' : '')
     + (msg ? ` · <span style="color:var(${err ? '--red' : '--text3'})">${esc(msg)}</span>` : '');
 }
 function libConfig() {
   const c = Survey.cfg(); let m = $('#lib-modal');
   if (!m) { m = document.createElement('div'); m.id = 'lib-modal'; m.className = 'modal'; document.body.appendChild(m); }
   m.innerHTML = `<div class="modal-box glass"><div class="side-top"><h2 style="margin:0">คลังราคาสืบกลาง</h2><button class="btn small" data-close="1">×</button></div>
-    <p class="hint">ราคาสืบเก็บใน Google Sheet กลาง · ดู/เพิ่ม/แก้ ต้องใช้รหัสทีม · คอมกลางหรือเครื่องคนอื่น อย่าติ๊ก "จำรหัส"</p>
+    <p class="hint">ราคาสืบเก็บใน Google Sheet กลาง (ใช้ร่วมกับ UD Cost Hub) · ปกติ<b>เข้าสู่ระบบด้วย Google</b> ที่แถบบัญชีก็พอ (บัญชีที่ผู้ดูแลอนุมัติเป็น "แก้ไขได้" ขึ้นไป) · รหัสทีมเป็นทางสำรอง — ใส่แล้วจะใช้รหัสทีมแทนบัญชี · คอมกลางหรือเครื่องคนอื่น อย่าติ๊ก "จำรหัส"</p>
     <div class="form-grid"><label>Web app URL (Apps Script)<input id="lib-url" value="${esc(c.url || '')}" placeholder="https://script.google.com/macros/s/.../exec"></label>
-    <label>รหัสทีม<input id="lib-team" type="password" autocomplete="off" value="${esc(c.team || '')}"></label>
+    <label>รหัสทีม (ไม่บังคับ)<input id="lib-team" type="password" autocomplete="off" value="${esc(c.team || '')}"></label>
     <label class="ck"><input type="checkbox" id="lib-remember" ${c.remember ? 'checked' : ''}> จำรหัสบนเครื่องนี้ (ไม่ติ๊ก = ลืมเมื่อปิดแท็บ)</label></div>
     <div class="btn-row"><button class="btn small primary" id="lib-save">บันทึกและทดสอบ</button><button class="btn small" id="lib-off">ลบรหัสจากเครื่องนี้</button><button class="btn small" id="lib-push">ส่งคลังในเครื่องขึ้นคลังกลาง</button></div>
     <div class="hint" id="lib-msg"></div></div>`;
@@ -433,18 +495,21 @@ function libConfig() {
   $('#lib-save').onclick = async () => {
     const n = { url: $('#lib-url').value.trim(), team: $('#lib-team').value, remember: $('#lib-remember').checked };
     if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(n.url)) { $('#lib-msg').textContent = 'URL ต้องเป็น Web app ของ Apps Script (https://script.google.com/macros/s/…/exec)'; return; }
-    try { const r = await Survey.ping(n); if (!r.ok) throw new Error(r.error); Survey.setCfg(n); $('#lib-msg').textContent = 'เชื่อมต่อแล้ว: ' + r.name; libStatus(); }
+    try { const r = await Survey.ping(n); if (!r.ok) throw new Error(r.error); Survey.setCfg(n); $('#lib-msg').textContent = 'เชื่อมต่อแล้ว: ' + r.name; svMode(true); }
     catch (er) { $('#lib-msg').textContent = 'เชื่อมต่อไม่ได้: ' + er.message; }
   };
-  $('#lib-off').onclick = () => { Survey.setCfg({ url: Survey.cfg().url }); libStatus(); m.classList.remove('on'); toast('ลบรหัสทีมออกจากเครื่องนี้แล้ว'); };
+  $('#lib-off').onclick = () => { Survey.setCfg({ url: Survey.cfg().url }); svMode(true); m.classList.remove('on'); toast('ลบรหัสทีมออกจากเครื่องนี้แล้ว'); };
   $('#lib-push').onclick = async () => {
-    const loc = await Survey.localAll(); let ok = 0, bad = 0;
-    for (const x of loc) { try { await Survey.libPut(x.key, x); ok++; } catch (er) { bad++; $('#lib-msg').textContent = er.message; } }
-    $('#lib-msg').textContent = `ส่งขึ้นคลังกลาง ${ok} รายการ${bad ? ` · ไม่สำเร็จ ${bad}` : ''}`;
+    if (S.libMode !== 'central') { $('#lib-msg').textContent = 'ยังส่งขึ้นคลังกลางไม่ได้ — ต้องเข้าสู่ระบบด้วยบัญชีที่อนุมัติแล้ว หรือใส่รหัสทีม'; return; }
+    await svPushPending(); $('#lib-msg').textContent = 'ส่งรายการที่ค้างแล้ว — ดูผลที่แถบคลังราคาสืบ';
   };
 }
 function bindSurvey() {
-  libStatus();
+  libStatus(); svMode();
+  const hook = () => window.UDAuth.on(st => { const was = svAuth.user && svAuth.user.uid, now = st.user && st.user.uid; const first = !svAuth.ready; svAuth = st; if (first || was !== now) svMode(true); });
+  if (window.UDAuth) hook(); else window.addEventListener('udauth-loaded', hook);
+  setTimeout(() => { if (!svAuth.ready) { svAuth.late = true; svMode(); } }, 8000);   // ระบบล็อกอินโหลดไม่ขึ้น → ดูแบบสาธารณะ
+  $('#sv-libst').addEventListener('click', e => { const a = e.target.dataset.libact; if (a === 'push') svPushPending(); else if (a === 'retry') svMode(true); });
   $('#sv-libcfg').onclick = libConfig;
   $('#sv-list').addEventListener('click', e => {
     const card = e.target.closest('[data-svi]'); if (!card) return;
@@ -463,6 +528,7 @@ function bindSurvey() {
     const card = e.target.closest('[data-svi]'); if (!card) return;
     const it = S.boq.surveys[card.dataset.svi]; if (!it) return;
     if (e.target.dataset.reason) { it.reason = e.target.value; svSave(it); return; }
+    if (e.target.dataset.svcat) { it.cat = e.target.value; svSave(it); renderSurvey(); return; }
     const qel = e.target.closest('[data-q]'), q = qel && it.quotes.find(x => x.id === qel.dataset.q); if (!q) return;
     if (e.target.dataset.qimg) {
       for (const f of e.target.files) { const d = await Survey.compress(f), id = Survey.uid('img'); S.img[id] = d; Survey.imgPut(id, d); q.imgs.push(id); }
@@ -473,9 +539,12 @@ function bindSurvey() {
     svSave(it); renderSurvey(); renderPR1(); renderSummary();
   });
   $$('#sv-filter [data-svf]').forEach(c => c.onclick = () => { S.svf = c.dataset.svf; renderSurvey(); });
-  $('#sv-add').onclick = () => {
-    const name = prompt('ชื่อวัสดุ'); if (!name) return; const unit = prompt('หน่วย (ตามใน ปร.)', 'ชุด') || '';
-    const id = Survey.uid('manual:'); S.boq.surveys[id] = { id, name, unit, target: id, quotes: [], reason: '' }; S.svOpen = id; S.svf = 'all'; svSave(S.boq.surveys[id]); renderSurvey();
+  $('#sv-add').onclick = () => { const b = $('#sv-addbox'); b.hidden = !b.hidden; if (!b.hidden) $('#sv-an').focus(); };
+  $('#sv-aok').onclick = () => {
+    const name = $('#sv-an').value.trim(), unit = $('#sv-au').value.trim(), cat = $('#sv-ac').value;
+    if (!name || !unit) { toast('ใส่ชื่อและหน่วยก่อน'); return; }
+    const id = Survey.uid('manual:'); S.boq.surveys[id] = { id, name, unit, target: id, quotes: [], reason: '', cat }; S.svOpen = id; S.svf = 'all'; svSave(S.boq.surveys[id]); renderSurvey();
+    $('#sv-an').value = ''; $('#sv-au').value = ''; $('#sv-ac').value = 'mat'; $('#sv-addbox').hidden = true;
   };
   $('#sv-print').onclick = () => { svPrintout(); document.body.classList.add('print-survey'); setTimeout(() => { window.print(); document.body.classList.remove('print-survey'); }, 300); };
   $('#sv-libx').onclick = async () => { const all = await Survey.libAll(); download('คลังราคาสืบ-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({ format: 'ud-survey-lib', items: all })); toast(`ส่งออกคลัง ${all.length} รายการ`); };
