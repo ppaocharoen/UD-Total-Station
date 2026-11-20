@@ -669,3 +669,17 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 .sv-addbox{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin:8px 0;font-size:12px}
 .sv-addbox[hidden]{display:none}.sv-addbox label{display:flex;flex-direction:column;gap:3px}
 @media (max-width:700px){.sv-addbox{grid-template-columns:1fr 1fr}}
+
+/* หน้ารายการคลังราคาสืบ (M2 ก้อน 5c) */
+#lv-modal .lv-box{max-width:1100px;max-height:88vh}
+.lv-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0}
+.lv-tools #lv-q{flex:1 1 260px;min-width:200px}
+.lv-tbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+.lv-tbl th,.lv-tbl td{padding:5px 7px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top}
+.lv-tbl th{color:var(--text3);font-weight:500;position:sticky;top:0;background:var(--solid,var(--bg))}
+.lv-tbl .r{text-align:right;white-space:nowrap}
+.lv-row{cursor:pointer}.lv-row:hover td,.lv-row.open td{background:rgba(127,127,127,.08)}
+.lv-det td{background:rgba(127,127,127,.04)}
+.lv-q{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 6px}
+.lv-q th,.lv-q td{padding:3px 6px;border-bottom:1px dashed var(--border);text-align:left}.lv-q .r{text-align:right}
+.btn.small.lv-del{color:var(--red);border-color:var(--red)}

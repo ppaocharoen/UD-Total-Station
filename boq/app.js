@@ -509,6 +509,7 @@ function bindSurvey() {
   const hook = () => window.UDAuth.on(st => { const was = svAuth.user && svAuth.user.uid, now = st.user && st.user.uid; const first = !svAuth.ready; svAuth = st; if (first || was !== now) svMode(true); });
   if (window.UDAuth) hook(); else window.addEventListener('udauth-loaded', hook);
   setTimeout(() => { if (!svAuth.ready) { svAuth.late = true; svMode(); } }, 8000);   // ระบบล็อกอินโหลดไม่ขึ้น → ดูแบบสาธารณะ
+  $('#sv-libview').onclick = () => svLibOpen();
   $('#sv-libst').addEventListener('click', e => { const a = e.target.dataset.libact; if (a === 'push') svPushPending(); else if (a === 'retry') svMode(true); });
   $('#sv-libcfg').onclick = libConfig;
   $('#sv-list').addEventListener('click', e => {
