@@ -835,17 +835,48 @@ function formData() {
   const repair = isRepair();
   return { mode: p.mode || 'estimate', vat: repair ? T.vat : undefined, roundTo: roundTo(), project: p, people: people(), sections,
     factor: { F: T.ff.F, advance: +fc.advance || 0, retention: +fc.retention || 0, loanShare: (+fc.loanPct || 0) / 100, table: FactorF.TABLES[`adv${+fc.advance || 0}_ret${+fc.retention || 0}`] || [] },
-    pr2: repair ? [] : S.boq.pr2, pr3: repair ? [] : S.boq.pr3, expect: T.grand };
+    pr2: repair ? [] : S.boq.pr2, pr3: repair ? [] : S.boq.pr3, sources: sourcesData(T.pr), expect: T.grand, pr4Text: BoqCalc.bahtText(T.pr4) };
+}
+/** แผ่น "ที่มาของราคา" (lib/pricesrc.js · ก้อน 7) — ราคาสืบทุกรายการในโครงการ + เลขภาพหลักฐานเดียวกับรายงานภาพ (PDF) */
+function sourcesData(pr) {
+  if (!window.PriceSrc || !S.db) return null;
+  let ev = null; try { ev = svEvidence(svReportItems()); } catch (e) { ev = null; }
+  return PriceSrc.build({ rows: pr, bind: S.boq.bind, cmp: S.boq.cmpline, surveys: S.boq.surveys, db: S.db, U: window.UDPrice,
+    surveyOf: svPriceOf, Survey: window.Survey, svKey, refTxt: ev ? ev.refTxt : null });
+}
+const JSZIP = { src: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', sri: 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG' };
+/** หลัง FormXlsx.build: ทำไฟล์ให้ Excel เปิดได้ไม่ถามกู้คืน + ลายน้ำตราเทศบาล (เหมือน Cost Hub) — ใช้ทั้งปุ่มส่งออกและชุดทดสอบ */
+async function xlsxFinish(wb) {
+  let wm = null;
+  try {
+    if (!window.JSZip) await loadScript(JSZIP.src, JSZIP.sri);
+    if (!window.XlsxWm) await loadScript('../lib/xlsxwm.js?v=' + (window.UD_VERSION ? UD_VERSION.v : ''));
+    wm = new Uint8Array(await (await fetch('watermark.jpg')).arrayBuffer());
+  } catch (e) { console.warn('ไม่ใส่ลายน้ำ', e); wm = null; }
+  wb.eachSheet(ws => { try {
+    const hf = ws.headerFooter || {};
+    if (!wm) ['oddHeader', 'oddFooter', 'evenHeader', 'evenFooter', 'firstHeader', 'firstFooter'].forEach(k => { if (typeof hf[k] === 'string') hf[k] = hf[k].replace(/&G/g, ''); });
+    (ws.rowBreaks || []).forEach(b => { if (b.max > 16383) b.max = 16383; });
+    if (ws.properties) ws.properties.outlineProperties = undefined;   // ExcelJS เขียน outlinePr ผิดลำดับ → Excel ทิ้งแผ่นงาน
+  } catch (e) { /* ข้าม */ } });
+  let out = await wb.xlsx.writeBuffer();
+  if (wm) { try { const w = await XlsxWm.add(window.JSZip, out, wm); if (w.count) out = w; } catch (e) { console.warn('ใส่ลายน้ำไม่สำเร็จ ใช้ไฟล์ไม่มีลายน้ำ', e); } }
+  return out;
 }
 async function exportXlsx() {
   if (!S.model) { toast('เปิดโมเดลก่อน'); return; }
+  const T = totals();
+  if (T.repair ? !(T.cost > 0) : !T.ff.F) { alert('ยังไม่มีค่างานต้นทุน (ปร.1) — ผูกราคาให้รายการก่อน' + (T.repair ? '' : ' จึงจะคิด Factor F') + ' แล้วจึงส่งออก'); return; }
+  const nNo = T.pr.filter(r => r.warns.includes('ยังไม่มีราคา')).length;
+  if (nNo && !confirm(`ยังมี ${nNo} รายการที่ไม่มีราคา (จะออกเป็นช่องว่าง) ส่งออกต่อหรือไม่?`)) return;
   toast('กำลังสร้างไฟล์ Excel…');
   try {
     if (!window.ExcelJS) await loadScript(EXCELJS.src, EXCELJS.sri);
     if (!window.FormXlsx) await loadScript('../lib/formxlsx.js?v=' + (window.UD_VERSION ? UD_VERSION.v : ''));
+    if (!window.PriceSrc) await loadScript('../lib/pricesrc.js?v=' + (window.UD_VERSION ? UD_VERSION.v : ''));
     const buf = await (await fetch('form_template.xlsx', { cache: 'no-cache' })).arrayBuffer();
     const o = await FormXlsx.build(window.ExcelJS, buf, formData());
-    const out = await o.wb.xlsx.writeBuffer();
+    const out = await xlsxFinish(o.wb);
     const nm = (isCentral() ? 'ราคากลาง_' : isRepair() ? 'ประมาณราคาซ่อมแซม_' : 'ประมาณราคา_') + (S.boq.project.name || 'โครงการ').replace(/[\\/:*?"<>|]/g, ' ').slice(0, 60) + '.xlsx';
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
