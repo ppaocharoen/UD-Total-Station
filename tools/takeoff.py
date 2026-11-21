@@ -72,8 +72,11 @@ DEFAULTS = {
     "lintel_extra": 0.30, # ทับหลัง/เสาเอ็นรอบช่องเปิด ยื่นเลยขอบข้างละ (ม.)
     # งานระบบ (หลักเกณฑ์ 2569 ข้อ 4.3–4.4; ช่วงที่เล่มให้ใช้ค่าต่ำตามที่ Earth เลือก) — เผื่อยาว + เบ็ดเตล็ด รวมแบบบวก
     "pipe_waste": 0.10,               # ท่อประปา/ระบายน้ำ 10%
-    "branch_conduit_waste": 0.30,     # ท่อร้อยสายวงจรย่อย 15% + เบ็ดเตล็ด 15%
-    "branch_wire_waste": 0.20,        # สายวงจรย่อย 15% + เบ็ดเตล็ด 5%
+    "branch_conduit_waste": 0.15,     # ท่อร้อยสาย เผื่อยาว 15% (เบ็ดเตล็ด 15% แยกเป็นแถว % ของค่าวัสดุ — Earth 22 พ.ย. 2569)
+    "branch_wire_waste": 0.15,        # สายไฟ เผื่อยาว 15% (เบ็ดเตล็ด 5% แยกเป็นแถว % ของค่าวัสดุ)
+    "misc_conduit_pct": 0.15,         # หลักเกณฑ์ 4.4 งานเบ็ดเตล็ดท่อร้อยสาย (ค่าต่ำสุด) — ไม่มีค่าแรง
+    "misc_wire_pct": 0.05,            # หลักเกณฑ์ 4.4 งานเบ็ดเตล็ดสายไฟ (ค่าต่ำสุด) — ไม่มีค่าแรง
+    "pipe_test": False,               # แถวทดสอบ ทำความสะอาด ทาสีท่อ: ค่าตั้งต้น "ไม่มี" (เปิดในข้อมูลโครงการบนเว็บ — Earth 22 พ.ย. 2569)
     "drain_run_depth": 0.30,          # ท่อระบายน้ำเดินใต้ระดับดิน (ม.) ตอนประมาณแนวท่อ
     "cw_run_depth": 0.20,             # ท่อประปาเดินใต้ระดับดิน (ม.) ตอนประมาณแนวท่อ
 }
@@ -89,6 +92,14 @@ EQUIP_NAME = {"septic_tank": "ถังบำบัดน้ำเสียส�
 FIXTURE_NAME = {"wc": "โถส้วมชักโครก", "lavatory": "อ่างล้างหน้า", "sink": "ซิงค์ล้างจาน", "shower": "ชุดฝักบัว",
                 "floor_drain": "ตะแกรงระบายน้ำพื้น (FD)", "faucet": "ก๊อกน้ำ", "spray": "สายฉีดชำระ",
                 "water_heater": "เครื่องทำน้ำอุ่น", "washer": "จุดเครื่องซักผ้า", "urinal": "โถปัสสาวะชาย"}
+# อุปกรณ์ประกอบสุขภัณฑ์ (Earth 22 พ.ย. 2569): นับตามจำนวนสุขภัณฑ์ · (ชนิด, คีย์, ชื่อ, เงื่อนไข) — เงื่อนไข None = ทุกตัว, "re:<คำ>" = สเปกมีคำนั้น, "wall" = ไม่ใช่ติดเคาน์เตอร์
+FIXTURE_ACC = {
+    "wc": [("gasket", "ประเก็นยางกันกลิ่นโถส้วม", None)],
+    "lavatory": [("supply_hose", "สายน้ำดีอ่างล้างหน้า", None), ("stop_valve", 'สต๊อปวาล์ว 1/2"', None),
+                 ("lav_waste", "ท่อน้ำทิ้งอ่างล้างหน้า", ("wall", r"พร้อม[^,]*ท่อน้ำทิ้ง"))],
+    "spray": [("stop_valve", 'สต๊อปวาล์ว 1/2"', None)],
+    "urinal": [("flush_valve", "ฟลัชวาล์วโถปัสสาวะ", ("any", r"ฟลัชวาล์ว"))],
+}
 # % ของค่าท่อ ตาม ว480 (ตกลงกับ Earth 18 ต.ค. 2569): ข้อต่อ / เหล็กยึด / ทดสอบ-ทำความสะอาด-ทาสีสัญลักษณ์ ค่าแรง 30% ของค่าวัสดุ
 PIPE_PCT = {"SN-3.7": {"name": "PVC ระบายน้ำ", "fit": 0.4, "sup": 0.3, "test": 0.1},
             "SN-3.8": {"name": "PVC ประปา", "fit": 0.5, "sup": 0.3, "test": 0.1},
@@ -216,7 +227,13 @@ def steel_perimeter(sec):
     """เส้นรอบรูปสำหรับทาสี (ม./ม.) จากชื่อหน้าตัด มอก. หรือ dims; เหล็กแผ่นบางนับ 2 ด้าน"""
     import re
     shape, name, d = sec.get("shape"), sec.get("name", ""), sec.get("dims") or {}
-    nums = [float(v) / 1000 for v in re.findall(r"[\d.]+", name.split(" ")[0])]
+    head = name.split(" ")[0]
+    pair = re.match(r"^\s*2\s*C\s*-?", head)   # 2C ประกบคู่ (ปลายชนปลาย เป็นกล่องปิด) → ทาเฉพาะด้านนอก = กล่อง h × 2b (Earth 22 พ.ย. 2569)
+    if pair:
+        head = head[pair.end():]
+    nums = [float(v) / 1000 for v in re.findall(r"[\d.]+", head)]
+    if pair and len(nums) >= 2:
+        return 2 * (nums[0] + 2 * nums[1])
     if shape == "lipped_C" and len(nums) >= 3:
         h, b, lip = nums[0], nums[1], nums[2]
         return 2 * (h + 2 * b + 2 * lip)
@@ -269,7 +286,12 @@ def open_area(t):
 class Takeoff:
     def __init__(self, m, settings=None):
         self.m = m
-        self.s = dict(DEFAULTS, **(settings or {}))
+        st = dict(settings or {})
+        if "misc_conduit_pct" not in st:   # ค่าที่บันทึกก่อน v7.10 รวมเบ็ดเตล็ดไว้ใน % เผื่อ (30% / 20%) → แยกเป็นแถว % แล้ว ใช้เผื่อยาว 15% ไม่ให้คิดซ้ำ
+            for k, old in (("branch_conduit_waste", 0.30), ("branch_wire_waste", 0.20)):
+                if abs(st.get(k, -1) - old) < 1e-9:
+                    st[k] = DEFAULTS[k]
+        self.s = dict(DEFAULTS, **st)
         self.items = OrderedDict()
         self.notes = []          # ข้อสมมติ / คำเตือน
         self.nodes = {n["id"]: n for n in m.get("nodes", [])}
@@ -640,7 +662,7 @@ class Takeoff:
             if s.get("lean"):
                 self.add("1.1.12", "lean_conc_slab", "คอนกรีตหยาบรองใต้พื้น (1:3:5)", "ลบ.ม.", A * s["lean"], s["id"], task=lt,
                          calc=f"พื้นที่ {A:.2f} × หนา {s['lean']:g} = {A*s['lean']:.3f} ลบ.ม.")
-            if s.get("pe_sheet", True):   # แผ่นพลาสติกรองใต้พื้น ไม่คิดเผื่อทับซ้อน (ตกลงกับ Earth 19 ต.ค. 2569)
+            if s.get("pe_sheet"):   # แผ่นพลาสติกรองใต้พื้น เฉพาะเมื่อแบบระบุ (Earth 22 พ.ย. 2569 · เดิมใส่ทุกพื้นบนดิน) ไม่คิดเผื่อทับซ้อน
                 self.add("1.1.4", "pe_sheet", "แผ่นพลาสติกรองใต้พื้น (Polyethylene)", "ตร.ม.", A, s["id"], task=lt,
                          calc=f"พื้นที่ {A:.2f} ตร.ม. (ไม่คิดเผื่อทับซ้อน)")
 
@@ -836,6 +858,8 @@ class Takeoff:
                 if not wd:
                     self.note(f"ผนัง คสล. {w['id']}: ยังไม่มีเหล็กเสริม")
                 continue
+            if w["kind"] == "other":   # แผง/ระแนง/คัน (ไม่ใช่งานก่อ) — ปริมาณอยู่ในแถวงานผิวของชิ้นนั้นแล้ว (Earth 22 พ.ย. 2569)
+                continue
             self.add("1.2.3", f"wall_{w['kind']}", WALL_NAME.get(w["kind"], "ผนัง") + f" หนา {w['t']*100:g} ซม.", "ตร.ม.",
                      net, w["id"], task=w.get("task") or "wall", work=w.get("work"),
                      calc=f"ยาว {L:.2f}{f' − หักเสา {ded:.2f}' if ded else ''} × สูง {H:.2f} = {gross:.2f} ตร.ม." + (f" หักช่องเปิด {opens:.2f} → สุทธิ {net:.2f} ตร.ม." if opens else ""))
@@ -935,6 +959,10 @@ class Takeoff:
             it = self.add(code[f["kind"]], f"fin_{f['kind']}_{f['spec']}", f["spec"], unit, q, f["id"],
                           task="ceiling" if f["kind"] == "ceiling" else "finish")
             it["spec"] = {"t": "finish", "kind": f["kind"], "desc": f["spec"]}
+            if f["kind"] == "ceiling" and unit == "ตร.ม." and "ทาสี" in f["spec"]:   # ฝ้าที่สเปกให้ทาสี → แถวทาสีฝ้า พื้นที่เท่าฝ้า (Earth 22 พ.ย. 2569)
+                it = self.add("1.2.7", "paint_ceiling", "ทาสีน้ำอะคริลิกฝ้าเพดาน", "ตร.ม.", q, f["id"], task="paint",
+                              calc=f"เท่าพื้นที่ฝ้า {q:.2f} ตร.ม.")
+                it["spec"] = {"t": "paint", "ceiling": True}
 
     # ------------------------------------------------------------ งานระบบ (หลักเกณฑ์ 2569 ข้อ 4.3–4.4)
     def _mep(self):
@@ -946,10 +974,12 @@ class Takeoff:
                           p.get("id"), count=True, task="mep_fix")
             it["spec"] = {"t": "point", "kind": t.get("kind"), "desc": t.get("desc", "")}
         for pnl in el.get("panels", []):
-            self.add("1.4", "panel", f"ตู้ไฟฟ้า {pnl.get('ways', '')} ช่อง {pnl.get('main', '')}".strip(), "ชุด", 1, pnl["id"],
-                     count=True, task="mep_fix")
+            nm = pnl.get("desc") or f"ตู้ไฟฟ้า {pnl.get('ways', '')} ช่อง {pnl.get('main', '')}".strip()   # desc = ชนิดตู้ตามแบบ (ไม่มีในแบบ = ถาม Earth)
+            it = self.add("1.4", "panel", nm, "ชุด", 1, pnl["id"], count=True, task="mep_fix")
+            it["spec"] = {"t": "panel", "desc": nm, "ways": pnl.get("ways"), "phase": pnl.get("phase", 1)}
         if el.get("points"):
             self._branch_circuits(el)
+            self._misc_elec()
         pl = ((self.m.get("mep") or {}).get("plumbing")) or {}
         ft = pl.get("fixture_types", {})
         for i, f in enumerate(pl.get("fixtures", [])):
@@ -957,6 +987,16 @@ class Takeoff:
             it = self.add("1.3", f"fx_{f['type']}", FIXTURE_NAME.get(t.get("kind"), f["type"]) + (f" ({t['desc']})" if t.get("desc") else ""), "ชุด", 1,
                           f.get("id"), count=True, task="mep_fix")
             it["spec"] = {"t": "fixture", "kind": t.get("kind"), "desc": t.get("desc", "")}
+            for ak, an, cond in FIXTURE_ACC.get(t.get("kind"), []):
+                if cond:
+                    where, rx = cond
+                    if where == "wall" and t.get("mount") == "counter":
+                        continue
+                    if not re.search(rx, t.get("desc", "")):
+                        continue
+                it = self.add("1.3", f"acc_{ak}", an, "ชุด", 1, f.get("id"), count=True, task="mep_fix",
+                              note="อุปกรณ์ประกอบสุขภัณฑ์ นับตามจำนวนสุขภัณฑ์")
+                it["spec"] = {"t": "fixture_acc", "kind": ak}
         for e in pl.get("equipment", []):
             it = self.add("1.3", f"eq_{e['kind']}", EQUIP_NAME.get(e["kind"], e["kind"]) + (f" {e['size']}" if e.get("size") else ""), "ชุด", 1,
                           e.get("id"), count=True, task="mep_ext")
@@ -1017,7 +1057,15 @@ class Takeoff:
             it["spec"] = {"t": "conduit", "conduit": sc}
             ws, wt, n = svc.get("wire_size"), svc.get("wire_type") or wire_t, svc.get("conductors") or 2
             self._wire(wt, ws, n, Ls, pid, f"สายเมน {n} เส้น × {Ls:g} ม." if not CABLE_RE.search(wt or "") else f"สายเมน {n} แกน × {Ls:g} ม.")
-        if el.get("conduits"):   # แนวท่อร้อยสายที่เก็บไว้ในโมเดล → ใช้ความยาวจริงของแนว ไม่ประมาณใหม่
+        if svc:   # จุดรับไฟเข้าอาคาร: แท่งกราวด์ + แร็ค 1 ชุดต่อจุด (Earth 22 พ.ย. 2569) · แร็ค 2 ช่อง (1 เฟส) / 4 ช่อง (3 เฟส)
+            pid = (el.get("panels") or [{}])[0].get("id")
+            rod = svc.get("ground_rod") or 'แท่งกราวด์ 1/2" ยาว 1.00 ม. พร้อมหัวต่อ'
+            it = self.add("1.4", "ground_rod", rod, "ชุด", 1, pid, count=True, task="mep_fix", note="1 ชุดต่อจุดรับไฟเข้าอาคาร")
+            it["spec"] = {"t": "elec_acc", "kind": "ground_rod"}
+            ways = 4 if svc.get("phase") == 3 else 2
+            it = self.add("1.4", f"rack_{ways}", f"แร็คไฟฟ้า {ways} ช่อง พร้อมลูกถ้วย", "ชุด", 1, pid, count=True, task="mep_fix", note="1 ชุดต่อจุดรับไฟเข้าอาคาร")
+            it["spec"] = {"t": "elec_acc", "kind": "rack", "ways": ways}
+        if el.get("conduits"):   # แนวท่อร้อยสายที่เก็บไว้ในโมเดล → ความยาวจริงของแนว (แถว % เบ็ดเตล็ด เพิ่มใน _mep หลังคิดท่อ/สายครบ) → ใช้ความยาวจริงของแนว ไม่ประมาณใหม่
             for r in el["conduits"]:   # คิดรายเส้น (แหล่งที่มา = id แนวท่อ) — แผนงาน/3D รู้ว่าแนวไหนอยู่งานไหน
                 L = sum(math.dist(r["pts"][i], r["pts"][i + 1]) for i in range(len(r["pts"]) - 1))
                 cid = r.get("circuit"); c = circuits.get(cid)
@@ -1025,10 +1073,11 @@ class Takeoff:
                     self.note(f"ไฟฟ้า: แนวท่อวงจร {cid} ไม่มีวงจร/แผงที่อ้างถึง — ไม่ได้คิด")
                     continue
                 it = self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, r["id"],
-                              waste=self.s["branch_conduit_waste"], task="mep_rough", note="ตามแนวท่อร้อยสายในโมเดล; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
+                              waste=self.s["branch_conduit_waste"], task="mep_rough", note="ตามแนวท่อร้อยสายในโมเดล; เผื่อยาว 15%")
                 it["spec"] = {"t": "conduit", "conduit": conduit}
                 n, size = c.get("conductors") or 2, c.get("wire_size")
-                self._wire(wire_t, size, n, L, r["id"], "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
+                self._wire(wire_t, size, n, L, r["id"], "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15%")
+                self._ground(c, wire_t, L, r["id"])
             if not svc.get("length"):
                 self.note("ไฟฟ้า: ยังไม่ได้ใส่ระยะสายเมน มิเตอร์ → แผง (mep.electrical.service.length)")
             return
@@ -1057,10 +1106,33 @@ class Takeoff:
             size = c.get("wire_size")
             it = self.add("1.4", f"conduit_{conduit}", f"ท่อร้อยสายวงจรย่อย {conduit}", "ม.", L, c["panel"],
                           waste=self.s["branch_conduit_waste"], task="mep_rough",
-                          note="ประมาณจากตำแหน่งจุดในโมเดล เดินระดับฝ้าแบบมุมฉาก; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
+                          note="ประมาณจากตำแหน่งจุดในโมเดล เดินระดับฝ้าแบบมุมฉาก; เผื่อยาว 15%")
             it["spec"] = {"t": "conduit", "conduit": conduit}
-            self._wire(wire_t, size, n, L, c["panel"], "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
+            self._wire(wire_t, size, n, L, c["panel"], "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15%")
+            self._ground(c, wire_t, L, c["panel"])
         self.note("ไฟฟ้า: คิดเฉพาะวงจรย่อย (แผง → จุด) ยังไม่รวมสายเมน/สายป้อน และค่าธรรมเนียมการไฟฟ้า")
+
+    def _ground(self, c, wt, L, src):
+        """สายดินของวงจร (circuit.ground = จำนวนเส้น, ground_size = ขนาด; ไม่ระบุขนาด = ขนาดสายวงจร) — แถวแยก THW สีเขียว (Earth 22 พ.ย. 2569)"""
+        g = c.get("ground") or 0
+        if not g:
+            return
+        size = c.get("ground_size") or c.get("wire_size")
+        wt = wt if not CABLE_RE.search(wt or "") else "IEC 01 (THW)"   # สายหลายแกนไม่มีแกนดินแยก → สายดินแกนเดียว
+        it = self.add("1.4", f"wire_ground_{wt}_{size}", f"สายดิน {wt} {size or ''} ตร.มม. (สีเขียว)".replace("  ", " "), "ม.", L * g, src,
+                      waste=self.s["branch_wire_waste"], task="mep_rough", note="ความยาวท่อ × จำนวนสายดิน; เผื่อยาว 15%")
+        it["spec"] = {"t": "wire", "wire": wt, "size": size, "ground": True}
+
+    def _misc_elec(self):
+        """งานเบ็ดเตล็ดระบบไฟฟ้า (หลักเกณฑ์ 4.4 ค่าต่ำสุด): % ของค่าวัสดุท่อร้อยสาย / สายไฟ ทุกขนาด — ไม่มีค่าแรง (Earth 22 พ.ย. 2569)"""
+        for t, key, label, pc in (("conduit", "misc_conduit", "งานเบ็ดเตล็ดท่อร้อยสายไฟ (Junction Box ข้อต่อ อุปกรณ์ยึด)", self.s["misc_conduit_pct"]),
+                                  ("wire", "misc_wire", "งานเบ็ดเตล็ดสายไฟฟ้า (หางปลา เทปพันสาย ฯลฯ)", self.s["misc_wire_pct"])):
+            keys = [it["key"] for it in self.items.values() if (it.get("spec") or {}).get("t") == t]
+            if not keys or not pc:
+                continue
+            it = self.add("1.4", key, f"{label} (วัสดุ {pc * 100:g}% ของค่า{'ท่อร้อยสาย' if t == 'conduit' else 'สายไฟ'}, ไม่มีค่าแรง)", "งาน", 1, None,
+                          count=True, task="mep_rough", note="หลักเกณฑ์งานอาคาร 2569 ข้อ 4.4 (ใช้ค่าต่ำสุด)")
+            it["pct"] = {"of": keys, "mat": pc, "lab_of_mat": 0.0, "of_label": "ค่าท่อร้อยสาย" if t == "conduit" else "ค่าสายไฟ"}
 
     def _wire(self, wt, size, n, L, src, note):
         """สายไฟ: แกนเดียว = ยาว × จำนวนสาย · สายหลายแกน (VCT/NYY) = 1 เส้น n แกน ยาวเท่าท่อ — เก็บ runs {แหล่ง: {n: ยาว}} ให้เว็บสลับชนิดสายได้"""
@@ -1154,6 +1226,8 @@ class Takeoff:
             pc, cd = PIPE_PCT[grp], PIPE_PCT_CODES[grp]
             for part, label, code in (("fit", "ข้อต่อ ข้องอ อุปกรณ์", cd[0]), ("sup", "เหล็กยึดและรองรับท่อ", cd[1]),
                                       ("test", "ทดสอบ ทำความสะอาด ทาสีทำสัญลักษณ์ท่อ", cd[2])):
+                if part == "test" and not self.s["pipe_test"]:   # งานเล็กปกติไม่คิด — เปิดเป็นตัวเลือกในข้อมูลโครงการ (Earth 22 พ.ย. 2569)
+                    continue
                 it = self.add("1.3", f"{part}_{grp}", f"{label} ท่อ{pc['name']} (วัสดุ {pc[part]*100:g}% ของค่าท่อ, ค่าแรง 30% ของค่าวัสดุ)",
                               "งาน", 1, None, count=True, task="mep_rough", note=f"ว480 {grp}-{code}")
                 it["pct"] = {"of": keys, "mat": pc[part], "lab_of_mat": 0.30, "of_label": "ค่าท่อ"}

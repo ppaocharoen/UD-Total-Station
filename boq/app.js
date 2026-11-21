@@ -137,7 +137,8 @@ function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q =
 function rows() {   // ผูกราคาตอนเปิด (lib/pricemap.js + tools/price_map.json) — ไม่ต้องถอดปริมาณใหม่เมื่อแก้การผูก
   const q0 = (S.model && S.model.quantities && S.model.quantities.items) || [];
   const q1 = typeof matRows === 'function' ? matRows(q0) : q0;   // เปลี่ยนวัสดุงานผิวใน 3D → แยกแถว (ตรง takeoff.py) ก่อนผูกราคา
-  const q = typeof mepRows === 'function' ? mepRows(q1) : q1;    // 6e เปลี่ยนชนิดท่อ/สายทั้งระบบ
+  const q2 = typeof mepRows === 'function' ? mepRows(q1) : q1;   // 6e เปลี่ยนชนิดท่อ/สายทั้งระบบ
+  const q = window.MepSel && S.boq.project.pipe_test === '1' ? MepSel.withPipeTest(q2) : q2;   // ตัวเลือกโครงการ: ค่าทดสอบ ทำความสะอาด ทาสีท่อ (ค่าตั้งต้นไม่มี · Earth 22 พ.ย. 2569)
   return applyQtyOv(PriceMap.bindAll(q, S.pmap)).concat(S.boq.custom_rows || []);
 }
 /** ปริมาณที่ผู้ใช้แก้เอง (S.boq.qty_ov[key] = {qty, orig, by, at, note}) — แทนจำนวนจากตัวถอด · orig = ค่าที่ถอดได้ตอนแก้
@@ -186,7 +187,7 @@ function sigHtml() {   // ส่วนลงนามท้ายแบบฟอ
 }
 function renderProject() {
   normProject();
-  const DEF = { mode: 'estimate', roundTo: '1000', vat: '1' };
+  const DEF = { mode: 'estimate', roundTo: '1000', vat: '1', pipe_test: '0' };
   $$('#proj-form [data-k]').forEach(el => { el.value = S.boq.project[el.dataset.k] ?? (DEF[el.dataset.k] || ''); });
   $('#pf-round').hidden = isCentral(); $('#pf-vat').hidden = !isRepair();
   $('#ff-card').hidden = isRepair(); $('#ff-repair').hidden = !isRepair();
@@ -1877,7 +1878,7 @@ function bind() {
   $$('#proj-form [data-k]').forEach(el => el.onchange = () => {
     S.boq.project[el.dataset.k] = el.type === 'number' ? (+el.value || '') : el.value;
     if (el.dataset.k === 'name') $('#meta-proj').textContent = el.value;
-    if (el.dataset.k === 'mode' || el.dataset.k === 'vat' || el.dataset.k === 'roundTo') { renderAll(); }
+    if (['mode', 'vat', 'roundTo', 'pipe_test'].includes(el.dataset.k)) { renderAll(); }
     autosave(); renderSummary(); renderPR1();
   });
   [['#ff-adv', 'advance'], ['#ff-ret', 'retention'], ['#ff-loan', 'loanPct']].forEach(([s, k]) => $(s).onchange = () => {

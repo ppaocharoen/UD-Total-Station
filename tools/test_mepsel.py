@@ -102,12 +102,19 @@ def main():
         thw = (((model.get("mep") or {}).get("electrical") or {}).get("wire_type")) or "สายไฟ"
         r = node_apply(bv, {"wire": thw})
         ok &= compare(r["items"], base, f"6e สาย VCT (ตามแบบ) → {thw}")
+    # ตัวเลือกโครงการ ค่าทดสอบท่อ (Earth 22 พ.ย. 2569): MepSel.withPipeTest(แถวตั้งต้น) = takeoff.py settings.pipe_test = true
+    if any(re.match(r"^sup_SN-", x["key"]) for x in base):
+        pt = subprocess.run(["node", "-e", "const M=require(process.argv[1]);let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.stringify(M.withPipeTest(JSON.parse(s)))))",
+                             os.path.join(HERE, "..", "lib", "mepsel.js")], input=json.dumps(base), capture_output=True, text=True, encoding="utf-8")
+        want, _, _ = takeoff.run(model, dict(settings or {}, pipe_test=True), pm)
+        ok &= compare(json.loads(pt.stdout), want, "ค่าทดสอบท่อ (ตัวเลือกโครงการ) = takeoff pipe_test")
+        ok &= [x["key"] for x in json.loads(pt.stdout)] == [x["key"] for x in want]
     # แถวสายจากตัวถอดรุ่นเก่า (ไม่มี runs) → ต้องถอดใหม่
     old = [dict(x) for x in base]
     for x in old:
         x.pop("runs", None)
     r = node_apply(old, {"wire": "VCT"})
-    w = [x["key"] for x in base if (x.get("spec") or {}).get("t") == "wire"]
+    w = [x["key"] for x in base if (x.get("spec") or {}).get("t") == "wire" and not x["spec"].get("ground")]   # สายดินคงเป็นแกนเดียว ไม่ต้องถอดใหม่
     g = sorted(r["retake"]) == sorted(w)
     print(("ผ่าน" if g else "ไม่ผ่าน"), "6e ตัวถอดรุ่นเก่า (ไม่มี runs) → บอกให้ถอดปริมาณใหม่ ไม่แปลงเอง", "" if g else r["retake"]); ok &= g
     print("รวม:", "ผ่านทั้งหมด" if ok else "มีไม่ผ่าน")

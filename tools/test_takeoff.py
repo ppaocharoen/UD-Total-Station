@@ -40,9 +40,9 @@ EXPECT = {
     "cover_metal_sheet": 58.93, "steel_C75x45x15x2.3": 253.50,
     "steel_C100x50x20x2.3": 73.08, "ridge_cap": 9.89, "open_W1": 2, "open_D1": 1, "paint_ext": 54.84,
     "demo_ARC-2.9.17-a": 20.00, "paint_rust": 38.53,
-    'conduit_PVC 1/2"': 29.64, "wire_THW_1.5": 26.16, "wire_THW_2.5": 42.84,
+    'conduit_PVC 1/2"': 26.22, "wire_THW_1.5": 25.07, "wire_THW_2.5": 41.06, "misc_conduit": 1, "misc_wire": 1,
     'pipe_soil_PVC ชั้น 8.5_4"': 3.30, 'pipe_waste_PVC ชั้น 8.5_2"': 6.16, 'pipe_cw_PVC ชั้น 13.5_1/2"': 14.63,
-    'pipe_vent_PVC ชั้น 8.5_2"': 3.52, "fit_SN-3.8": 1, "fit_SN-3.7": 1, "sup_SN-3.7": 1, "sup_SN-3.8": 1, "test_SN-3.7": 1, "test_SN-3.8": 1,
+    'pipe_vent_PVC ชั้น 8.5_2"': 3.52, "fit_SN-3.8": 1, "fit_SN-3.7": 1, "sup_SN-3.7": 1, "sup_SN-3.8": 1,
 }
 ok = "backfill" not in by
 print(("PASS" if ok else "FAIL"), "ไม่มีแถวถมคืนแยก (รวมใน 1.3)")
@@ -83,7 +83,7 @@ good = by.get('pipe_cw_PVC ชั้น 13.5_1/2"', {}).get("status") == "assume
 ok &= good
 print(("PASS" if good else "FAIL"), "ท่อที่ประมาณแนวให้ติดป้าย assumed, ท่อที่เขียนไว้เป็น computed")
 good = by["fit_SN-3.7"]["price_ref"]["kind"] == "pct" and set(by["fit_SN-3.7"]["price_ref"]["of"]) == {'pipe_soil_PVC ชั้น 8.5_4"', 'pipe_waste_PVC ชั้น 8.5_2"', 'pipe_vent_PVC ชั้น 8.5_2"'} \
-    and by["fit_SN-3.7"]["price_ref"]["mat"] == 0.4 and by["sup_SN-3.7"]["price_ref"]["mat"] == 0.3 and by["test_SN-3.8"]["price_ref"]["mat"] == 0.1 \
+    and by["fit_SN-3.7"]["price_ref"]["mat"] == 0.4 and by["sup_SN-3.7"]["price_ref"]["mat"] == 0.3 and "test_SN-3.8" not in by \
     and by["fit_SN-3.8"]["price_ref"]["mat"] == 0.5
 # งานระบบส่ง spec ให้เว็บผูกราคา (ราคาผูกใน lib/pricemap.js — ทดสอบ tools/test_pricemap.js)
 good = good and by['pipe_cw_PVC ชั้น 13.5_1/2"'].get("spec") == {"t": "pipe", "sys": "cw", "mat": "PVC ชั้น 13.5", "dia": '1/2"'} \
@@ -190,5 +190,44 @@ good &= abs(k7b["excav_deep_septic"]["qty_net"] - 2.7 * 2.7 * 2.2) < 0.006
 ok &= good
 print(("PASS" if good else "FAIL"), "บ่อถังบำบัด: ขุด ≤2 ม./เกิน 2 ม. ทรายถมรอบถัง เหล็กแยกแถวงานถังบำบัด", {k: round(v["qty_net"], 3) for k, v in k7.items() if k.endswith("_septic")})
 
-print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
-sys.exit(0 if ok else 1)
+
+# ---- ข้อตัดสิน Earth 22 พ.ย. 2569 (v7.10)
+bt = {i["key"]: i for i in run(m, {"pipe_test": True})[0]}
+good = bt["test_SN-3.8"]["price_ref"]["mat"] == 0.1 and bt["test_SN-3.7"]["price_ref"]["lab_of_mat"] == 0.3
+ok &= good; print(("PASS" if good else "FAIL"), "ค่าทดสอบท่อ: ค่าตั้งต้นไม่มี · settings.pipe_test = true จึงออกแถว")
+mc = by["misc_conduit"]["price_ref"]; mw = by["misc_wire"]["price_ref"]
+good = mc["mat"] == 0.15 and mc["lab_of_mat"] == 0 and set(mc["of"]) == {'conduit_PVC 1/2"'} and mw["mat"] == 0.05 and set(mw["of"]) == {"wire_THW_1.5", "wire_THW_2.5"} \
+    and by['conduit_PVC 1/2"']["waste"] == 0.15 and by["wire_THW_2.5"]["waste"] == 0.15
+ok &= good; print(("PASS" if good else "FAIL"), "เบ็ดเตล็ดไฟฟ้า: ท่อ 15% · สาย 5% ของค่าวัสดุ ไม่มีค่าแรง · เผื่อยาว 15%", mc, mw)
+old = {i["key"]: i for i in run(m, {"branch_conduit_waste": 0.30, "branch_wire_waste": 0.20})[0]}
+good = old['conduit_PVC 1/2"']["waste"] == 0.15 and old["wire_THW_1.5"]["waste"] == 0.15
+ok &= good; print(("PASS" if good else "FAIL"), "ค่าเผื่อรุ่นเก่า (30%/20% รวมเบ็ดเตล็ด) ไม่คิดซ้ำกับแถว %")
+from takeoff import steel_perimeter  # noqa: E402
+p2 = steel_perimeter({"shape": "box", "name": "2C-100x50x20x2.3 (ประกบคู่)"}); p1 = steel_perimeter({"shape": "lipped_C", "name": "C-100x50x20x2.3"})
+good = abs(p2 - 0.40) < 1e-9 and abs(p1 - 2 * (0.10 + 0.10 + 0.04)) < 1e-9
+ok &= good; print(("PASS" if good else "FAIL"), "ทาสีกันสนิม: 2C ประกบคู่ = กล่อง h×2b ด้านนอก 0.40 · C เดี่ยว 2 ด้าน", p2, p1)
+m4 = copy.deepcopy(m)
+el = m4["mep"]["electrical"]; c0 = el["circuits"][0]; c0.update(ground=1, ground_size=2.5)
+el.setdefault("service", {}).update(length=5, phase=1)
+el["panels"][0]["desc"] = "ตู้โหลดเซ็นเตอร์ 1 เฟส 4 ช่อง"
+pl4 = m4["mep"]["plumbing"]; ft = pl4["fixture_types"]
+kinds = {k: v.get("kind") for k, v in ft.items()}
+for k, v in ft.items():
+    if v.get("kind") == "urinal": v["desc"] = "โถปัสสาวะ พร้อมฟลัชวาล์ว และท่อน้ำทิ้ง"
+    if v.get("kind") == "lavatory": v["desc"] = "อ่างล้างหน้าแขวนผนัง พร้อมท่อน้ำทิ้ง"; v.pop("mount", None)
+cnt = lambda kind: sum(1 for f in pl4["fixtures"] if kinds.get(f["type"]) == kind)
+m4["finishes"] = (m4.get("finishes") or []) + [{"id": "CL-T", "kind": "ceiling", "spec": "ฝ้ายิปซัมบอร์ด 9 มม. ฉาบเรียบทาสี", "rects": [[0, 0, 2, 3]]}]
+m4["walls"] = m4["walls"] + [{"id": "SL-T", "kind": "other", "t": 0.025, "path": [[0, 0], [1, 0]], "bottom": 0, "top": 1, "status": "from_drawing", "src": "test"}]
+b4 = {i["key"]: i for i in run(m4)[0]}
+good = b4.get("acc_gasket", {}).get("qty", 0) == cnt("wc") and b4.get("acc_supply_hose", {}).get("qty", 0) == cnt("lavatory") \
+    and b4.get("acc_lav_waste", {}).get("qty", 0) == cnt("lavatory") and b4.get("acc_stop_valve", {}).get("qty", 0) == cnt("lavatory") + cnt("spray") \
+    and b4.get("acc_flush_valve", {}).get("qty", 0) == cnt("urinal") and "acc_urinal_waste" not in b4
+ok &= good; print(("PASS" if good else "FAIL"), "อุปกรณ์ประกอบสุขภัณฑ์", {k: v["qty"] for k, v in b4.items() if k.startswith("acc_")}, {k: cnt(k) for k in ("wc", "lavatory", "spray", "urinal")})
+good = b4["paint_ceiling"]["qty"] == 6.0 and b4["ground_rod"]["qty"] == 1 and b4["rack_2"]["qty"] == 1 and b4["panel"]["name"] == "ตู้โหลดเซ็นเตอร์ 1 เฟส 4 ช่อง" \
+    and b4["wire_ground_THW_2.5"]["spec"]["ground"] and "wire_ground_THW_2.5" in b4["misc_wire"]["price_ref"]["of"] and not any("SL-T" in i["from"] for i in b4.values() if i["key"].startswith("wall_"))
+ok &= good; print(("PASS" if good else "FAIL"), "ทาสีฝ้า · แท่งกราวด์+แร็ค · ตู้ตามแบบ · สายดินแยกแถว · ผนัง other ไม่เป็นแถวผนัง")
+m5 = copy.deepcopy(m); m5["slabs"][0]["pe_sheet"] = True
+b5 = {i["key"] for i in run(m5)[0]}
+good = "pe_sheet" not in by and "pe_sheet" in b5
+ok &= good; print(("PASS" if good else "FAIL"), "แผ่นพลาสติกรองพื้น: เฉพาะพื้นที่แบบระบุ pe_sheet")
+print("ทั้งหมดผ่าน" if ok else "มีไม่ผ่าน"); sys.exit(0 if ok else 1)

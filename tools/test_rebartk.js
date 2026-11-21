@@ -73,8 +73,8 @@ async function cmp(label, m) {
   m9.stairs[0].landings = [{ rect: [2.25, 0, 3.45, 2.5], top: 1.6, t: 0.15 }];
   m9.design.stairs['ST2'].landing = [1.2, 1.0, 0.12]; m9.design.stairs['ST1#1'].waist = 0.17;
   await cmp('กำแพงมีระดับ + ชานพัก', m9);
-  const m10 = clone(m9); m10.slabs.filter(s => s.kind !== 'cast').forEach(s => { s.pe_sheet = false; }); m10.stairs[0].material = m10.materials.find(x => x.kind === 'concrete').id;
-  await cmp('ไม่เอาพลาสติก + บันไดระบุคอนกรีต', m10);
+  const m10 = clone(m9); m10.slabs.filter(s => s.kind !== 'cast').forEach(s => { s.pe_sheet = true; }); m10.stairs[0].material = m10.materials.find(x => x.kind === 'concrete').id;
+  await cmp('แบบระบุพลาสติกรองพื้น + บันไดระบุคอนกรีต', m10);
   // ปลอกถี่หัว-โคนเสา · ปลอกคู่ช่วงหัวเสา · เหล็กเสริมรายการย่อย · ตะแกรง Topping พื้นสำเร็จรูป
   const m11 = clone(m10), cols = m11.members.filter(x => x.type === 'column'), bms = m11.members.filter(x => x.type === 'beam');
   m11.design.members[cols[0].id] = { rebar: { main: [4, 16], stirrup: [9, 0.2, 0.1, 0.5] } };
