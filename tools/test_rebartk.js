@@ -36,6 +36,7 @@ async function cmp(label, m) {
 }
 (async () => {
   await cmp('ตัวอย่างเดิม', clone(base));
+  await cmp('ท12 (ไฟล์ตัวอย่างหลัก)', clone(require('../examples/t12/t12.bm.json')));   // M3: เว็บ (rebartk.js) = takeoff.py บนโมเดลจริง
   // ใส่ผลออกแบบหลายแบบ: เสริมพิเศษ ปลอกคู่ ปลอกระยะต่างกัน พื้นตะแกรง/ตะแกรงสำเร็จรูป ฐานรากใหม่
   const m = clone(base), D = m.design.members;
   const beams = m.members.filter(x => x.type === 'beam' || x.type === 'tie_beam');

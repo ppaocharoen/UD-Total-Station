@@ -1871,7 +1871,7 @@ function bind() {
     if (ids.size > Object.keys(svimg).length) toast(`คำเตือน: ภาพหลักฐาน ${ids.size - Object.keys(svimg).length} ภาพยังโหลดไม่เสร็จ — บันทึกอีกครั้ง`);
   };
   $('#b-sample').onclick = async () => {
-    try { const r = await fetch('../examples/sample-building.bm.json'); loadModel(await r.text(), 'sample-building.bm.json'); toast('เปิดอาคารตัวอย่างแล้ว'); }
+    try { const r = await fetch('../examples/t12/t12.bm.json', { cache: 'no-cache' }); if (!r.ok) throw new Error('HTTP ' + r.status); loadModel(await r.text(), 'ห้องน้ำ ท12 (ตัวอย่าง).bm.json'); toast('เปิดไฟล์ตัวอย่าง ห้องน้ำ ท12 แล้ว'); }
     catch (er) { alert('โหลดตัวอย่างไม่ได้: ' + er.message); }
   };
   $$('#proj-form [data-k]').forEach(el => el.onchange = () => {

@@ -7,7 +7,8 @@
 | ไฟล์ | ใช้ทำอะไร |
 |---|---|
 | `schema/bm.schema.json` | schema ของ `.bm.json` v0.1 |
-| `examples/sample-building.bm.json` | อาคาร คสล. 1 ชั้น 2x1 ช่วง หลังคาจั่วเหล็ก (ค่าน้ำหนักเป็นตัวอย่าง) |
+| `examples/t12/t12.bm.json` | **ไฟล์ตัวอย่างหลัก** ห้องน้ำ ท12 (ห้องสุขาสาธารณะชั้นเดียว) อ่านแบบครบ Step 1–5 + ถอดปริมาณ · `t12.golden.json` ค่าอ้างอิงที่ Earth รับรอง (ปริมาณ + ผลตรวจ ไม่รวมราคา) · `t12.golden.md` รายงานให้ตรวจ |
+| `examples/sample-building.bm.json` | อาคาร คสล. 1 ชั้น 2x1 ช่วง หลังคาจั่วเหล็ก (สังเคราะห์) — ใช้กับชุดทดสอบย่อยที่ดัดแปลงโมเดลทีละจุด และทดสอบ SAP (จนกว่า M4 จะทดสอบ SAP ด้วย ท12) |
 | `examples/gen_sample.py` | สคริปต์สร้างไฟล์ตัวอย่าง |
 | `tools/validate.py` | ตัวตรวจไฟล์: schema, การอ้างอิง id, กฎงาน, ระดับความครบ L0–L3, stale |
 | `tools/test_validate.py` | ชุดทดสอบตัวตรวจ |
@@ -21,6 +22,8 @@
 
 ```
 pip install jsonschema
+bash tools/test_all.sh                       # รันชุดทดสอบทั้งหมด (+ --e2e ทดสอบส่งออก Excel ในเบราว์เซอร์)
+python tools/golden.py examples/t12/t12.bm.json   # เทียบ ท12 กับค่าอ้างอิง (--write = เขียนใหม่ ต้องให้ Earth รับรอง)
 python tools/validate.py examples/sample-building.bm.json
 python tools/test_validate.py
 python tools/takeoff.py examples/sample-building.bm.json --write
