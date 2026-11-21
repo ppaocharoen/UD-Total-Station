@@ -1,17 +1,21 @@
 // คลังวัสดุ UD Total Station (Firestore คอลเลกชัน materials) — วางเพิ่มในกฎ Firestore ของโปรเจค ud-cost-hub-88a5a
 // ใส่ไว้ภายใน  match /databases/{database}/documents { ... }  ต่อจากกฎเดิม (ไม่ลบกฎ profiles / access / users ที่มีอยู่)
+// v7.3: รองรับวัสดุแผ่นมุงหลังคา (cls 'roof' + cover + ins) · kinds ได้ถึง 7 ชนิด (เพิ่ม cap/fascia)
 // สิทธิ์ (Earth 21 พ.ย. 2569): ผู้ที่ได้รับอนุมัติทุกคน (access/{uid}.status == 'approved') อ่านและสร้างได้ · แก้/ลบ = ผู้สร้าง หรือผู้ดูแลระบบ (role 'admin')
     match /materials/{mid} {
       function acc() { return get(/databases/$(database)/documents/access/$(request.auth.uid)).data; }
       function approved() { return request.auth != null && exists(/databases/$(database)/documents/access/$(request.auth.uid)) && acc().status == 'approved'; }
       function admin() { return approved() && acc().role == 'admin'; }
       function valid(d) {
-        return d.keys().hasOnly(['name', 'cls', 'kinds', 'spec', 'look', 'sug', 'by', 'byName', 'at'])
+        return d.keys().hasOnly(['name', 'cls', 'kinds', 'spec', 'look', 'sug', 'cover', 'ins', 'by', 'byName', 'at'])
           && d.name is string && d.name.size() > 0 && d.name.size() <= 200
-          && d.cls in ['clad', 'paint', 'ground']
-          && d.kinds is list && d.kinds.size() <= 5
+          && d.cls in ['clad', 'paint', 'ground', 'roof']
+          && d.kinds is list && d.kinds.size() <= 7
           && d.spec is string && d.spec.size() <= 300
-          && d.look is map && d.by is string && d.at is number;
+          && d.look is map && d.by is string && d.at is number
+          && (d.cls == 'roof'
+                ? (d.get('cover', '') is string && d.get('cover', '').size() > 0 && d.get('cover', '').size() <= 40 && d.get('ins', null) is map)
+                : !('cover' in d) && !('ins' in d));
       }
       allow read: if approved();
       allow create: if approved() && request.resource.data.by == request.auth.uid && valid(request.resource.data);
