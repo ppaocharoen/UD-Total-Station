@@ -6,6 +6,7 @@
 import copy
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -18,6 +19,9 @@ const M = require(process.argv[1]); let s = ''; process.stdin.on('data', d => s 
   const a = JSON.parse(s), out = {};
   out.eff = Object.fromEntries(Object.entries(M.effective(a.model, a.sel, a.mats)).map(([k, v]) => [k, v.id]));
   out.items = M.apply(a.items, a.model, a.sel, a.mats);
+  out.side = {}; out.need = M.needSide(a.model, a.sel, a.mats, a.items);   // 6b: ด้านของชิ้นที่สลับ ทาสี ↔ กรุ
+  const E = M.effective(a.model, a.sel, a.mats);
+  (a.model.finishes || []).forEach(f => { if (E[f.id] && M.swapMode(f, E[f.id])) out.side[f.id] = M.sideOf(f, E[f.id], a.model, a.sel, a.items); });
   out.port = {};   // contribs(ตามแบบ) ของทุกงานผิว — ต้องเท่ากับ by_src ของ takeoff.py
   (a.model.finishes || []).forEach(f => M.contribs(f, null, a.model).forEach(c => { const k = c.key; (out.port[k] = out.port[k] || {})[f.id] = ((out.port[k] || {})[f.id] || 0) + c.q; }));
   process.stdout.write(JSON.stringify(out));
@@ -34,13 +38,49 @@ def node_apply(model, items, sel, mats):
     return json.loads(p.stdout)
 
 
-def modify(model, eff, mats):
+def modify(model, eff, mats, side=None, base=None):
+    """แก้โมเดลให้ takeoff.py ได้ผลที่ควรเป็น · 6b: ทาสี ↔ กรุ แก้ counted_by/tag/spec ของชิ้น + plaster_area/paint_area ของผนัง"""
     m = copy.deepcopy(model)
+    walls = {w["id"]: w for w in m.get("walls", [])}
+
+    def areas(w, kind):   # พื้นที่ฉาบ/ทาสีปัจจุบันของผนัง (ไม่มีค่า → ค่าเริ่มจาก by_src ของ takeoff)
+        fld = "plaster_area" if kind == "plaster" else "paint_area"
+        if w.get(kind) and w.get(fld):
+            return w[fld]
+        pat = r"^plaster_(int|ext)_" if kind == "plaster" else r"^paint_(int|ext)$"
+        out = {"int": 0.0, "ext": 0.0}
+        if w.get(kind):
+            for r in base or []:
+                mm = re.match(pat, r["key"])
+                if mm and w["id"] in (r.get("by_src") or {}):
+                    out[mm.group(1)] += r["by_src"][w["id"]]
+        w[fld] = out
+        return out
     for f in m.get("finishes", []):
         mid = eff.get(f["id"])
-        if not mid or f.get("counted_by") == "wall":
+        if not mid:
             continue
         mt = mats[mid]
+        sd = (side or {}).get(f["id"])
+        if f.get("counted_by") == "wall" and mt["cls"] == "clad":   # ทาสี → กรุ
+            if not sd:
+                continue
+            w = walls[f["wall"]]
+            for kind in ("plaster", "paint"):
+                if w.get(kind):
+                    a = areas(w, kind); a[sd] = round(a.get(sd, 0) - f["qty"], 9)
+            del f["counted_by"]; f["tag"] = "2"; f["spec"] = mt["spec"]
+            continue
+        if f.get("counted_by") == "wall":
+            continue
+        if f["kind"] == "wall" and f.get("wall") and mt["cls"] == "paint":   # กรุ → ทาสี
+            if not sd:
+                continue
+            w = walls[f["wall"]]
+            for kind in ("plaster", "paint"):
+                a = areas(w, kind); a[sd] = round(a.get(sd, 0) + f["qty"], 9); w[kind] = True
+            f["counted_by"] = "wall"; f["tag"] = "1"
+            continue
         if f["kind"] == "struct":
             for fc in f.get("faces", []):
                 if mt["cls"] == "paint":
@@ -136,23 +176,51 @@ def main():
         cases.append(("ผิวโครงสร้างทุกชิ้นชนิดเดียวกัน → กรุ", {"type": {"|".join(["struct", "", structs[0].get("tag", ""), structs[0]["spec"]]): "WT"}}))
     if painted:
         cases.append(("ผนังทาสี → สีอื่น (ไม่กระทบ BOQ)", {"piece": {painted[0]["id"]: "P1"}}))
+        # 6b ทาสี → กรุ
+        cases.append(("6b ผนังทาสี 1 ด้าน → กรุ (ด้านจากคำในรายการ)", {"piece": {painted[0]["id"]: "WT"}}))
+        et = [f for f in painted if f.get("side") in ("E", "T")]
+        if et:
+            cases.append(("6b ปลาย/สันผนังทาสี → กรุ", {"piece": {et[0]["id"]: "WT"}}))
+        p0 = painted[0]
+        cases.append(("6b ผนังทาสีทุกชิ้นชนิดเดียวกัน → กรุ (แถวฉาบ/ทาสีผนังหาย)", {"type": {"|".join(["wall", "c", p0.get("tag", ""), p0["spec"]]): "WT"}}))
+        mats["WT2"] = mat("WT2", "clad", tiled[0]["spec"], ["wall"]) if tiled else mats["WT"]
+        cases.append(("6b ผนังทาสี → กรุรายการที่มีอยู่แล้ว (รวมแถว)", {"piece": {painted[1]["id"]: "WT2"}}))
+    if tiled:
+        mats["PI"] = mat("PI", "paint", "", ["wall"]); mats["PI"]["name"] = "สีทาภายใน ขาวนวล"
+        mats["PE"] = mat("PE", "paint", "", ["wall"]); mats["PE"]["name"] = "สีทาภายนอก เทา"
+        t0 = tiled[0]
+        cases.append(("6b ผนังกรุ → ทาสี (ด้านจากชื่อวัสดุ)", {"piece": {t0["id"]: "PI"}}))
+        cases.append(("6b ผนังกรุ → ทาสี ยังไม่รู้ด้าน = ยังไม่แยกแถว", {"piece": {t0["id"]: "P1"}}, True))
+        cases.append(("6b ผนังกรุ → ทาสี (ด้านที่ตอบในหน้าต่าง)", {"piece": {t0["id"]: "P1"}, "side": {t0["id"]: "int"}}))
+        nop = [f for f in tiled if not next((w for w in model["walls"] if w["id"] == f.get("wall")), {}).get("plaster")]
+        if nop:
+            cases.append(("6b ผนังไม่ฉาบ (กรุสองด้าน) → ทาสี (แถวฉาบใหม่)", {"piece": {nop[0]["id"]: "PE"}}))
+        cases.append(("6b ผนังกรุทุกชิ้นชนิดเดียวกัน → ทาสีภายใน", {"type": {"|".join(["wall", "", t0.get("tag", ""), t0["spec"]]): "PI"}}))
+        if painted:
+            cases.append(("6b สลับไปกลับพร้อมกัน (ทาสี → กรุ + กรุ → ทาสี)", {"piece": {painted[0]["id"]: "WT", t0["id"]: "PE"}}))
     if ceil:
         cases.append(("ฝ้า", {"piece": {ceil[0]["id"]: "CL"}}))
     if ctr:
         cases.append(("เคาน์เตอร์ทุกชิ้น", {"piece": {f["id"]: "CT" for f in ctr}}))
     allsel = {"piece": {}, "type": {}}
-    for _, s in cases[:1] + cases[4:]:
+    for c in cases[:1] + cases[4:]:
+        if c[0].startswith("6b"):
+            continue
         for k in ("piece", "type"):
-            allsel[k].update(s.get(k, {}))
+            allsel[k].update(c[1].get(k, {}))
     cases.append(("หลายอย่างพร้อมกัน", allsel))
 
-    for tag, sel in cases:
+    for c in cases:
+        tag, sel, expect_need = c[0], c[1], (c[2] if len(c) > 2 else False)
         r = node_apply(model, base, sel, mats)
         if not r["eff"]:
             print("ข้าม", tag, "(ไม่มีชิ้นที่ใช้ได้)")
             continue
-        exp, _, _ = takeoff.run(modify(model, r["eff"], mats), settings, pm)
-        ok &= compare(r["items"], exp, f"{tag} — {len(r['eff'])} ชิ้น")
+        if bool(r["need"]) != expect_need:
+            print("ไม่ผ่าน", tag, "— ชิ้นที่ต้องถามด้าน", r["need"][:5]); ok = False
+        sides = {k: v for k, v in r["side"].items() if v}
+        exp, _, _ = takeoff.run(modify(model, r["eff"], mats, sides, base), settings, pm)
+        ok &= compare(r["items"], exp, f"{tag} — {len(r['eff'])} ชิ้น" + (f" · ด้าน {sorted(set(sides.values()))}" if sides else ""))
     print("\nรวม:", "ผ่านทั้งหมด" if ok else "มีข้อที่ไม่ผ่าน")
     sys.exit(0 if ok else 1)
 

@@ -5,10 +5,14 @@
  *   วัสดุ "เฉพาะโครงการนี้" (id P-…) อยู่ในสำเนาอย่างเดียว ส่งขึ้นคลังกลางทีหลังได้
  * BOQ: MatLib.apply แยกแถวก่อนผูกราคา (rows() ใน app.js) — ชิ้นที่เปลี่ยนย้ายไปแถวรายการใหม่ ปริมาณตรง takeoff.py
  * ป้าย "เปลี่ยนวัสดุ" ใน ปร.1 แสดงบนจอเท่านั้น · ราคาแนะนำของวัสดุ = คำแนะนำ ไม่ทับการผูกอัตโนมัติ
+ * 6b ผนังทาสี ↔ ผนังกรุ: ด้านภายใน/ภายนอกหาเองจากคำในรายการ/ผนังฉาบด้านเดียว — ไม่รู้ → ถามในหน้าต่าง เก็บใน matsel.side {id: 'int'|'ext'}
  */
 'use strict';
 const MT = { lib: [], loaded: false, loading: false, err: '', auth: { ready: false }, pick: null, scope: 'piece', q: '', ed: null, edFor: null };
-const mtSel = () => { const b = S.boq; b.matsel = b.matsel && typeof b.matsel === 'object' ? b.matsel : {}; b.matsel.piece = b.matsel.piece || {}; b.matsel.type = b.matsel.type || {}; return b.matsel; };
+const mtSel = () => { const b = S.boq; b.matsel = b.matsel && typeof b.matsel === 'object' ? b.matsel : {}; b.matsel.piece = b.matsel.piece || {}; b.matsel.type = b.matsel.type || {}; b.matsel.side = b.matsel.side || {}; return b.matsel; };
+const mtItems = () => (S.model && S.model.quantities && S.model.quantities.items) || [];
+/** 6b: ชิ้นที่สลับ ทาสี ↔ กรุ แต่ยังไม่รู้ด้าน */
+const mtNeed = () => S.model && S.boq ? MatLib.needSide(S.model, mtSel(), mtUseMats(), mtItems()) : [];
 const mtSnaps = () => (S.boq.mats = S.boq.mats && typeof S.boq.mats === 'object' ? S.boq.mats : {});
 const mtFin = id => ((S.model && S.model.finishes) || []).find(f => f.id === id) || null;
 const mtApproved = () => !!(MT.auth.user && MT.auth.access && MT.auth.access.status === 'approved');
@@ -91,7 +95,14 @@ function matPickHtml(id) {
   if (g && cur) h += `<button class="btn small" data-mt="revert">คืนเป็นดิน</button>`;
   if (!g && sel.type[tk]) h += `<button class="btn small" data-mt="untype" title="ยกเลิกการเปลี่ยนทุกชิ้นชนิดนี้">ยกเลิกทั้งชนิด (${mtSameType(f).length} ชิ้น)</button>`;
   h += '</div>';
-  if (pc === 'paint') h += '<div class="hint">ผนังทาสี: เปลี่ยนได้เฉพาะวัสดุทาสี (สีใน 3D — ไม่กระทบ BOQ) · ทาสี → กรุผิว ยังไม่รองรับ (ก้อน 6b)</div>';
+  const sm = !g && cur && MatLib.swapMode(f, cur);
+  if (sm) {
+    const sd = MatLib.sideOf(f, cur, S.model, sel, mtItems()), chosen = sel.side[id] && sd === sel.side[id];
+    const what = sm === 'p2c' ? 'ทาสี → กรุ: หักฉาบ/ทาสีของผนังด้าน' : 'กรุ → ทาสี: เพิ่มฉาบ/ทาสีของผนังด้าน';
+    if (!sd) h += `<div class="hint" style="color:var(--red)">ยังไม่รู้ว่าเป็นผนังด้านภายในหรือภายนอก — BOQ ยังไม่แยกแถว</div>`;
+    else h += `<div class="hint">${what}<b>${MatLib.SIDE_TH[sd]}</b>${chosen ? ' (เลือกเอง)' : ''}</div>`;
+    if (!sd || chosen) h += `<div class="btn-row"><span class="hint">ด้าน:</span><button class="btn small ${sd === 'int' ? 'primary' : ''}" data-mt="side-int">ภายใน</button><button class="btn small ${sd === 'ext' ? 'primary' : ''}" data-mt="side-ext">ภายนอก</button></div>`;
+  } else if (pc === 'paint') h += '<div class="hint">ผนังทาสี: วัสดุทาสี = เปลี่ยนสีใน 3D (ไม่กระทบ BOQ) · วัสดุกรุ = ย้ายปริมาณจากฉาบ/ทาสีของผนังไปแถวกรุ</div>';
   return h + '</div>';
 }
 function matPickBind(box, id) {
@@ -99,6 +110,7 @@ function matPickBind(box, id) {
   box.querySelectorAll('[data-mt]').forEach(b => b.onclick = () => {
     const a = b.dataset.mt, sel = mtSel(), f = mtFin(id);
     if (a === 'open') return mtOpen(id);
+    if (a === 'side-int' || a === 'side-ext') { sel.side[id] = a.slice(5); return mtAfterChange(id); }
     if (a === 'revert') { if (id !== MatLib.GROUND && f && sel.type[MatLib.typeKey(f)]) sel.piece[id] = ''; else delete sel.piece[id]; }
     if (a === 'untype' && f) { const k = MatLib.typeKey(f); delete sel.type[k]; mtSameType(f).forEach(x => { if (sel.piece[x.id] === '') delete sel.piece[x.id]; }); }
     mtAfterChange(id);
@@ -178,7 +190,7 @@ function mtRenderList() {
   const box = $('#mt-list'); if (!box) return;
   const id = MT.pick, g = id === MatLib.GROUND, f = g ? MatLib.GROUND : mtFin(id), cur = mtCur(id), all = mtAll();
   const qs = MT.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  const list = Object.values(all).filter(m => MatLib.accepts(f, m)).filter(m => qs.every(q => (m.name + ' ' + (m.spec || '') + ' ' + (m.byName || '')).toLowerCase().includes(q)))
+  const list = Object.values(all).filter(m => MatLib.accepts(f, m, S.model)).filter(m => qs.every(q => (m.name + ' ' + (m.spec || '') + ' ' + (m.byName || '')).toLowerCase().includes(q)))
     .sort((a, b) => (b.builtin ? 1 : 0) - (a.builtin ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'th'));
   const SRC = { lib: '', proj: '<span class="pill warn">เฉพาะโครงการนี้</span>', gone: '<span class="pill warn">ถูกลบจากคลังแล้ว (ใช้สำเนาในโครงการ)</span>' };
   if (!list.length) { box.innerHTML = `<div class="hint" style="margin-top:8px">ยังไม่มีวัสดุที่ใช้กับ${g ? 'ผิวดิน' : 'ผิวนี้'}ได้ — กด "+ สร้างวัสดุใหม่"</div>`; return; }
@@ -207,13 +219,37 @@ function mtUse(mid) {
     if (m) sel.piece[id] = m.id; else if (sel.type[MatLib.typeKey(f)]) sel.piece[id] = ''; else delete sel.piece[id];
   }
   mtPrune();
+  toast(m ? `ใช้ "${m.name}" แล้ว${MT.scope === 'type' && f ? ' กับทุกชิ้นชนิดเดียวกัน' : ''}` : 'กลับไปใช้วัสดุตามแบบแล้ว');
+  const need = mtNeed();
+  if (need.length) { mtAfterChange(id); return mtAskSide(need, id); }
   const mm = $('#mt-modal'); if (mm) mm.classList.remove('on');
   mtAfterChange(id);
-  toast(m ? `ใช้ "${m.name}" แล้ว${MT.scope === 'type' && f ? ' กับทุกชิ้นชนิดเดียวกัน' : ''}` : 'กลับไปใช้วัสดุตามแบบแล้ว');
+}
+/** 6b: ถามด้านภายใน/ภายนอกของชิ้นที่สลับ ทาสี ↔ กรุ (ตอบครั้งเดียวใช้กับทุกชิ้นที่ยังไม่รู้) */
+function mtAskSide(need, id) {
+  const m = mtModal(); m.classList.add('on');
+  const fs = need.map(mtFin).filter(Boolean), eff = MatLib.effective(S.model, mtSel(), mtUseMats());
+  const p2c = fs.filter(f => MatLib.swapMode(f, eff[f.id]) === 'p2c').length;
+  $('#mt-title', m).textContent = 'ผนังด้านภายในหรือภายนอก?';
+  const list = fs.slice(0, 8).map(f => `<li>${esc([f.room, f.level].filter(Boolean).join(' · ') || f.id)} <span class="mono hint">${esc(f.id)} · ผนัง ${esc(f.wall || '')}</span></li>`).join('') + (fs.length > 8 ? `<li class="hint">… อีก ${fs.length - 8} ชิ้น</li>` : '');
+  $('#mt-body', m).innerHTML = `<div class="mt-head"><div>${fs.length} ชิ้นที่เปลี่ยน${p2c === fs.length ? 'จากผนังทาสีเป็นผนังกรุ' : p2c ? 'ระหว่างผนังทาสีกับผนังกรุ' : 'จากผนังกรุเป็นผนังทาสี'} ยังไม่รู้ว่าเป็นผนังด้านภายในหรือภายนอก
+    <div class="hint">ใช้เลือกแถวฉาบปูน/ทาสี${p2c === fs.length ? 'ที่จะหักออก' : p2c ? 'ที่จะหัก/เพิ่ม' : 'ที่จะเพิ่ม'} (ภายใน/ภายนอกราคาต่างกัน) — ชื่อรายการไม่มีคำว่า "ภายใน/ภายนอก" และผนังไม่ได้ฉาบด้านเดียว</div></div>
+    <ul style="margin:6px 0 0 18px">${list}</ul>
+    <div class="btn-row" style="margin-top:10px"><button class="btn small primary" data-mts="int">ภายใน</button><button class="btn small primary" data-mts="ext">ภายนอก</button>
+    <button class="btn small" data-mts="later">ไว้ทีหลัง</button></div>
+    <div class="hint">ตอบแล้วใช้กับทุกชิ้นในรายการนี้ · แก้ทีละชิ้นได้ที่กล่องข้อมูลชิ้น · "ไว้ทีหลัง" = 3D เปลี่ยนแล้ว แต่ ปร.1 ยังไม่แยกแถวจนกว่าจะเลือกด้าน</div></div>`;
+  $('#mt-body', m).querySelectorAll('[data-mts]').forEach(b => b.onclick = () => {
+    const v = b.dataset.mts, sel = mtSel();
+    if (v !== 'later') need.forEach(x => { sel.side[x] = v; });
+    m.classList.remove('on'); mtAfterChange(id);
+    if (v !== 'later') toast(`ตั้งเป็นผนังด้าน${MatLib.SIDE_TH[v]} ${need.length} ชิ้นแล้ว`);
+  });
 }
 /** ลบสำเนาวัสดุที่ไม่มีชิ้นใดใช้แล้ว (ยกเว้นวัสดุเฉพาะโครงการ — ยังเลือกใช้ได้ภายหลัง) */
 function mtPrune() {
-  const sel = mtSel(), used = new Set(Object.values(sel.piece).concat(Object.values(sel.type)).filter(Boolean)), sn = mtSnaps();
+  const sel = mtSel(), eff0 = S.model ? MatLib.effective(S.model, sel, mtUseMats()) : {};
+  Object.keys(sel.side).forEach(id => { const f = mtFin(id); if (!f || !eff0[id] || !MatLib.swapMode(f, eff0[id])) delete sel.side[id]; });   // ด้านของชิ้นที่ไม่ได้สลับแล้ว
+  const used = new Set(Object.values(sel.piece).concat(Object.values(sel.type)).filter(Boolean)), sn = mtSnaps();
   Object.keys(sn).forEach(id => { if (!used.has(id) && !String(id).startsWith('P-')) delete sn[id]; });
 }
 async function mtDel(m) {
@@ -278,7 +314,7 @@ function mtEdRender() {
     <label class="fld">ประเภท<select data-mtf="cls">${['clad', 'paint', 'ground'].map(c => `<option value="${c}" ${e.cls === c ? 'selected' : ''}>${MatLib.CLS_TH[c]}</option>`).join('')}</select></label>
     ${e.cls === 'ground' ? '<div class="hint">ผิวดินรอบอาคาร — แสดงใน 3D อย่างเดียว ไม่มีแถว BOQ</div>' : `<div class="fld">ใช้กับผิว<div class="mte-kinds">${kinds}</div></div>`}
     ${e.cls === 'clad' ? `<label class="fld">ข้อความรายการ BOQ<textarea class="cell" rows="2" data-mtf="spec" placeholder="เช่น พื้นปูกระเบื้องแกรนิตโต้ 60x60 ซม. ผิวด้าน">${esc(e.spec)}</textarea>
-      <span class="hint">เป็นชื่อแถวใน ปร.4 — ชิ้นที่เปลี่ยนย้ายไปแถวนี้ (ตรงกับรายการที่มีอยู่แล้ว = รวมแถว) · แกรนิตโต้ระบุขนาด "60x60 ซม." และ ฝ้ายิปซัม ผูกราคาอัตโนมัติได้</span></label>` : e.cls === 'paint' ? '<div class="hint">ฉาบทาสี: เปลี่ยนสีใน 3D · ผิวโครงสร้างที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนโครงสร้าง + ทาสีน้ำอะคริลิก</div>' : ''}
+      <span class="hint">เป็นชื่อแถวใน ปร.4 — ชิ้นที่เปลี่ยนย้ายไปแถวนี้ (ตรงกับรายการที่มีอยู่แล้ว = รวมแถว) · แกรนิตโต้ระบุขนาด "60x60 ซม." และ ฝ้ายิปซัม ผูกราคาอัตโนมัติได้</span></label>` : e.cls === 'paint' ? '<div class="hint">ฉาบทาสี: เปลี่ยนสีใน 3D · ผิวโครงสร้างที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนโครงสร้าง + ทาสีน้ำอะคริลิก · ผนังกรุที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนเรียบผนัง + ทาสีน้ำอะคริลิก (ใส่คำว่า "ภายใน" หรือ "ภายนอก" ในชื่อวัสดุ = ไม่ต้องถามด้าน)</div>' : ''}
     <label class="fld">ลาย<select data-mtl="pat">${pats.map(p => `<option value="${p}" ${L.pat === p ? 'selected' : ''}>${P[p].th}</option>`).join('')}</select></label>
     <div class="mte-row"><label class="fld">สีหลัก<input type="color" data-mtl="color" value="${esc(L.color)}"></label>
       ${show('color2') ? `<label class="fld">${L.pat === 'granito' || L.pat === 'washed' ? 'สีเม็ด' : 'สีที่ 2'}<input type="color" data-mtl="color2" value="${esc(L.color2 || '#888888')}"></label>` : ''}
@@ -329,7 +365,7 @@ async function mtEdSave() {
   const e = MT.ed; if (!e) return;
   const c = MatLib.clean(e), err = MatLib.problems(c), em = $('#mte-err');
   if (err.length) { em.textContent = err.join(' · '); return; }
-  if (MT.edFor && !MatLib.accepts(MT.edFor === MatLib.GROUND ? MatLib.GROUND : mtFin(MT.edFor), c)) { em.textContent = 'วัสดุนี้ใช้กับชิ้นที่เลือกไม่ได้ (ตรวจประเภท/ผิวที่ใช้)'; return; }
+  if (MT.edFor && !MatLib.accepts(MT.edFor === MatLib.GROUND ? MatLib.GROUND : mtFin(MT.edFor), c, S.model)) { em.textContent = 'วัสดุนี้ใช้กับชิ้นที่เลือกไม่ได้ (ตรวจประเภท/ผิวที่ใช้)'; return; }
   em.textContent = 'กำลังบันทึก…';
   let saved;
   try {
