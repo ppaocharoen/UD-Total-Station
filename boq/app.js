@@ -22,7 +22,8 @@ const S = {
 };
 function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 0, retention: 0, loanPct: 0 },
-    overrides: {}, bind: {}, cmpline: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(), model_file: '', saved_at: '' };
+    overrides: {}, bind: {}, cmpline: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(),
+    matsel: { piece: {}, type: {} }, mats: {}, model_file: '', saved_at: '' };   // matsel/mats = วัสดุที่เปลี่ยนใน 3D + สำเนาวัสดุ (boq/matui.js)
 }
 /** คำเรียกตามประเภทงาน: กำหนดราคากลาง → ราคากลาง · ประมาณราคา → ราคาประมาณการ */
 const RG = () => (isCentral() ? 'ราคากลาง' : isRepair() ? 'ประมาณราคาค่าซ่อมแซม' : 'ราคาประมาณการ');
@@ -113,6 +114,7 @@ function loadModel(json, name) {
   S.boq.model_file = name;
   if (BoqBind.migrate(S.boq)) autosave();   // ไฟล์เดิม: ราคาที่พิมพ์ในช่อง / ไม่มีค่าวัสดุ → การผูกเอง (6.52)
   if (typeof cuPruneOpen === 'function') cuPruneOpen();   // มวลรวมสร้างเองที่ถูกลบจากคลังกลางแล้ว → เลิกผูก (เมื่อโหลดคลังสำเร็จ)
+  if (typeof matOnLoad === 'function') matOnLoad();   // วัสดุที่เปลี่ยนใน 3D (ก่อน viewer.load)
   const p = S.boq.project;
   p.name = p.name || m.meta.name || '';
   p.location = p.location || [m.meta.district, m.meta.province].filter(Boolean).join(' ');
@@ -132,7 +134,8 @@ function loadModel(json, name) {
 function polyArea(p) { let a = 0; for (let i = 0; i < p.length; i++) { const q = p[(i + 1) % p.length]; a += p[i][0] * q[1] - q[0] * p[i][1]; } return Math.abs(a) / 2; }
 
 function rows() {   // ผูกราคาตอนเปิด (lib/pricemap.js + tools/price_map.json) — ไม่ต้องถอดปริมาณใหม่เมื่อแก้การผูก
-  const q = (S.model && S.model.quantities && S.model.quantities.items) || [];
+  const q0 = (S.model && S.model.quantities && S.model.quantities.items) || [];
+  const q = typeof matRows === 'function' ? matRows(q0) : q0;   // เปลี่ยนวัสดุงานผิวใน 3D → แยกแถว (ตรง takeoff.py) ก่อนผูกราคา
   return applyQtyOv(PriceMap.bindAll(q, S.pmap)).concat(S.boq.custom_rows || []);
 }
 /** ปริมาณที่ผู้ใช้แก้เอง (S.boq.qty_ov[key] = {qty, orig, by, at, note}) — แทนจำนวนจากตัวถอด · orig = ค่าที่ถอดได้ตอนแก้
@@ -645,7 +648,7 @@ function _renderPR1() {
           <td class="r c-no">${n}</td>
           <td class="c-name" data-n="${n}">${custom ? `<input class="cell" data-cf="name" value="${esc(r.name)}">` : esc(r.name)}
             ${r.waste && !r.qty_ov ? `<span class="src">สุทธิ ${fmt(r.qty_net)} + เผื่อ ${+(r.waste * 100).toFixed(2)}%</span>` : ''}
-            ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}
+            ${r.status === 'assumed' ? '<span class="pill warn">ประมาณ — ตรวจกับแบบ</span>' : ''}${r.mat_swap && typeof mtPill === 'function' ? mtPill(r) : ''}
             ${r.warns.map(w => `<span class="warnline">${esc(w)}</span>`).join('')}${r.ref && r.ref.kind === 'comp' && S.db ? cmpPanel(r) : ''}${S.db ? sugHtml(r) : ''}${(r.mat_unit === null || /^ราคาสืบ/.test(r.mat_src || '')) && r.unit !== 'งาน' && !isInfo(r) && !custom && !r.lab_only && !(r.ref && r.ref.kind === 'comp') ? `<button class="btn small sv-go" data-svgo="${esc(r.key)}">${r.mat_unit === null ? 'สืบราคา' : 'ดูราคาสืบ'}</button>${r.mat_unit === null ? ` <button class="btn small" data-nomat="${esc(r.key)}">ไม่มีค่าวัสดุ</button>` : ''}` : ''}${b.mat && b.mat.kind === 'none' ? `<span class="src">ค่าแรงอย่างเดียว (กำหนดเอง) <button class="btn small" data-unnomat="${esc(r.key)}">ยกเลิก</button></span>` : ''}</td>
           <td class="r c-qty" data-l="จำนวน">${custom ? `<input class="price" data-cf="qty" value="${esc(r.qty)}">` : `<input class="price ${r.qty_ov ? 'ov' : ''}" data-qov="1" value="${esc(r.qty)}" inputmode="decimal">${r.qty_ov ? qtyOvMark(r) : ''}`}</td>
           <td class="c-unit">${custom ? `<input class="cell" data-cf="unit" value="${esc(r.unit)}" style="width:60px">` : esc(r.unit)}</td>
@@ -1467,6 +1470,7 @@ function initViewer() {
   solidApply();
   try { if (localStorage.getItem('udboq:proj') === 'para') $('#proj-seg [data-proj=para]').click(); } catch (e) { /* */ }
   if (curTheme() !== 'terminal') S.viewer.setTheme(curTheme());
+  if (S.model && typeof mtLooks === 'function') S.viewer.looks = mtLooks();
   if (S.model) buildLayers(S.viewer.load(S.model));
   const sel = S.selKey && (S.priced || []).find(r => r.key === S.selKey);
   if (sel) S.viewer.highlight(sel.from || []);
@@ -1739,6 +1743,7 @@ function showPick(d, pt) {
   if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
   else if (d.info) h += `<div class="pk-spec"><div>${esc(d.info)}</div></div>`;
   h += locHtml(id, pt);
+  if (typeof matPickHtml === 'function') h += matPickHtml(id);   // วัสดุงานผิว/ผิวดิน: เปลี่ยนวัสดุ
   if (S.viewer.hasRebar(id)) h += `<div class="pk-sec"><button class="btn small primary" data-pk="rebar">ดูเหล็กชิ้นนี้</button> <span class="hint">ซ่อนเหล็กชิ้นอื่น · ตารางเหล็ก · เลื่อนดูชิ้นเครื่องหมายเดียวกัน</span></div>`;
   if (q.rows.length) {
     h += `<div class="pk-sec"><div class="pk-lbl">ปริมาณของชิ้นนี้ (ไม่รวมเผื่อ) · กดรายการเพื่อไปที่ ปร.1</div><table class="pk-q">${q.rows.map(r => `<tr data-pk-row="${esc(r.key)}"><td>${esc(r.name)}${r.calc.map(c => `<div class="pk-calc">${esc(c)}</div>`).join('')}</td><td class="r">${f2(r.q)}</td><td>${esc(r.unit)}</td></tr>`).join('')}</table></div>`;
@@ -1757,6 +1762,7 @@ function showPick(d, pt) {
   if (sp && sp.note) h += `<div class="pk-sec hint">หมายเหตุ: ${esc(sp.note)}</div>`;
   box.innerHTML = h; box.classList.add('on'); box.scrollTop = 0;
   box.querySelector('[data-pk=close]').onclick = () => showPick(null);
+  if (typeof matPickBind === 'function') matPickBind(box, id);
   const rbb = box.querySelector('[data-pk=rebar]'); if (rbb) rbb.onclick = () => rbOne(id);
   box.querySelectorAll('[data-pk-task]').forEach(a => a.onclick = () => { setDock('gantt'); selectTask(a.dataset.pkTask); });
   box.querySelectorAll('[data-pk-row]').forEach(tr => tr.onclick = () => gotoRow(tr.dataset.pkRow));
@@ -1812,7 +1818,9 @@ function bind() {
       S.boq = Object.assign(newBoq(), b);
       S.boq.plan = Object.assign(newPlan(), S.boq.plan || {}); normProject();
       if (S.model && b.model_file && b.model_file !== S.modelName) toast(`หมายเหตุ: ไฟล์ BOQ นี้ทำกับ ${b.model_file}`);
-      applySurvey(); if (typeof cuPruneOpen === 'function') cuPruneOpen(); autosave(); renderAll(); toast('เปิดงาน BOQ แล้ว');
+      applySurvey(); if (typeof cuPruneOpen === 'function') cuPruneOpen();
+      if (typeof matOnLoad === 'function') { matOnLoad(); if (S.viewer && S.viewer.setLooks) S.viewer.setLooks(mtLooks()); }
+      autosave(); renderAll(); toast('เปิดงาน BOQ แล้ว');
     } catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); }
     e.target.value = '';
   };

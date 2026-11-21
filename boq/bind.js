@@ -531,8 +531,11 @@ function sugResolve(r) {
     return null;
   };
   const fromMem = side => { for (const v of linkFind(r.name, side)) { const x = okMem(v); if (x) return x; } return null; };
-  if (needMat) { const x = fromMem('mat'); if (x) { out.mat = x; out.why = 'เคยผูกชื่อนี้ไว้'; } }
-  if (needLab) { const x = fromMem('lab'); if (x && x.kind !== 'mat') { out.lab = x; out.why = 'เคยผูกชื่อนี้ไว้'; } }
+  const ms = typeof mtSugOf === 'function' && r.mat_swap ? mtSugOf(r) : null;   // ราคาแนะนำของวัสดุที่เปลี่ยนใน 3D (คลังวัสดุ) มาก่อน
+  if (ms) { if (needMat && ms.mat) { const x = okMem(ms.mat); if (x) { out.mat = x; out.why = 'ราคาแนะนำของวัสดุ'; } }
+    if (needLab && ms.lab) { const x = okMem(ms.lab); if (x && x.kind !== 'mat') { out.lab = x; out.why = 'ราคาแนะนำของวัสดุ'; } } }
+  if (needMat && !out.mat) { const x = fromMem('mat'); if (x) { out.mat = x; out.why = out.why || 'เคยผูกชื่อนี้ไว้'; } }
+  if (needLab && !out.lab) { const x = fromMem('lab'); if (x && x.kind !== 'mat') { out.lab = x; out.why = out.why || 'เคยผูกชื่อนี้ไว้'; } }
   if ((needMat && !out.mat) || (needLab && !out.lab)) {
     const sg = window.BoqSuggest && BoqSuggest.suggest({ name: r.name, unit: r.unit, qty: r.qty });
     if (sg) {

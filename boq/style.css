@@ -703,3 +703,24 @@ table.cu-tbl select{max-width:100%}
 .btn.danger,html.plain .btn.danger,html.dos .btn.danger{color:var(--red,#c00);border-color:var(--red,#c00)}
 table.cu-tbl td:nth-child(2){min-width:200px}
 @media (max-width:700px){.cu-head{grid-template-columns:1fr}}
+/* v7.0 คลังวัสดุ (boq/matui.js) */
+canvas.mt-sw{border:1px solid var(--text3);border-radius:3px;flex:none;image-rendering:auto}
+.mt-pk .mt-cur{display:flex;gap:8px;align-items:center;margin:4px 0}
+#mt-modal,#mte-modal{z-index:305}#mte-modal{z-index:312}
+.mt-box{max-width:860px;max-height:90vh}
+.mt-head{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.mt-scope label{margin-right:14px;cursor:pointer}
+.mt-item{display:flex;gap:10px;align-items:center;padding:6px;border-bottom:1px solid var(--accent-dim)}
+.mt-item.on{background:var(--accent-dim)}
+.mt-iname{flex:1;min-width:0}
+.mt-ibtn{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:240px}
+.mte-grid{display:grid;grid-template-columns:1fr 300px;gap:14px}
+.mte-form{display:flex;flex-direction:column;gap:8px}
+.mte-form .fld{display:flex;flex-direction:column;gap:3px}
+.mte-form select,.mte-form textarea{width:100%}
+.mte-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.mte-row input.num{width:76px}
+.mte-kinds label{margin-right:10px;white-space:nowrap}
+.mte-prev canvas{width:100%;height:auto;border:1px solid var(--text3);border-radius:4px;display:block;margin-bottom:2px}
+.mte-prev #mte-cv2{margin-top:10px}
+@media (max-width:760px){.mte-grid{grid-template-columns:1fr}.mt-ibtn{max-width:none}}
