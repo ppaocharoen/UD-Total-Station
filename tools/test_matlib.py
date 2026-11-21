@@ -185,6 +185,110 @@ def roof_cases(model, settings, pm):
     return ok
 
 
+def unit_modify(model, eff, mats):
+    """6d: ชิ้นนับจำนวนที่ใช้วัสดุ m → แบบใหม่ <แบบ>~<id วัสดุ> (desc = spec ของวัสดุ) · อุปกรณ์ไม่มีแบบ — ตรวจแยก (unit_eq_expect)"""
+    m = copy.deepcopy(model)
+    mep = m.get("mep") or {}
+    groups = [(m.get("openings", []), m.setdefault("opening_types", {})),
+              (((mep.get("plumbing") or {}).get("fixtures") or []), (mep.get("plumbing") or {}).get("fixture_types") or {}),
+              (((mep.get("electrical") or {}).get("points") or []), (mep.get("electrical") or {}).get("point_types") or {})]
+    for objs, types in groups:
+        for o in objs:
+            mid = eff.get(o.get("id"))
+            if not mid:
+                continue
+            nt = f"{o['type']}~{mid}"
+            if nt not in types:
+                types[nt] = dict(copy.deepcopy(types[o["type"]]), desc=mats[mid]["spec"])
+            o["type"] = nt
+    return m
+
+
+def unit_norm(rows, eff):
+    """ชื่อแถวประตูของ takeoff.py มีเลขแบบใหม่ (DR1~M) — เว็บใช้เลขแบบเดิม (DR1) ตามที่ตกลง"""
+    mids = set(eff.values())
+    out = []
+    for r in rows:
+        r = dict(r)
+        for mid in mids:
+            r["name"] = r["name"].replace(f"~{mid} ", " ")
+        out.append(r)
+    return out
+
+
+def unit_cases(model, settings, pm):
+    """6d แคตตาล็อก ประตู-หน้าต่าง · สุขภัณฑ์ · อุปกรณ์ · จุดไฟฟ้า"""
+    import subprocess as sp
+    us = json.loads(sp.run(["node", "-e", "const M=require(process.argv[1]);let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(JSON.stringify(M.units(JSON.parse(s)))))",
+                            os.path.abspath(os.path.join(HERE, "..", "lib", "matlib.js"))], input=json.dumps(model), capture_output=True, text=True, encoding="utf-8").stdout)
+    if not us:
+        print("ข้าม 6d (ไม่มีชิ้นนับจำนวน)")
+        return True
+    base, _, _ = takeoff.run(model, settings, pm)
+    ok = True
+    def im(i, kinds, spec, style=None):
+        d = {"id": i, "name": i, "cls": "item", "kinds": kinds, "spec": spec, "look": {"pat": "plain", "color": "#335577", "color2": "#aabbcc"}}
+        if style:
+            d["style"] = style
+        return d
+    by = lambda unit: [u for u in us if u["unit"] == unit]
+    tk = lambda u: "|".join(["u", u["unit"], u["type"], u.get("size", "") if u["unit"] == "eq" else ""])
+    mats, cases = {}, []
+    op, fx, pt, eq = by("open"), by("fx"), by("pt"), by("eq")
+    if op:
+        d = op[0]; mats["DA"] = im("DA", [d["ik"]], "ประตูอลูมิเนียมบานเลื่อน กระจกเขียวตัดแสง 6 มม.", "slide")
+        mats["DB"] = im("DB", [d["ik"]], "ประตูไม้อัดยางกันชื้น บานเปิดเดี่ยว")
+        same = [u for u in op if u["type"] == d["type"]]
+        cases.append(("ประตู 1 บาน → แยกแถว", {"piece": {d["id"]: "DA"}}))
+        cases.append(("ประตูทุกบานแบบเดียวกัน (แถวเดิมหาย = เปลี่ยนชื่อ)", {"type": {tk(d): "DA"}}))
+        if len(same) > 1:
+            cases.append(("ทั้งแบบ + ยกเว้น 1 บานตามแบบ + 1 บานวัสดุอื่น", {"type": {tk(d): "DA"}, "piece": {same[1]["id"]: "", **({same[2]["id"]: "DB"} if len(same) > 2 else {})}}))
+        win = [u for u in op if u["kind"] != d["kind"]]
+        if win:
+            mats["WX"] = im("WX", [win[0]["ik"]], "หน้าต่างอลูมิเนียมบานเลื่อน กระจกใส 5 มม.")
+            cases.append(("หน้าต่าง/ช่องลม 1 ชุด", {"piece": {win[0]["id"]: "WX"}}))
+    if fx:
+        f0 = fx[0]; mats["FX"] = im("FX", [f0["ik"]], f"{f0['kind']} ยี่ห้อ X รุ่นทดสอบ")
+        cases.append(("สุขภัณฑ์ 1 ชิ้น", {"piece": {f0["id"]: "FX"}}))
+        cases.append(("สุขภัณฑ์ทั้งแบบ", {"type": {tk(f0): "FX"}}))
+    if pt:
+        p0 = pt[0]; mats["PX"] = im("PX", [p0["ik"]], "โคมดาวน์ไลท์ LED 12W ฝังฝ้า")
+        cases.append(("จุดไฟฟ้า 1 จุด", {"piece": {p0["id"]: "PX"}}))
+        cases.append(("จุดไฟฟ้าทั้งแบบ", {"type": {tk(p0): "PX"}}))
+    if op and fx and pt:
+        cases.append(("ประตู + สุขภัณฑ์ + โคม พร้อมกัน", {"piece": {op[0]["id"]: "DA", fx[0]["id"]: "FX"}, "type": {tk(pt[0]): "PX"}}))
+    # ต่างชนิดใช้ไม่ได้
+    if op and fx:
+        r = node_apply(model, base, {"piece": {op[0]["id"]: "FX"}}, mats)
+        print(("ผ่าน" if not r["eff"] else "ไม่ผ่าน"), "6d วัสดุต่างชนิด (สุขภัณฑ์ → ประตู) ใช้ไม่ได้"); ok &= not r["eff"]
+    for tag, sel in cases:
+        r = node_apply(model, base, sel, mats)
+        if not r["eff"]:
+            print("ไม่ผ่าน", tag, "(ไม่มีชิ้นที่ใช้ได้)"); ok = False
+            continue
+        exp, _, _ = takeoff.run(unit_modify(model, r["eff"], mats), settings, pm)
+        ok &= compare(r["items"], unit_norm(exp, r["eff"]), f"6d {tag} — {len(r['eff'])} ชิ้น")
+        keys = [x["key"] for x in r["items"]]   # แถวใหม่อยู่ต่อจากแถวเดิม (หรือที่เดิมถ้าแถวเดิมหาย)
+        for k in keys:
+            if "~" in k:
+                b = k.split("~")[0]
+                i = keys.index(k)
+                prev = keys[i - 1] if i else ""
+                if not (prev == b or prev.startswith(b + "~") or (b not in keys and [x["key"] for x in base].index(b) >= 0)):
+                    print("ไม่ผ่าน", tag, "ลำดับแถว", k, "ต่อจาก", prev); ok = False
+    if eq:
+        e0 = eq[0]; mats["EQ"] = im("EQ", [e0["ik"]], f"{takeoff.EQUIP_NAME.get(e0['kind'], e0['kind'])} ยี่ห้อ Y")
+        r = node_apply(model, base, {"piece": {e0["id"]: "EQ"}}, mats)
+        A = {x["key"]: x for x in r["items"]}; B = {x["key"]: x for x in base}
+        k0, k1 = f"eq_{e0['kind']}", f"eq_{e0['kind']}~EQ"
+        n0 = B[k0]["qty"]
+        good = k1 in A and A[k1]["qty"] == 1 and A[k1]["name"] == mats["EQ"]["spec"] + (" " + e0["size"] if e0["size"] else "") \
+            and A[k1]["spec"] == {"t": "equip", "kind": e0["kind"], "size": e0["size"]} and A[k1]["group_code"] == B[k0]["group_code"] \
+            and ((n0 == 1 and k0 not in A) or (n0 > 1 and A[k0]["qty"] == n0 - 1))
+        print(("ผ่าน" if good else "ไม่ผ่าน"), f"6d อุปกรณ์ 1 ชิ้น ({e0['id']}) — ชื่อ = ข้อความรายการ + ขนาดจากโมเดล · spec ผูกราคาเดิม"); ok &= good
+    return ok
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "examples", "sample-building.bm.json")
     model = json.load(open(path, encoding="utf-8"))
@@ -287,6 +391,7 @@ def main():
         exp, _, _ = takeoff.run(modify(model, r["eff"], mats, sides, base), settings, pm)
         ok &= compare(r["items"], exp, f"{tag} — {len(r['eff'])} ชิ้น" + (f" · ด้าน {sorted(set(sides.values()))}" if sides else ""))
     ok &= roof_cases(model, settings, pm)
+    ok &= unit_cases(model, settings, pm)
     print("\nรวม:", "ผ่านทั้งหมด" if ok else "มีข้อที่ไม่ผ่าน")
     sys.exit(0 if ok else 1)
 
