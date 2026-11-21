@@ -38,7 +38,7 @@ L = Survey.compMerge(db0, [U1]);
 chk(db0.compList.length === 2 && db0.compItems.length === 6 && !db0.matRef['U:U-10:0'] && db0.matRef.A, 'compMerge รอบสอง: ถอด U-10 ออกหมด มาตรฐานอยู่ครบ');
 
 // ---- 3) คิดราคาด้วยตัวคำนวณจริง
-const PP = process.env.PRICING || require('path').join(__dirname, '../../udmaterial-price/lib/pricing-v1.js');
+const PP = process.env.PRICING || require('path').join(__dirname, '../../udmaterial-price/lib/pricing-v2.js');
 let UP = null; try { UP = require(PP); } catch (e) { console.log('SKIP ราคา — ไม่พบ pricing-v1.js (ตั้ง PRICING=…)'); }
 if (UP) {
   const D = new UP.DB({

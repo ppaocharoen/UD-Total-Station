@@ -317,7 +317,7 @@
 <script>
   // โค้ดคิดราคาใช้ร่วมกับ UD-Cost Hub; ทดสอบในเครื่องใส่ ?pricing=<url> — รับเฉพาะ URL ของเราเอง/localhost (กันลิงก์แฝงสคริปต์)
   (function () {
-    const DEF = 'https://ppaocharoen.github.io/UDmaterial-price/lib/pricing-v1.js';
+    const DEF = 'https://ppaocharoen.github.io/UDmaterial-price/lib/pricing-v2.js';
     let u = new URLSearchParams(location.search).get('pricing') || DEF;
     try { const x = new URL(u, location.href); const ok = (x.origin === 'https://ppaocharoen.github.io' && x.pathname.startsWith('/UDmaterial-price/')) || (/^(localhost|127\.0\.0\.1)$/.test(x.hostname) && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)); u = ok ? x.href : DEF; } catch (e) { u = DEF; }
     document.write('<script src="' + u.replace(/["<>]/g, encodeURIComponent) + '"><\/script>');   // โหลดแบบรอ (app.js ใช้ UDPrice ทันที)

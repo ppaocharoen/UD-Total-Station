@@ -83,7 +83,7 @@ chk(n === 3 && boq.bind.a.mat.price === 10 && boq.bind.b.mat.kind === 'none' && 
 const ov = { a: { mat: 1 } }; BB.apply(rows, { a: { mat: { kind: 'none' } } }, { overrides: ov });
 chk(ov.a.mat === 1 && rows[0].price_ref.code === 'C1', 'apply ไม่แก้ overrides/rows ต้นทาง');
 // ---------------------------------------------------------------- 4b มวลรวมผูกทีละบรรทัด (ใช้ DB จริงของ UD Cost Hub: PRICING=<path pricing-v1.js>)
-const PP = process.env.PRICING || require('path').join(__dirname, '../../udmaterial-price/lib/pricing-v1.js');
+const PP = process.env.PRICING || require('path').join(__dirname, '../../udmaterial-price/lib/pricing-v2.js');
 let UP = null; try { UP = require(PP); } catch (e) { console.log('SKIP 4b — ไม่พบ pricing-v1.js (ตั้ง PRICING=…)'); }
 if (UP) {
   const D = new UP.DB({
