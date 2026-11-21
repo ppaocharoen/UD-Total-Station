@@ -94,6 +94,29 @@ PIPE_PCT = {"SN-3.7": {"name": "PVC ระบายน้ำ", "fit": 0.4, "sup"
             "SN-3.8": {"name": "PVC ประปา", "fit": 0.5, "sup": 0.3, "test": 0.1},
             "SN-3.10": {"name": "PP-R/PB/HDPE ประปา", "fit": 0.5, "sup": 0.2, "test": 0.1}}
 PIPE_PCT_CODES = {"SN-3.7": ("g/h", "i/j", "k/l"), "SN-3.8": ("k/l", "m/n", "o/p"), "SN-3.10": ("k/l", "m/n", "o/p")}
+# ท่อ PP-R เรียกขนาดเป็น มม. (Earth 21 พ.ย. 2569) — คีย์แถว/ผูกค่าแรงยังใช้ขนาดนิ้วในโมเดล
+PPR_MM = {0.5: 20, 0.75: 25, 1.0: 32, 1.25: 40, 1.5: 50, 2.0: 63}
+# สายหลายแกน (Earth 21 พ.ย. 2569): 1 เส้นต่อวงจร จำนวนแกน = จำนวนสาย · ยาว = ความยาวท่อ (สายแกนเดียว = ความยาวท่อ × จำนวนสาย)
+CABLE_RE = re.compile(r"VCT|NYY", re.I)
+
+
+def dia_in(s):
+    """'1/2"' → 0.5 · '1 1/2"' → 1.5 · ไม่ใช่นิ้ว → None"""
+    m = re.match(r'^\s*(\d+)?\s*(?:(\d+)/(\d+))?\s*(?:"|”|นิ้ว)\s*$', str(s or ""))
+    if not m or not (m.group(1) or m.group(2)):
+        return None
+    return (int(m.group(1) or 0)) + (int(m.group(2)) / int(m.group(3)) if m.group(2) else 0)
+
+
+def pipe_dia_label(mat, dia):
+    """ชื่อขนาดท่อในรายการ: PP-R ใช้ มม. ตามตารางเทียบ (ไม่มีในตาราง = นิ้วเดิม)"""
+    if re.search(r"PP-?R", mat or "", re.I):
+        mm = PPR_MM.get(dia_in(dia))
+        if mm:
+            return f"{mm} มม."
+    return dia
+
+
 RB_SIZES = {6, 9}   # ปลอก/เหล็กกลม (SR24); ขนาดอื่นถือเป็นข้ออ้อย SD40 ตามข้อตกลง
 
 
@@ -992,9 +1015,7 @@ class Takeoff:
                           note="สายเมน มิเตอร์ → แผง ตามระยะที่ระบุ")
             it["spec"] = {"t": "conduit", "conduit": sc}
             ws, wt, n = svc.get("wire_size"), svc.get("wire_type") or wire_t, svc.get("conductors") or 2
-            it = self.add("1.4", f"wire_{wt}_{ws}", f"สายไฟฟ้า {wt} {ws or ''} ตร.มม.".replace("  ", " "), "ม.", Ls * n, pid,
-                          waste=self.s["branch_wire_waste"], task="mep_rough", note=f"สายเมน {n} เส้น × {Ls:g} ม.")
-            it["spec"] = {"t": "wire", "wire": wt, "size": ws}
+            self._wire(wt, ws, n, Ls, pid, f"สายเมน {n} เส้น × {Ls:g} ม." if not CABLE_RE.search(wt or "") else f"สายเมน {n} แกน × {Ls:g} ม.")
         if el.get("conduits"):   # แนวท่อร้อยสายที่เก็บไว้ในโมเดล → ใช้ความยาวจริงของแนว ไม่ประมาณใหม่
             for r in el["conduits"]:   # คิดรายเส้น (แหล่งที่มา = id แนวท่อ) — แผนงาน/3D รู้ว่าแนวไหนอยู่งานไหน
                 L = sum(math.dist(r["pts"][i], r["pts"][i + 1]) for i in range(len(r["pts"]) - 1))
@@ -1006,9 +1027,7 @@ class Takeoff:
                               waste=self.s["branch_conduit_waste"], task="mep_rough", note="ตามแนวท่อร้อยสายในโมเดล; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
                 it["spec"] = {"t": "conduit", "conduit": conduit}
                 n, size = c.get("conductors") or 2, c.get("wire_size")
-                it = self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, r["id"],
-                              waste=self.s["branch_wire_waste"], task="mep_rough", note="ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
-                it["spec"] = {"t": "wire", "wire": wire_t, "size": size}
+                self._wire(wire_t, size, n, L, r["id"], "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
             if not svc.get("length"):
                 self.note("ไฟฟ้า: ยังไม่ได้ใส่ระยะสายเมน มิเตอร์ → แผง (mep.electrical.service.length)")
             return
@@ -1039,20 +1058,31 @@ class Takeoff:
                           waste=self.s["branch_conduit_waste"], task="mep_rough",
                           note="ประมาณจากตำแหน่งจุดในโมเดล เดินระดับฝ้าแบบมุมฉาก; เผื่อยาว 15% + เบ็ดเตล็ด 15%")
             it["spec"] = {"t": "conduit", "conduit": conduit}
-            it = self.add("1.4", f"wire_{wire_t}_{size}", f"สายไฟฟ้า {wire_t} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, c["panel"],
-                          waste=self.s["branch_wire_waste"], task="mep_rough",
-                          note="ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
-            it["spec"] = {"t": "wire", "wire": wire_t, "size": size}
+            self._wire(wire_t, size, n, L, c["panel"], "ความยาวท่อ × จำนวนสายในวงจร; เผื่อยาว 15% + เบ็ดเตล็ด 5%")
         self.note("ไฟฟ้า: คิดเฉพาะวงจรย่อย (แผง → จุด) ยังไม่รวมสายเมน/สายป้อน และค่าธรรมเนียมการไฟฟ้า")
+
+    def _wire(self, wt, size, n, L, src, note):
+        """สายไฟ: แกนเดียว = ยาว × จำนวนสาย · สายหลายแกน (VCT/NYY) = 1 เส้น n แกน ยาวเท่าท่อ — เก็บ runs {แหล่ง: {n: ยาว}} ให้เว็บสลับชนิดสายได้"""
+        if CABLE_RE.search(wt or ""):
+            it = self.add("1.4", f"wire_{wt}_{n}C_{size}", (f"สายไฟฟ้า {wt} {n}x{size} ตร.มม." if size else f"สายไฟฟ้า {wt} {n} แกน"), "ม.", L, src,
+                          waste=self.s["branch_wire_waste"], task="mep_rough", note=note.replace("ความยาวท่อ × จำนวนสายในวงจร", "สายหลายแกน 1 เส้นต่อวงจร ยาวเท่าท่อ"))
+            it["spec"] = {"t": "wire", "wire": wt, "size": size, "cores": n}
+        else:
+            it = self.add("1.4", f"wire_{wt}_{size}", f"สายไฟฟ้า {wt} {size or ''} ตร.มม.".replace("  ", " "), "ม.", L * n, src,
+                          waste=self.s["branch_wire_waste"], task="mep_rough", note=note)
+            it["spec"] = {"t": "wire", "wire": wt, "size": size}
+        rs = it.setdefault("runs", {}).setdefault(src, {})
+        rs[str(n)] = rs.get(str(n), 0.0) + L
+        return it
 
     def _pipes(self, pl):
         GL = self.GL
         ft = pl.get("fixture_types", {})
         eq = pl.get("equipment", [])
+        dm = pl.get("drain_material", "PVC ชั้น 8.5")   # ระบายน้ำ: แยกรายระบบได้ (soil_material ฯลฯ) ไม่ใส่ = drain_material (6e Earth 21 พ.ย.)
         mat = {"cw": pl.get("cw_material", "PVC ชั้น 13.5"), "hw": pl.get("hw_material", "PP-R"),
-               "soil": pl.get("drain_material", "PVC ชั้น 8.5"), "waste": pl.get("drain_material", "PVC ชั้น 8.5"),
-               "vent": pl.get("drain_material", "PVC ชั้น 8.5"), "rain": pl.get("drain_material", "PVC ชั้น 8.5"),
-               "drain": pl.get("drain_material", "PVC ชั้น 8.5")}
+               "soil": pl.get("soil_material", dm), "waste": pl.get("waste_material", dm),
+               "vent": pl.get("vent_material", dm), "rain": pl.get("rain_material", dm), "drain": dm}
         runs = defaultdict(float); src = defaultdict(list); est_note = defaultdict(list); plen = defaultdict(dict)
         drawn = defaultdict(list)    # system -> จุดปลายท่อที่เขียนไว้
         served = defaultdict(set)    # system -> สุขภัณฑ์ที่ท่อในโมเดลระบุว่าต่อแล้ว (pipe.serves)
@@ -1108,7 +1138,7 @@ class Takeoff:
                 note += f" · ประมาณแนวท่อให้ (แบบไม่ได้เขียน): {', '.join(est_note[k])} — ตรวจกับแบบ"
             grp = ("SN-3.7" if sysn in ("soil", "waste", "vent", "rain", "drain") else "SN-3.8") if "PVC" in m_.upper() else \
                   ("SN-3.10" if re.search(r"PP-?R|PB|HDPE", m_, re.I) and sysn in ("cw", "hw") else None)
-            it = self.add("1.3", key, f"ท่อ{SYS_NAME.get(sysn, sysn)} {m_} ⌀ {dia}", "ม.", Lp, None,
+            it = self.add("1.3", key, f"ท่อ{SYS_NAME.get(sysn, sysn)} {m_} ⌀ {pipe_dia_label(m_, dia)}", "ม.", Lp, None,
                           waste=self.s["pipe_waste"], task="mep_rough", note=note)
             it["from"] = src[k]; it["parts"] = {"mep_rough": {"q": Lp, "from": src[k]}}; it["by_src"] = dict(plen[k])
             it["spec"] = {"t": "pipe", "sys": sysn, "mat": m_, "dia": dia}
@@ -1328,6 +1358,8 @@ class Takeoff:
                 row["by_src"] = {k: round(v, 4) for k, v in it["by_src"].items() if v}
             if it.get("calc"):
                 row["calc"] = it["calc"]
+            if it.get("runs"):      # สายไฟ: {แหล่ง: {จำนวนสาย: ยาว}} — เว็บสลับแกนเดียว ↔ หลายแกน (6e)
+                row["runs"] = {k: {n: round(v, 4) for n, v in d.items()} for k, d in it["runs"].items()}
             if it.get("spec"):      # ชนิด/ขนาด ให้เว็บ (lib/pricemap.js) ผูกราคาตอนเปิด
                 row["spec"] = it["spec"]
             parts = it.get("parts") or {}
