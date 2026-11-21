@@ -352,6 +352,67 @@ def v75_cases(model, settings, pm):
     return ok
 
 
+JS6F = r"""
+const M = require(process.argv[1]); let s = ''; process.stdin.on('data', d => s += d).on('end', () => {
+  const a = JSON.parse(s), out = {};
+  const r0 = M.fromDrawing(a.model, []);
+  out.fresh0 = r0.fresh.map(g => ({ key: g.key, cls: g.mat.cls, kinds: g.mat.kinds, n: g.ids.length, text: M.matText(g.mat), look: g.mat.look }));
+  out.looks0 = r0.looks;
+  const lib = r0.fresh.map((g, i) => Object.assign(M.clean(g.mat), { id: 'L' + i }));
+  lib.forEach(m => { if (m.cls === 'clad') m.spec = ' ' + m.spec.split('').join(' ') + ' '; });   // ช่องว่างต่างกัน → ยังตรง
+  const r1 = M.fromDrawing(a.model, lib);
+  out.fresh1 = r1.fresh.length; out.matched1 = Object.keys(r1.matched).length; out.lib = lib;
+  out.looks1 = r1.looks;
+  // ข้อความเดียวกันแต่ต่างหมวด / ต่างชนิดหลังคา → ไม่ตรง
+  const wrong = lib.map(m => m.cls === 'clad' ? Object.assign({}, m, { cls: 'paint', name: m.spec, spec: '' }) : m.cls === 'roof' && !m.kinds.length ? Object.assign({}, m, { cover: m.cover === 'upvc' ? 'shingle' : 'upvc' }) : null).filter(Boolean);
+  out.wrongMatched = Object.keys(M.fromDrawing(a.model, wrong).matched).length;
+  process.stdout.write(JSON.stringify(out));
+});
+"""
+
+
+def f6_cases(model, settings, pm):
+    """6f: วัสดุตามแบบ ↔ คลัง (fromDrawing) + steel_paint.spec เป็นชื่อแถวทาสีเหล็ก"""
+    ok = True
+    m = copy.deepcopy(model)
+    fins = [f for f in m.get("finishes", []) if f.get("spec")]
+    if fins:
+        fins[0]["look"] = {"pat": "granito", "color": "#cccccc", "color2": "#555555", "cell": [0.6, 0.6]}
+    for r in m.get("roofs", []):
+        if r.get("cover") != "concrete_deck":
+            r["cover_spec"] = "หลังคาเมทัลชีท หนา 0.40 มม. สีแดง"
+            r["look"] = {"color": "#aa3333"}
+    m["steel_paint"] = {"spec": "ทาสีกันสนิม 1 เที่ยว ทับหน้าสีน้ำมัน 2 เที่ยว สีเทา", "color": "#666666"}
+    exp, _, _ = takeoff.run(m, settings, pm)
+    m["quantities"] = {"items": exp}
+    pr = [x for x in exp if x["key"] == "paint_rust"]
+    if pr:
+        good = pr[0]["name"] == m["steel_paint"]["spec"]
+        print("ผ่าน" if good else "ไม่ผ่าน", "6f steel_paint.spec → ชื่อแถว paint_rust", pr[0]["name"]); ok &= good
+    lib = os.path.join(HERE, "..", "lib", "matlib.js")
+    p = subprocess.run(["node", "-e", JS6F, os.path.abspath(lib)], input=json.dumps({"model": m}), capture_output=True, text=True, encoding="utf-8")
+    if p.returncode:
+        raise SystemExit(p.stderr)
+    r = json.loads(p.stdout)
+    n0 = sum(g["n"] for g in r["fresh0"])
+    good = len(r["fresh0"]) > 0 and r["fresh1"] == 0 and r["matched1"] == n0
+    print("ผ่าน" if good else "ไม่ผ่าน", f"6f คลังว่าง → วัสดุใหม่ {len(r['fresh0'])} รายการ ({n0} ชิ้น) · บันทึกแล้วจับคู่ได้ {r['matched1']} ชิ้น เหลือใหม่ {r['fresh1']}"); ok &= good
+    good = r["wrongMatched"] == 0
+    print("ผ่าน" if good else "ไม่ผ่าน", "6f ข้อความเดียวกันแต่ต่างหมวด/ต่างชนิดหลังคา ไม่จับคู่", r["wrongMatched"]); ok &= good
+    clsset = {(g["cls"], g["text"]) for g in r["fresh0"]}
+    for want in [("paint", m["steel_paint"]["spec"])] + ([("roof", "หลังคาเมทัลชีท หนา 0.40 มม. สีแดง")] if any(x.get("cover") == "metal_sheet" for x in m.get("roofs", [])) else []):
+        good = want in clsset
+        print("ผ่าน" if good else "ไม่ผ่าน", "6f มีวัสดุใหม่", want); ok &= good
+    if fins:
+        lk = r["looks0"].get(fins[0]["id"]) or {}
+        good = lk.get("pat") == "granito"
+        print("ผ่าน" if good else "ไม่ผ่าน", "6f หน้าตาตามแบบของงานผิว", fins[0]["id"], lk.get("pat")); ok &= good
+    st = [k for k, v in r["looks1"].items() if v.get("steel")]
+    good = not pr or len(st) > 0
+    print("ผ่าน" if good else "ไม่ผ่าน", f"6f ชิ้นเหล็กได้หน้าตาสีเหล็กจากคลัง {len(st)} ชิ้น"); ok &= good
+    return ok
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "examples", "sample-building.bm.json")
     model = json.load(open(path, encoding="utf-8"))
@@ -456,6 +517,7 @@ def main():
     ok &= roof_cases(model, settings, pm)
     ok &= unit_cases(model, settings, pm)
     ok &= v75_cases(model, settings, pm)
+    ok &= f6_cases(model, settings, pm)
     print("\nรวม:", "ผ่านทั้งหมด" if ok else "มีข้อที่ไม่ผ่าน")
     sys.exit(0 if ok else 1)
 

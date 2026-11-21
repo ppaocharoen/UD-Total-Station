@@ -23,7 +23,7 @@ const S = {
 function newBoq() {
   return { format: 'ud-boq', version: 1, project: {}, factor: { advance: 0, retention: 0, loanPct: 0 },
     overrides: {}, bind: {}, cmpline: {}, survey: {}, surveys: {}, subSkip: {}, custom_rows: [], pr2: [], pr3: [], plan: newPlan(),
-    matsel: { piece: {}, type: {} }, mats: {}, mepsel: {}, model_file: '', saved_at: '' };   // mepsel = ชนิดท่อ/สายทั้งระบบ (boq/mepui.js)   // matsel/mats = วัสดุที่เปลี่ยนใน 3D + สำเนาวัสดุ (boq/matui.js)
+    matsel: { piece: {}, type: {} }, mats: {}, mepsel: {}, matskip: [], model_file: '', saved_at: '' };   // mepsel = ชนิดท่อ/สายทั้งระบบ (boq/mepui.js)   // matsel/mats = วัสดุที่เปลี่ยนใน 3D + สำเนาวัสดุ (boq/matui.js)
 }
 /** คำเรียกตามประเภทงาน: กำหนดราคากลาง → ราคากลาง · ประมาณราคา → ราคาประมาณการ */
 const RG = () => (isCentral() ? 'ราคากลาง' : isRepair() ? 'ประมาณราคาค่าซ่อมแซม' : 'ราคาประมาณการ');
@@ -674,6 +674,7 @@ function _renderPR1() {
   if (nAcc.length) $('#pr1-alert').insertAdjacentHTML('beforeend', ` <button class="btn small no-print" id="cmp-accall" title="รวมราคาเฉพาะวัสดุย่อยที่มีราคา (ที่ขาดคิดเป็น 0) และระบุในที่มาของราคา">ยอมรับราคามวลรวมไม่ครบ ${nAcc.length} รายการ</button>`);
   const ab = $('#cmp-accall'); if (ab) ab.onclick = () => cmpAcceptAll(nAcc);
   if (typeof mepAlertHtml === 'function') { const mh = mepAlertHtml(); if (mh) { $('#pr1-alert').insertAdjacentHTML('beforeend', mh); mepAlertBind($('#pr1-alert')); } }
+  if (typeof mtDrawAlertHtml === 'function') { const dh = mtDrawAlertHtml(); if (dh) { $('#pr1-alert').insertAdjacentHTML('beforeend', dh); mtDrawAlertBind($('#pr1-alert')); } }   // 6f วัสดุใหม่จากแบบ
   cmpBindEvents(tb); sugBindEvents(tb); linkLibWarm();
   const nSug = S.db ? sugRows().length : 0;
   if (nSug) $('#pr1-alert').insertAdjacentHTML('beforeend', ` <button class="btn small no-print" id="sug-all" title="ใช้คำแนะนำกับทุกแถวที่ยังไม่มีราคาและยังไม่ได้ผูกเอง">ใช้คำแนะนำทั้งหมด (${nSug})</button>`);

@@ -780,7 +780,8 @@ class Takeoff:
             for m, ln in steel_mem[sec_id].items():
                 pbs[m] = pbs.get(m, 0) + per * ln
         if paint:
-            it = self.add("1.1.19", "paint_rust", "ทาสีกันสนิมโครงเหล็ก", "ตร.ม.", paint, None, task="roof_frame",
+            sp = ((self.m.get("steel_paint") or {}).get("spec") or "").strip()   # 6f: ข้อความรายการทาสีเหล็กตามแบบ (ผูกราคาเดิม)
+            it = self.add("1.1.19", "paint_rust", sp or "ทาสีกันสนิมโครงเหล็ก", "ตร.ม.", paint, None, task="roof_frame",
                           note="เส้นรอบรูปหน้าตัด × ความยาวจริง; เหล็กรีดเย็นนับผิว 2 ด้าน")
             it["from"] = srcs
             it["parts"] = {"roof_frame": {"q": paint, "from": srcs}}

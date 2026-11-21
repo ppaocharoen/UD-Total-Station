@@ -11,6 +11,10 @@
  * 6d แคตตาล็อก: ประตู-หน้าต่าง · สุขภัณฑ์ · อุปกรณ์สุขาภิบาล · จุดไฟฟ้า/โคม (วัสดุ cls 'item') — ชนิดเดียวกันเท่านั้น · ขนาดใช้ของโมเดล
  *   ชิ้นนี้ = แยกแถว · ทุกชิ้นแบบเดียวกัน = ทั้งแถวเปลี่ยนชื่อ · 3D เปลี่ยนสีวงกบ/บาน/ตัว + วิธีเปิดบาน
  * 6b ผนังทาสี ↔ ผนังกรุ: ด้านภายใน/ภายนอกหาเองจากคำในรายการ/ผนังฉาบด้านเดียว — ไม่รู้ → ถามในหน้าต่าง เก็บใน matsel.side {id: 'int'|'ext'}
+ * 6f วัสดุจากแบบ (Earth 21 พ.ย.): MatLib.fromDrawing จับคู่ชิ้นกับคลัง (หมวด + ชนิด + ข้อความรายการหลังตัดช่องว่าง)
+ *   ตรง → หน้าตาวัสดุในคลังใน 3D (ไม่เขียน matsel · ไม่กระทบ BOQ) · ไม่ตรง → "วัสดุใหม่จากแบบ" ติ๊กแล้วบันทึกเข้าคลัง
+ *   ที่ไม่ติ๊ก/ไม่บันทึก → จำใน .boq.json matskip [กุญแจ] ไม่เตือนซ้ำ (ยังเปิดดูได้จากปุ่ม "วัสดุจากแบบ…")
+ *   ส่งออกคลังเป็น คลังวัสดุ.json ลงโฟลเดอร์ _claude_kb (เลือกโฟลเดอร์ครั้งแรก จำไว้ใน IndexedDB · เบราว์เซอร์ไม่รองรับ = ดาวน์โหลด) ให้สกิลอ่านแบบใช้ชื่อ/ข้อความ/ลายตรงคลัง
  */
 'use strict';
 const MT = { lib: [], loaded: false, loading: false, err: '', auth: { ready: false }, pick: null, scope: 'piece', q: '', ed: null, edFor: null };
@@ -39,7 +43,7 @@ function matRows(items) {
 }
 function mtLooks() {
   if (!S.model || !S.boq) return {};
-  const eff = MatLib.effective(S.model, mtSel(), mtUseMats()), L = {};
+  const eff = MatLib.effective(S.model, mtSel(), mtUseMats()), L = Object.assign({}, mtDraw().looks);   // 6f: หน้าตาตามแบบ/วัสดุในคลังที่ตรงกับแบบ — ที่เลือกเองทับ
   Object.entries(eff).forEach(([id, m]) => {
     if (MatLib.isRacc({ racc: /@(ridge|hip|valley)$/.test(id) })) return;   // v7.5 ครอบสัน/ตะเข้ที่คิดจากหลังคา: ไม่มีชิ้นใน 3D
     L[id] = m.cls === 'item' ? Object.assign({}, m.look, m.style ? { style: m.style } : {}) : (m.kinds || [])[0] === 'steel' ? Object.assign({}, m.look, { steel: true }) : m.look;   // 6d วิธีเปิดบาน · v7.5 สีเหล็ก
@@ -53,7 +57,7 @@ function mtRefresh(noRender) {
 }
 /** เปิดโมเดล/เปิด .boq.json (เรียกจาก app.js ก่อน viewer.load) */
 function matOnLoad() {
-  if (!S.boq) return; mtSel(); mtSnaps();
+  if (!S.boq) return; mtSel(); mtSnaps(); MT.drawFor = null; MT.drawToast = null;
   if (S.viewer) S.viewer.looks = mtLooks();
   mtSyncSnaps();
 }
@@ -64,7 +68,9 @@ async function mtLoad(force) {
   MT.loading = true; MT.err = '';
   try { MT.lib = (await UDMatFS.list()).map(m => Object.assign(MatLib.clean(m), { id: m.id })); MT.loaded = true; }
   catch (e) { MT.err = e.message; } finally { MT.loading = false; }
-  mtSyncSnaps(); mtRender();
+  MT.drawFor = null; mtSyncSnaps(); mtRender();
+  if (MT.loaded && S.model && S.viewer && S.viewer.setLooks) S.viewer.setLooks(mtLooks());   // 6f: วัสดุในคลังที่ตรงกับแบบ
+  mtDrawNotify(); mtDrawRender();
 }
 /** สำเนาในโครงการที่คลังมีรุ่นใหม่กว่า → อัปเดต (แจ้งจำนวน) */
 function mtSyncSnaps() {
@@ -79,6 +85,144 @@ function mtAuthHook() {
 }
 if (window.UDAuth) mtAuthHook(); else window.addEventListener('udauth-loaded', mtAuthHook);
 window.addEventListener('udmatfs', () => mtLoad());
+
+// ------------------------------------------------------------------ 6f วัสดุจากแบบ ↔ คลัง
+const mtSkip = () => (S.boq.matskip = Array.isArray(S.boq.matskip) ? S.boq.matskip : []);
+/** ผลจับคู่ (จำไว้จนโมเดล/คลังเปลี่ยน) — ก่อนโหลดคลังกลาง: เทียบกับสำเนาในโครงการเท่านั้น (ไม่เตือนวัสดุใหม่) */
+function mtDraw() {
+  if (!S.model) return { looks: {}, matched: {}, fresh: [] };
+  const lib = Object.values(mtAll()).filter(m => !m.builtin);
+  const sig = MT.loaded + '|' + lib.map(m => m.id + ':' + (m.at || 0)).join(',');
+  if (MT.drawFor && MT.drawFor.model === S.model && MT.drawFor.sig === sig) return MT.drawFor.r;
+  let r; try { r = MatLib.fromDrawing(S.model, lib); } catch (e) { console.warn('จับคู่วัสดุจากแบบไม่สำเร็จ', e); r = { looks: {}, matched: {}, fresh: [] }; }
+  MT.drawFor = { model: S.model, sig, r }; return r;
+}
+/** วัสดุใหม่จากแบบที่ยังไม่เคยเลือกไม่บันทึก (เฉพาะเมื่อโหลดคลังกลางแล้ว) */
+const mtDrawNew = () => !MT.loaded || !S.boq ? [] : mtDraw().fresh.filter(g => !mtSkip().includes(g.key));
+function mtDrawNotify() {
+  const n = mtDrawNew().length, k = S.model && (S.boq.model_file || '') + '|' + n;
+  if (!n || MT.drawToast === k) return; MT.drawToast = k;
+  toast(`วัสดุใหม่จากแบบ ${n} รายการยังไม่อยู่ในคลัง — ดูที่ปุ่ม "วัสดุจากแบบ…" หน้า ปร.1`);
+  if (typeof renderAll === 'function') renderAll();
+}
+/** แถบเตือนใน ปร.1 (บนจอเท่านั้น) */
+function mtDrawAlertHtml() {
+  const n = mtDrawNew().length; if (!n) return '';
+  return ` <span class="warnline no-print">วัสดุใหม่จากแบบ ${n} รายการยังไม่อยู่ในคลังวัสดุ <button class="btn small" data-mtd-open="1">ดูรายการ…</button></span>`;
+}
+function mtDrawAlertBind(box) { const b = box && box.querySelector('[data-mtd-open]'); if (b) b.onclick = () => mtDrawOpen(); }
+function mtDrawModal() {
+  let m = $('#mtd-modal'); if (m) return m;
+  m = document.createElement('div'); m.id = 'mtd-modal'; m.className = 'modal';
+  m.innerHTML = `<div class="modal-box glass mt-box"><div class="side-top"><h2 style="margin:0">วัสดุจากแบบ</h2><button class="btn small" data-close="1">×</button></div><div id="mtd-body"></div></div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click', e => { if (e.target === m || e.target.dataset.close) m.classList.remove('on'); });
+  m.addEventListener('input', e => { const k = e.target.dataset.mtdn; if (k !== undefined && MT.dsel[k]) MT.dsel[k].name = e.target.value; });
+  m.addEventListener('change', e => { const k = e.target.dataset.mtdc; if (k !== undefined && MT.dsel[k]) MT.dsel[k].on = e.target.checked; });
+  m.addEventListener('click', e => {
+    const b = e.target.closest('[data-mtda]'); if (!b) return;
+    const a = b.dataset.mtda;
+    if (a === 'save') mtDrawSave();
+    else if (a === 'skipall') mtDrawSkip(mtDraw().fresh.map(g => g.key));
+    else if (a === 'all' || a === 'none') { Object.values(MT.dsel).forEach(x => { x.on = a === 'all'; }); mtDrawRender(); }
+    else if (a === 'reload') mtLoad(true);
+    else if (a === 'export') mtKbExport(true);
+    else if (a === 'repick') mtKbExport(true, true);
+  });
+  return m;
+}
+function mtDrawOpen() { MT.dsel = null; mtDrawModal().classList.add('on'); mtDrawRender(); if (!MT.loaded) mtLoad(); }
+const mtGroupWhat = m => m.cls === 'item' ? m.kinds.map(k => MatLib.ITEM_KINDS[k]).join(', ') + (m.style ? ' · ' + MatLib.STYLE_TH[m.style] : '')
+  : m.cls === 'roof' ? (m.kinds.length ? MatLib.RPART_TH[m.kinds[0]] : 'แผ่นมุง ' + (MatLib.COVER_TH[m.cover] || m.cover))
+  : m.cls === 'paint' && m.kinds[0] === 'steel' ? 'ทาสีเหล็กรูปพรรณ' : MatLib.CLS_TH[m.cls] + ' · ' + m.kinds.map(k => MatLib.KIND_TH[k]).join(', ');
+function mtDrawRender() {
+  const m = $('#mtd-modal'); if (!m || !m.classList.contains('on')) return;
+  const body = $('#mtd-body', m);
+  if (!S.model) { body.innerHTML = '<div class="hint">ยังไม่ได้เปิดโมเดล</div>'; return; }
+  const r = mtDraw(), sk = mtSkip(), nm = Object.keys(r.matched).length;
+  let h = `<div class="mt-head"><div class="mt-stat">${mtStatus().replace(/data-mta="reload"/g, 'data-mtda="reload"')}</div>
+    <div class="hint">จับคู่ชิ้นในโมเดลกับคลังด้วย หมวด + ชนิดชิ้น + ข้อความรายการ (ไม่สนช่องว่าง) — ตรงกัน = ใช้หน้าตาวัสดุในคลังใน 3D (ไม่กระทบ BOQ)${MT.loaded ? ` · ตรงกับคลังแล้ว ${nm} ชิ้น` : ''}</div>
+    <div class="btn-row"><button class="btn small" data-mtda="export" title="เขียนคลังวัสดุกลางทั้งหมดเป็นไฟล์ คลังวัสดุ.json ในโฟลเดอร์ _claude_kb ให้สกิลอ่านแบบใช้ชื่อ/ข้อความ/ลายตรงคลัง">ส่งออกคลัง → _claude_kb</button>${MT.kbName ? `<span class="hint">โฟลเดอร์: ${esc(MT.kbName)}</span> <button class="btn small ghost" data-mtda="repick">เปลี่ยนโฟลเดอร์</button>` : ''}</div></div>`;
+  if (!MT.loaded) { body.innerHTML = h + '<div class="hint" style="margin-top:8px">ต้องโหลดคลังวัสดุกลางก่อนจึงจะบอกได้ว่าวัสดุใดยังไม่อยู่ในคลัง</div>'; return; }
+  const fr = r.fresh.slice().sort((a, b) => (sk.includes(a.key) ? 1 : 0) - (sk.includes(b.key) ? 1 : 0) || a.mat.cls.localeCompare(b.mat.cls));
+  if (!fr.length) { body.innerHTML = h + '<div class="hint" style="margin-top:8px">วัสดุทุกรายการในแบบอยู่ในคลังแล้ว (หรือแบบไม่ได้ระบุข้อความรายการ)</div>'; return; }
+  if (!MT.dsel) { MT.dsel = {}; fr.forEach(g => { MT.dsel[g.key] = { on: !sk.includes(g.key), name: g.mat.name }; }); }
+  fr.forEach(g => { if (!MT.dsel[g.key]) MT.dsel[g.key] = { on: !sk.includes(g.key), name: g.mat.name }; });
+  h += `<div style="margin-top:8px"><b>วัสดุใหม่จากแบบ ${fr.length} รายการ</b> <span class="hint">ติ๊กรายการที่จะบันทึกเข้าคลังกลาง แก้ชื่อได้ — ที่ไม่ติ๊กจะจำไว้ว่าไม่บันทึก (ไม่เตือนซ้ำในโครงการนี้)</span></div>
+    <div class="btn-row"><button class="btn small ghost" data-mtda="all">ติ๊กทั้งหมด</button><button class="btn small ghost" data-mtda="none">เอาติ๊กออกทั้งหมด</button></div><div id="mtd-list">`;
+  h += fr.map(g => { const d = MT.dsel[g.key], mt = g.mat;
+    return `<div class="mt-item"><input type="checkbox" data-mtdc="${esc(g.key)}" ${d.on ? 'checked' : ''} style="align-self:center">${mtSwatchHtml(MatLib.viewLook(mt), 72, 48)}
+      <div class="mt-iname"><input class="cell" data-mtdn="${esc(g.key)}" value="${esc(d.name)}" style="width:100%">
+        <div class="hint">${esc(mtGroupWhat(mt))} · ${g.ids.length} ชิ้น${sk.includes(g.key) ? ' · <span class="pill warn">เคยเลือกไม่บันทึก</span>' : ''}</div>
+        ${mt.spec ? `<div class="hint">รายการ BOQ: ${esc(mt.spec)}</div>` : ''}</div></div>`; }).join('');
+  h += `</div><div class="btn-row" style="margin-top:10px"><button class="btn small primary" data-mtda="save" ${mtApproved() ? '' : 'disabled'}>บันทึกที่ติ๊กเข้าคลังกลาง</button><button class="btn small" data-mtda="skipall">ไม่บันทึกทั้งหมด</button><span id="mtd-err" style="color:var(--red)"></span></div>
+    <div class="hint">บันทึกแล้วแก้ลาย/สี/ราคาแนะนำได้ทีหลังที่ "เปลี่ยนวัสดุ…" ของชิ้นนั้น</div>`;
+  body.innerHTML = h; mtPaintSwatches(body);
+}
+function mtDrawSkip(keys) {
+  const sk = mtSkip(); keys.forEach(k => { if (!sk.includes(k)) sk.push(k); });
+  autosave(); $('#mtd-modal').classList.remove('on'); renderAll(); toast(`จำไว้แล้ว: ไม่บันทึก ${keys.length} รายการ`);
+}
+async function mtDrawSave() {
+  const fr = mtDraw().fresh, D = MT.dsel || {}, em = $('#mtd-err');
+  const on = fr.filter(g => D[g.key] && D[g.key].on), off = fr.filter(g => !(D[g.key] && D[g.key].on));
+  for (const g of on) { const c = MatLib.clean(Object.assign({}, g.mat, { name: (D[g.key].name || '').trim() || g.mat.name })), e = MatLib.problems(c); if (e.length) { em.textContent = c.name + ': ' + e.join(' · '); return; } }
+  em.textContent = 'กำลังบันทึก…'; let n = 0;
+  try {
+    for (const g of on) {
+      const c = MatLib.clean(Object.assign({}, g.mat, { name: (D[g.key].name || '').trim() || g.mat.name })); delete c.id;
+      const d = await UDMatFS.put(c); MT.lib.push(Object.assign(MatLib.clean(d), { id: d.id })); n++;
+    }
+  } catch (e) { em.textContent = `บันทึกได้ ${n} รายการ แล้วไม่สำเร็จ: ${e.message}`; MT.drawFor = null; mtRefresh(); return; }
+  const sk = mtSkip(); on.forEach(g => { const i = sk.indexOf(g.key); if (i >= 0) sk.splice(i, 1); }); off.forEach(g => { if (!sk.includes(g.key)) sk.push(g.key); });
+  MT.drawFor = null; MT.dsel = null; $('#mtd-modal').classList.remove('on'); mtRefresh();
+  toast(`บันทึกเข้าคลังกลาง ${n} รายการ${off.length ? ` · จำไม่บันทึก ${off.length} รายการ` : ''}`);
+  if (n) mtKbExport(false);   // เคยเลือกโฟลเดอร์และยังได้สิทธิ์ → อัปเดตไฟล์ให้เลย
+}
+
+// ------------------------------------------------------------------ 6f ส่งออกคลังเป็นไฟล์ให้สกิลอ่านแบบ
+const KB_FILE = 'คลังวัสดุ.json';
+function mtIdb(mode, fn) {
+  return new Promise((res, rej) => {
+    let rq; try { rq = indexedDB.open('udts-kb', 1); } catch (e) { return rej(e); }
+    rq.onupgradeneeded = () => rq.result.createObjectStore('h');
+    rq.onerror = () => rej(rq.error);
+    rq.onsuccess = () => { const db = rq.result, tx = db.transaction('h', mode), r = fn(tx.objectStore('h')); tx.oncomplete = () => { db.close(); res(r && r.result); }; tx.onerror = () => { db.close(); rej(tx.error); }; };
+  });
+}
+/** เนื้อไฟล์ คลังวัสดุ.json (ไม่มีชื่อบัญชีผู้สร้าง/เวลา) */
+function mtKbJson() {
+  const keep = ['id', 'name', 'cls', 'kinds', 'spec', 'look', 'cover', 'ins', 'style'];
+  const mats = MT.lib.map(m => { const o = {}; keep.forEach(k => { if (m[k] !== undefined && m[k] !== '') o[k] = m[k]; }); return o; })
+    .sort((a, b) => a.cls.localeCompare(b.cls) || String(a.name).localeCompare(String(b.name), 'th'));
+  return JSON.stringify({ format: 'ud-matlib/1', exported_at: new Date().toISOString(), count: mats.length,
+    note: 'คลังวัสดุกลาง UD Total Station (ส่งออกจากเว็บ) — สกิลอ่านแบบใช้ตั้งชื่อ/ข้อความรายการ/ลาย ให้ตรงคลัง · จับคู่ = หมวด + ชนิด + ข้อความรายการ (ทาสีผิวใช้ชื่อ) ไม่สนช่องว่าง',
+    materials: mats }, null, 1);
+}
+/** ask = กดเอง (ขอสิทธิ์/เลือกโฟลเดอร์ได้) · repick = เลือกโฟลเดอร์ใหม่ */
+async function mtKbExport(ask, repick) {
+  if (!MT.loaded) { if (ask) toast('ยังโหลดคลังวัสดุกลางไม่ได้ — ล็อกอินด้วยบัญชีที่อนุมัติก่อน'); return; }
+  const text = mtKbJson();
+  if (!window.showDirectoryPicker) {
+    if (!ask) return;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' })); a.download = KB_FILE; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast(`ดาวน์โหลด ${KB_FILE} แล้ว — ย้ายไปไว้ในโฟลเดอร์ _claude_kb (เบราว์เซอร์นี้เขียนลงโฟลเดอร์เองไม่ได้)`); return;
+  }
+  try {
+    let h = repick ? null : await mtIdb('readonly', s => s.get('kbdir')).catch(() => null);
+    if (!h) {
+      if (!ask) return;
+      h = await window.showDirectoryPicker({ id: 'udts-kb', mode: 'readwrite' });
+      if (h.name !== '_claude_kb' && !confirm(`โฟลเดอร์ที่เลือกชื่อ "${h.name}" ไม่ใช่ _claude_kb — ใช้โฟลเดอร์นี้ต่อไหม?`)) return;
+      await mtIdb('readwrite', s => s.put(h, 'kbdir'));
+    }
+    let p = await h.queryPermission({ mode: 'readwrite' });
+    if (p !== 'granted' && ask) p = await h.requestPermission({ mode: 'readwrite' });
+    if (p !== 'granted') { if (ask) toast('ไม่ได้รับสิทธิ์เขียนโฟลเดอร์'); return; }
+    const fh = await h.getFileHandle(KB_FILE, { create: true }), w = await fh.createWritable(); await w.write(text); await w.close();
+    MT.kbName = h.name; toast(`เขียน ${KB_FILE} ลง ${h.name} แล้ว (${MT.lib.length} รายการ)`); mtDrawRender();
+  } catch (e) { if (e && e.name === 'AbortError') return; if (ask) alert('ส่งออกคลังไม่สำเร็จ: ' + (e.message || e)); else console.warn('ส่งออกคลังไม่สำเร็จ', e); }
+}
 
 // ------------------------------------------------------------------ กล่องข้อมูลชิ้น (showPick)
 function mtCur(id) {
@@ -432,7 +576,7 @@ async function mtEdSave() {
     if (MT.edTarget === 'lib') {
       if (e.id) { c.id = e.id; c.by = e.by; c.byName = e.byName; } else delete c.id;
       const d = await UDMatFS.put(c); saved = Object.assign(MatLib.clean(d), { id: d.id });
-      MT.lib = MT.lib.filter(x => x.id !== saved.id).concat([saved]);
+      MT.lib = MT.lib.filter(x => x.id !== saved.id).concat([saved]); MT.drawFor = null;
     } else {
       saved = Object.assign(c, { id: e.id || ('P-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)), at: Date.now() });
     }

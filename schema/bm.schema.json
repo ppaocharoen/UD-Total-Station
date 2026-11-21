@@ -186,6 +186,20 @@
         "$ref": "#/$defs/finish"
       }
     },
+    "steel_paint": {
+      "type": "object",
+      "description": "ทาสีเหล็กรูปพรรณตามแบบ (6f · ทั้งโครงการ) — spec = ชื่อแถว paint_rust ใน ปร.4 (ผูกราคาเดิม: รองพื้นกันสนิม + สีน้ำมัน) · color = สีใน 3D",
+      "properties": {
+        "spec": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "additionalProperties": false
+    },
     "mep": {
       "$ref": "#/$defs/mep"
     },
@@ -1374,6 +1388,32 @@
             "arch"
           ],
           "description": "rect = สี่เหลี่ยม (ค่าตั้งต้น) · arch = สี่เหลี่ยม w×h + ครึ่งวงกลมรัศมี w/2 ด้านบน"
+        },
+        "look": {
+          "type": "object",
+          "description": "การวาดบาน/ช่องใน 3D (style, leaf, frame, pattern, cell …) · 6f: color = สีวงกบ, color2 = สีบาน ตามแบบ (ใช้จับคู่คลังวัสดุกับ desc)",
+          "properties": {
+            "style": {
+              "enum": [
+                "swing",
+                "swing2",
+                "slide",
+                "slide_hung",
+                "glass",
+                "vent_block",
+                "glass_block"
+              ],
+              "description": "ประตู-หน้าต่าง: วิธีเปิดบาน"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            },
+            "color2": {
+              "type": "string",
+              "pattern": "^#[0-9a-fA-F]{6}$"
+            }
+          }
         }
       }
     },
@@ -1606,6 +1646,9 @@
               }
             }
           }
+        },
+        "look": {
+          "$ref": "#/$defs/look"
         }
       }
     },
@@ -1915,6 +1958,9 @@
             "section",
             "spacing"
           ]
+        },
+        "look": {
+          "$ref": "#/$defs/look"
         }
       }
     },
@@ -1986,6 +2032,9 @@
                   },
                   "price_ref": {
                     "$ref": "#/$defs/priceRef"
+                  },
+                  "look": {
+                    "$ref": "#/$defs/look"
                   }
                 }
               }
@@ -2129,6 +2178,9 @@
                   },
                   "price_ref": {
                     "$ref": "#/$defs/priceRef"
+                  },
+                  "look": {
+                    "$ref": "#/$defs/look"
                   }
                 }
               }
@@ -3105,6 +3157,55 @@
           "description": "ชนิดเหล็กเมื่อแบบระบุต่างจากค่าตั้งต้น (Ø6/9 = RB · อื่น = DB) เช่น RB12 → kind RB"
         }
       }
+    },
+    "look": {
+      "type": "object",
+      "description": "หน้าตาตามแบบ (6f · ใช้วาด 3D และจับคู่คลังวัสดุ — ไม่กระทบ BOQ) รูปแบบเดียวกับ look ของคลังวัสดุ (lib/matlib.js)",
+      "properties": {
+        "pat": {
+          "enum": [
+            "plain",
+            "concrete",
+            "tile",
+            "granito",
+            "washed",
+            "brick",
+            "wood"
+          ],
+          "description": "ลาย"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "color2": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "สีที่ 2 / สีเม็ด / สีบาน (ประตู-หน้าต่าง)"
+        },
+        "grout": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$",
+          "description": "สียาแนว/ปูนก่อ"
+        },
+        "gw": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50,
+          "description": "ร่องยาแนว มม."
+        },
+        "cell": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "ขนาดแผ่น/หน่วยลาย [กว้าง, ยาว] ม."
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
