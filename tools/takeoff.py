@@ -689,10 +689,13 @@ class Takeoff:
             roof_area += area
             w = 0.05 if rf["form"] == "hip" else 0.03
             if rf["cover"] != "concrete_deck":
-                it = self.add("1.2.1", f"cover_{rf['cover']}", f"วัสดุมุงหลังคา {COVER_NAME.get(rf['cover'], rf['cover'])}",
+                cs = (rf.get("cover_spec") or "").strip()   # ข้อความรายการตามแบบ (เช่น หนา/สี) — แยกแถวตามข้อความ · ราคาผูกตามชนิด cover (M2b 6c)
+                it = self.add("1.2.1", f"cover_{rf['cover']}" + (f"_{cs}" if cs else ""), cs or f"วัสดุมุงหลังคา {COVER_NAME.get(rf['cover'], rf['cover'])}",
                               "ตร.ม.", area, rf["id"], waste=w, task="roof_cover",
                               note="พื้นที่ตามแนวลาด; ถ้าคิดเป็นแผ่นให้แปลงตามคู่มือผู้ผลิตแล้วเผื่อ 3%/5%")
                 it["spec"] = {"t": "cover", "cover": rf["cover"], "form": rf["form"]}
+                if cs:
+                    it["spec"]["desc"] = cs
                 if rf["cover"] == "metal_sheet":   # แผ่นลอน: หน้ากว้างปิดจริง 0.76 (ซ้อน 1 ลอน) วางยาวตามแนวลาด — หน่วยราคายังเป็น ตร.ม.
                     sh = dict(SHEET_DEFAULT, **(rf.get("sheet") or {}))
                     lay = [sheet_layout(p, sh) for p in planes]
@@ -714,7 +717,7 @@ class Takeoff:
                     it = self.add("1.2.1", "valley", "ตะเข้ราง", "ม.", valley, rf["id"], waste=0.03, task="roof_cover")
                     it["spec"] = {"t": "valley", "cover": rf["cover"]}
                 if rf.get("insulation"):
-                    it = self.add("1.2.1", "insulation", f"ฉนวนใต้หลังคา {rf['insulation']}", "ตร.ม.", area, rf["id"], task="roof_cover")
+                    it = self.add("1.2.1", f"insulation_{rf['insulation']}", f"ฉนวนใต้หลังคา {rf['insulation']}", "ตร.ม.", area, rf["id"], task="roof_cover")   # แยกแถวตามชนิดฉนวน (6c)
                     it["spec"] = {"t": "insulation", "desc": rf["insulation"], "cover": rf["cover"]}
                 for part, along, typ in (("purlin", "u", "purlin"), ("rafter", "v", "rafter")):
                     spec = rf.get(part)

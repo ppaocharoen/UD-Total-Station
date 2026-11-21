@@ -56,6 +56,17 @@ def modify(model, eff, mats, side=None, base=None):
                     out[mm.group(1)] += r["by_src"][w["id"]]
         w[fld] = out
         return out
+    for rf in m.get("roofs", []):   # 6c: แผ่นมุง → cover_spec · ฉนวนตามวัสดุ
+        mid = eff.get(rf["id"])
+        if not mid:
+            continue
+        mt = mats[mid]
+        rf["cover_spec"] = mt["spec"]
+        ins = mt.get("ins") or {"mode": "keep"}
+        if ins["mode"] == "none":
+            rf.pop("insulation", None)
+        elif ins["mode"] == "set":
+            rf["insulation"] = ins["desc"]
     for f in m.get("finishes", []):
         mid = eff.get(f["id"])
         if not mid:
@@ -118,6 +129,60 @@ def compare(a, b, tag):
     for e in err[:12]:
         print("   ", e)
     return not err
+
+
+def roof_cases(model, settings, pm):
+    """6c แผ่นมุงหลังคา + ครอบ/เชิงชาย — ทั้งโมเดลตามแบบ และโมเดลที่ใส่ฉนวน/ข้อความรายการไว้แล้ว"""
+    roofs = [r for r in model.get("roofs", []) if r.get("cover") != "concrete_deck"]
+    if not roofs:
+        print("ข้าม 6c (ไม่มีหลังคา)")
+        return True
+    ok = True
+    r0 = roofs[0]
+    def rm(i, spec, ins, cover=None):
+        return {"id": i, "name": i, "cls": "roof", "kinds": [], "cover": cover or r0["cover"], "spec": spec, "ins": ins, "look": {"pat": "plain", "color": "#aa3322"}}
+    mats = {"RS": rm("RS", "หลังคาเมทัลชีท หนา 0.47 มม. สีแดง", {"mode": "keep"}),
+            "RPU": rm("RPU", "หลังคาเมทัลชีท หนา 0.40 มม. สีเทา", {"mode": "set", "desc": "PU โฟม หนา 25 มม."}),
+            "RNO": rm("RNO", "หลังคาเมทัลชีท หนา 0.40 มม. สีเทา", {"mode": "none"}),
+            "RSAME": rm("RSAME", "", {"mode": "keep"}),
+            "CAP": {"id": "CAP", "name": "CAP", "cls": "clad", "kinds": ["cap"], "spec": "ครอบหลังคาเมทัลชีท สีแดง", "look": {"pat": "plain"}},
+            "FA": {"id": "FA", "name": "FA", "cls": "clad", "kinds": ["fascia"], "spec": "เชิงชายไม้ฝาไฟเบอร์ซีเมนต์ 8\"", "look": {"pat": "plain"}}}
+    others = [f for f in model.get("finishes", []) if f["kind"] == "other"]
+    caps = [f for f in others if "ครอบ" in f.get("spec", "") and "เชิงชาย" not in f["spec"]]
+    fas = [f for f in others if "เชิงชาย" in f.get("spec", "") or "ปั้นลม" in f.get("spec", "")]
+    variants = [("ตามแบบ", model)]
+    m2 = copy.deepcopy(model)
+    m2["roofs"][model["roofs"].index(r0)]["insulation"] = "ฉนวนใยแก้ว หนา 2 นิ้ว ปิดฟอยล์"
+    m2["roofs"][model["roofs"].index(r0)]["cover_spec"] = "หลังคาเมทัลชีท หนา 0.35 มม."
+    variants.append(("มีฉนวน+ข้อความรายการตามแบบ", m2))
+    for vn, mdl in variants:
+        base, _, _ = takeoff.run(mdl, settings, pm)
+        mats["RSAME"]["spec"] = mdl["roofs"][model["roofs"].index(r0)].get("cover_spec", "")
+        cases = [("แผ่นมุง 1 หลัง → รายการใหม่ ฉนวนตามแบบ", {"piece": {r0["id"]: "RS"}}),
+                 ("แผ่นมุง + ใส่ฉนวน PU", {"piece": {r0["id"]: "RPU"}}),
+                 ("แผ่นมุง + ไม่มีฉนวน", {"piece": {r0["id"]: "RNO"}}),
+                 ("หลังคาทุกหลังชนิดเดียวกัน", {"type": {"|".join(["roof", r0["cover"], "", r0.get("cover_spec") if vn == "ตามแบบ" and r0.get("cover_spec") else (mdl["roofs"][model["roofs"].index(r0)].get("cover_spec") or "วัสดุมุงหลังคา " + takeoff.COVER_NAME[r0["cover"]])]): "RPU"}})]
+        if mats["RSAME"]["spec"]:
+            cases.append(("ข้อความเดิม (ไม่กระทบ BOQ)", {"piece": {r0["id"]: "RSAME"}}))
+        if caps:
+            cases.append(("ครอบหลังคา (งานผิว) → วัสดุใหม่", {"piece": {caps[0]["id"]: "CAP"}}))
+        if fas:
+            cases.append(("เชิงชาย → วัสดุใหม่", {"piece": {fas[0]["id"]: "FA"}}))
+        if caps and fas:
+            cases.append(("หลังคา + ครอบ + เชิงชาย พร้อมกัน", {"piece": {r0["id"]: "RPU", caps[0]["id"]: "CAP", fas[0]["id"]: "FA"}}))
+        # ต่างชนิดเลือกไม่ได้
+        other_cover = next(c for c in takeoff.COVER_NAME if c not in (r0["cover"], "concrete_deck"))
+        mats["RX"] = rm("RX", "กระเบื้อง", {"mode": "keep"}, other_cover)
+        r = node_apply(mdl, base, {"piece": {r0["id"]: "RX"}}, mats)
+        print(("ผ่าน" if not r["eff"] else "ไม่ผ่าน"), f"6c [{vn}] วัสดุหลังคาต่างชนิดใช้ไม่ได้"); ok &= not r["eff"]
+        for tag, sel in cases:
+            r = node_apply(mdl, base, sel, mats)
+            if not r["eff"]:
+                print("ไม่ผ่าน", tag, "(ไม่มีชิ้นที่ใช้ได้)"); ok = False
+                continue
+            exp, _, _ = takeoff.run(modify(mdl, r["eff"], mats), settings, pm)
+            ok &= compare(r["items"], exp, f"6c [{vn}] {tag} — {len(r['eff'])} ชิ้น")
+    return ok
 
 
 def main():
@@ -221,6 +286,7 @@ def main():
         sides = {k: v for k, v in r["side"].items() if v}
         exp, _, _ = takeoff.run(modify(model, r["eff"], mats, sides, base), settings, pm)
         ok &= compare(r["items"], exp, f"{tag} — {len(r['eff'])} ชิ้น" + (f" · ด้าน {sorted(set(sides.values()))}" if sides else ""))
+    ok &= roof_cases(model, settings, pm)
     print("\nรวม:", "ผ่านทั้งหมด" if ok else "มีข้อที่ไม่ผ่าน")
     sys.exit(0 if ok else 1)
 
