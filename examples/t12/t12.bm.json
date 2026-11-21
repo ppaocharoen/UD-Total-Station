@@ -12896,6 +12896,13 @@
    "sections": [
     "quantities"
    ]
+  },
+  {
+   "at": "2026-11-22T02:33:07+07:00",
+   "by": "tools/takeoff.py",
+   "sections": [
+    "quantities"
+   ]
   }
  ],
  "finishes": [
@@ -38885,7 +38892,7 @@
      "FF-WK-S1",
      "FF-WK-S2"
     ],
-    "task": "finish",
+    "task": "lift:WC",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -38901,7 +38908,7 @@
      "desc": "พื้นคอนกรีตผิวขัดหยาบ"
     },
     "by_task": {
-     "finish": {
+     "lift:WC": {
       "share": 1.0,
       "from": [
        "FF-WK-N",
@@ -38996,7 +39003,7 @@
     "from": [
      "RF-FA"
     ],
-    "task": "finish",
+    "task": "roof_cover",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39008,7 +39015,7 @@
      "desc": "เชิงชายสำเร็จรูป ขนาด 8\""
     },
     "by_task": {
-     "finish": {
+     "roof_cover": {
       "share": 1.0,
       "from": [
        "RF-FA"
@@ -39029,7 +39036,7 @@
     "from": [
      "RF-CAP"
     ],
-    "task": "finish",
+    "task": "roof_cover",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39041,7 +39048,7 @@
      "desc": "ครอบหลังคาเมทัลชีท"
     },
     "by_task": {
-     "finish": {
+     "roof_cover": {
       "share": 1.0,
       "from": [
        "RF-CAP"
@@ -39673,7 +39680,7 @@
     "from": [
      "AC-M2"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39685,7 +39692,7 @@
      "desc": "กระจกเงาบานเปลือย 5 มม. 2.20x1.10 ม. (M.2)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-M2"
@@ -39706,7 +39713,7 @@
     "from": [
      "AC-M3"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39718,7 +39725,7 @@
      "desc": "กระจกเงาบานเปลือย 5 มม. 1.50x1.10 ม. (M.3)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-M3"
@@ -39739,7 +39746,7 @@
     "from": [
      "AC-M1"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39751,7 +39758,7 @@
      "desc": "กระจกเงาบานเปลือย 5 มม. 0.80x1.10 ม. (M.1)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-M1"
@@ -39772,7 +39779,7 @@
     "from": [
      "AC-R1"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39784,7 +39791,7 @@
      "desc": "ราวจับสแตนเลส 304 รูปตัว L ขนาด 30x50 ซม. (RAL.1)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-R1"
@@ -39805,7 +39812,7 @@
     "from": [
      "AC-R2"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39817,7 +39824,7 @@
      "desc": "ราวจับสแตนเลส 304 แบบพับได้ ขนาด 20x58 ซม. (RAL.2)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-R2"
@@ -39838,7 +39845,7 @@
     "from": [
      "AC-R3"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39850,7 +39857,7 @@
      "desc": "ราวจับสแตนเลส 304 รูปตัว T ขนาด 70x70 ซม. (RAL.3)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-R3"
@@ -39871,7 +39878,7 @@
     "from": [
      "AC-R4"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39883,7 +39890,7 @@
      "desc": "ราวจับสแตนเลส 304 แบบตรง ขนาด 80 ซม. (RAL.4)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-R4"
@@ -39904,7 +39911,7 @@
     "from": [
      "AC-S12"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39916,7 +39923,7 @@
      "desc": "ป้ายสัญลักษณ์ห้องน้ำชาย/หญิง แผ่นพลาสวูด 5 มม. 0.50x0.50 ม. พ่นสีน้ำมัน (D.1 / D.2)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-S12"
@@ -39937,7 +39944,7 @@
     "from": [
      "AC-S3"
     ],
-    "task": "finish",
+    "task": "mep_fix",
     "status": "computed",
     "src": "tools/takeoff.py (หลักเกณฑ์อาคาร 2569)",
     "by_src": {
@@ -39949,7 +39956,7 @@
      "desc": "ป้ายสัญลักษณ์ห้องน้ำคนพิการ แผ่นพลาสวูด 5 มม. 0.30x0.30 ม. พ่นสีน้ำมัน (D.3)"
     },
     "by_task": {
-     "finish": {
+     "mep_fix": {
       "share": 1.0,
       "from": [
        "AC-S3"
@@ -40767,6 +40774,16 @@
        "CL1-E"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "comp",
+     "code": "10.2",
+     "wage_code": "ARC-2.8.1-b",
+     "wage_tiers": {
+      "ARC-2.8.1-a": "ภายในตั้งแต่ 5,000 ตร.ม.",
+      "ARC-2.8.1-b": "ภายในน้อยกว่า 5,000 ตร.ม."
+     },
+     "note": "ทาสีฝ้าเพดาน (สเปกฝ้าให้ทาสี) ใช้สีภายใน — Earth 22 พ.ย. 2569"
     }
    },
    {
@@ -41091,6 +41108,12 @@
        "UR-E3"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ค่าแรงรวมในค่าติดตั้งสุขภัณฑ์ ว480 ข้อ 2.6 (พร้อมอุปกรณ์)",
+     "why": "อุปกรณ์ประกอบสุขภัณฑ์ไม่มีในราคาพาณิชย์"
     }
    },
    {
@@ -41252,6 +41275,12 @@
        "WC-D"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ค่าแรงรวมในค่าติดตั้งสุขภัณฑ์ ว480 ข้อ 2.6 (พร้อมอุปกรณ์)",
+     "why": "อุปกรณ์ประกอบสุขภัณฑ์ไม่มีในราคาพาณิชย์"
     }
    },
    {
@@ -41403,6 +41432,12 @@
        "LAV-FO2"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ค่าแรงรวมในค่าติดตั้งสุขภัณฑ์ ว480 ข้อ 2.6 (พร้อมอุปกรณ์)",
+     "why": "อุปกรณ์ประกอบสุขภัณฑ์ไม่มีในราคาพาณิชย์"
     }
    },
    {
@@ -41503,6 +41538,12 @@
        "LAV-FO2"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ค่าแรงรวมในค่าติดตั้งสุขภัณฑ์ ว480 ข้อ 2.6 (พร้อมอุปกรณ์)",
+     "why": "อุปกรณ์ประกอบสุขภัณฑ์ไม่มีในราคาพาณิชย์"
     }
    },
    {
@@ -41536,6 +41577,12 @@
        "LAV-D"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ค่าแรงรวมในค่าติดตั้งสุขภัณฑ์ ว480 ข้อ 2.6 (พร้อมอุปกรณ์)",
+     "why": "อุปกรณ์ประกอบสุขภัณฑ์ไม่มีในราคาพาณิชย์"
     }
    },
    {
@@ -42997,6 +43044,12 @@
        "LC"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ว480 ไม่มีค่าแรงตอกหลักดิน — สืบราคารวมติดตั้ง",
+     "why": "แท่งกราวด์ไม่มีในราคาพาณิชย์"
     }
    },
    {
@@ -43031,6 +43084,12 @@
        "LC"
       ]
      }
+    },
+    "price_ref": {
+     "kind": "user",
+     "need_mat": true,
+     "no_lab": "ว480 ไม่มีค่าแรงติดตั้งแร็ค — สืบราคารวมติดตั้ง",
+     "why": "แร็คไฟฟ้าไม่มีในราคาพาณิชย์"
     }
    },
    {

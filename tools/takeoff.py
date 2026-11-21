@@ -92,6 +92,9 @@ EQUIP_NAME = {"septic_tank": "ถังบำบัดน้ำเสียส�
 FIXTURE_NAME = {"wc": "โถส้วมชักโครก", "lavatory": "อ่างล้างหน้า", "sink": "ซิงค์ล้างจาน", "shower": "ชุดฝักบัว",
                 "floor_drain": "ตะแกรงระบายน้ำพื้น (FD)", "faucet": "ก๊อกน้ำ", "spray": "สายฉีดชำระ",
                 "water_heater": "เครื่องทำน้ำอุ่น", "washer": "จุดเครื่องซักผ้า", "urinal": "โถปัสสาวะชาย"}
+# งานผิวที่ไม่อยู่งานปูพื้น/บุผนัง (Earth 22 พ.ย. 2569) — ตรงกับ lib/matlib.js finishTask
+FIN_ROOF_RE = re.compile(r"แฟลช|flashing|เชิงชาย|ปั้นลม|ตะเข้ราง|ครอบ", re.I)
+FIN_CAST_RE = re.compile(r"คอนกรีต\S*ผิว\S*ขัด|ผิวขัด(หยาบ|มัน|เรียบ)")
 # อุปกรณ์ประกอบสุขภัณฑ์ (Earth 22 พ.ย. 2569): นับตามจำนวนสุขภัณฑ์ · (ชนิด, คีย์, ชื่อ, เงื่อนไข) — เงื่อนไข None = ทุกตัว, "re:<คำ>" = สเปกมีคำนั้น, "wall" = ไม่ใช่ติดเคาน์เตอร์
 FIXTURE_ACC = {
     "wc": [("gasket", "ประเก็นยางกันกลิ่นโถส้วม", None)],
@@ -957,12 +960,25 @@ class Takeoff:
             if f["kind"] in ("skirting", "railing", "counter") and not f.get("unit"):
                 unit = "ม."
             it = self.add(code[f["kind"]], f"fin_{f['kind']}_{f['spec']}", f["spec"], unit, q, f["id"],
-                          task="ceiling" if f["kind"] == "ceiling" else "finish")
+                          task=self.finish_task(f, f["spec"], unit))
             it["spec"] = {"t": "finish", "kind": f["kind"], "desc": f["spec"]}
             if f["kind"] == "ceiling" and unit == "ตร.ม." and "ทาสี" in f["spec"]:   # ฝ้าที่สเปกให้ทาสี → แถวทาสีฝ้า พื้นที่เท่าฝ้า (Earth 22 พ.ย. 2569)
                 it = self.add("1.2.7", "paint_ceiling", "ทาสีน้ำอะคริลิกฝ้าเพดาน", "ตร.ม.", q, f["id"], task="paint",
                               calc=f"เท่าพื้นที่ฝ้า {q:.2f} ตร.ม.")
                 it["spec"] = {"t": "paint", "ceiling": True}
+
+    def finish_task(self, f, spec, unit):
+        """งานในแผนของงานผิว (Earth 22 พ.ย. 2569): ฝ้า → งานฝ้า · อุปกรณ์หลังคา (เชิงชาย ปั้นลม ครอบ แฟลชชิ่ง ตะเข้ราง) → งานมุงหลังคา
+        · พื้นคอนกรีตขัด (ไม่ปู) → งานโครงสร้างระดับที่เทพื้นนั้น · ของเป็นชุด (กระจก ราวจับ ป้าย) → งานติดตั้งอุปกรณ์ · ที่เหลือ → งานปูพื้น/บุผนัง"""
+        if f["kind"] == "ceiling":
+            return "ceiling"
+        if f["kind"] == "other" and FIN_ROOF_RE.search(spec or ""):
+            return "roof_cover"
+        if f["kind"] == "floor" and FIN_CAST_RE.search(spec or ""):
+            return self.slab_lift(f.get("z", self.GL))
+        if unit == "ชุด":
+            return "mep_fix"
+        return "finish"
 
     # ------------------------------------------------------------ งานระบบ (หลักเกณฑ์ 2569 ข้อ 4.3–4.4)
     def _mep(self):

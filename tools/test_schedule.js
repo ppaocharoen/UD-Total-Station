@@ -34,5 +34,17 @@ check('สุทธิ = เงินงวด − ล่วงหน้า − 
 check('งวดสุดท้ายครบกำหนดวันเสร็จโครงการ', I.list[3].due === p.finish);
 const I2 = S.installments(p, { n: 4, mode: 'manual', assign: Object.assign({}, I.assign, { roof_cover: 4 }) }, 1000000);
 check('กำหนดงวดเอง (มุงหลังคา → งวด 4)', I2.list[3].tasks.includes('roof_cover') && !I2.list[2].tasks.includes('roof_cover'));
+// Earth 22 พ.ย. 2569: จุดไฟกำหนดวันงานเดินท่อ · สุขภัณฑ์ใหญ่ ÷ 3 ชิ้นเล็ก ÷ 10 · งานปูพื้นนับเฉพาะ ตร.ม.
+{ const R = [
+    { key: 'pt_L', qty: 20, unit: 'จุด', task: 'mep_fix' }, { key: 'conduit_PVC', qty: 50, unit: 'ม.', task: 'mep_rough' },
+    { key: 'fx_WC', qty: 6, unit: 'ชุด', task: 'mep_fix', spec: { t: 'fixture', kind: 'wc' } },
+    { key: 'fx_K', qty: 20, unit: 'ชุด', task: 'mep_fix', spec: { t: 'fixture', kind: 'faucet' } },
+    { key: 'fin_other_กระจก', qty: 10, unit: 'ชุด', task: 'mep_fix' },
+    { key: 'fin_floor_กระเบื้อง', qty: 150, unit: 'ตร.ม.', task: 'finish' },
+    { key: 'fin_counter_เคาน์เตอร์', qty: 80, unit: 'ม.', task: 'finish' }];
+  const D = S.build(R, m, { start: '2026-11-02' }).tasks.reduce((o, t) => (o[t.id] = t.days, o), {});
+  check('งานเดินท่อร้อยสาย = 20 จุด ÷ 10 + 2 = 4 วัน', D.mep_rough === 4, D.mep_rough);
+  check('ติดตั้งอุปกรณ์ = 20/12 + 6/3 + 30/10 + 1 → 8 วัน', D.mep_fix === 8, D.mep_fix);
+  check('ปูพื้น = 150 ตร.ม. ÷ 15 = 10 วัน (ไม่บวกเมตร)', D.finish === 10, D.finish); }
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);

@@ -230,4 +230,14 @@ m5 = copy.deepcopy(m); m5["slabs"][0]["pe_sheet"] = True
 b5 = {i["key"] for i in run(m5)[0]}
 good = "pe_sheet" not in by and "pe_sheet" in b5
 ok &= good; print(("PASS" if good else "FAIL"), "แผ่นพลาสติกรองพื้น: เฉพาะพื้นที่แบบระบุ pe_sheet")
+m6 = copy.deepcopy(m)
+m6["finishes"] = (m6.get("finishes") or []) + [
+    {"id": "T-FA", "kind": "other", "spec": "เชิงชายสำเร็จรูป 8\"", "qty": 10, "unit": "ม."},
+    {"id": "T-FL", "kind": "floor", "spec": "พื้นคอนกรีตผิวขัดหยาบ", "z": 0.0, "rects": [[0, 0, 2, 2]]},
+    {"id": "T-MR", "kind": "other", "spec": "กระจกเงา 0.60x0.90 ม.", "qty": 2, "unit": "ชุด"},
+    {"id": "T-TL", "kind": "floor", "spec": "กระเบื้อง 30x30 ซม.", "z": 0.0, "rects": [[0, 0, 2, 2]]}]
+t6 = {i["key"]: i["task"] for i in run(m6)[0] if i["key"].startswith("fin_")}
+good = t6['fin_other_เชิงชายสำเร็จรูป 8"'] == "roof_cover" and t6["fin_floor_พื้นคอนกรีตผิวขัดหยาบ"].startswith("lift:") \
+    and t6["fin_other_กระจกเงา 0.60x0.90 ม."] == "mep_fix" and t6["fin_floor_กระเบื้อง 30x30 ซม."] == "finish"
+ok &= good; print(("PASS" if good else "FAIL"), "งานในแผนของงานผิว: เชิงชาย → มุงหลังคา · ขัดหยาบ → งานเทพื้น · ของเป็นชุด → ติดตั้งอุปกรณ์ · ปูกระเบื้อง → ปูพื้น", t6)
 print("ทั้งหมดผ่าน" if ok else "มีไม่ผ่าน"); sys.exit(0 if ok else 1)
