@@ -77,6 +77,7 @@ async function loadPrices() {
     applySurvey();
     $('#meta-price').textContent = `ราคาพาณิชย์ ${S.db.period || ''} · ค่าแรง ว480 ${S.db.wages.length} รายการ`;
     bootDone(`UD-Cost Hub OK · ${S.db.wages.length} wage items`);
+    if (typeof cuLoad === 'function') cuLoad();   // วัสดุมวลรวมที่สร้างเอง (คลังกลาง) → เติมลง S.db แล้ว render ใหม่เอง (boq/cucomp.js)
   } catch (e) {
     $('#meta-price').textContent = 'โหลดราคาไม่สำเร็จ: ' + e.message;
     bootDone('ERROR: ' + e.message);
@@ -111,6 +112,7 @@ function loadModel(json, name) {
   if (name === 'sample-building.bm.json' && S.boq.factor && +S.boq.factor.advance === 15 && +S.boq.factor.retention === 10) S.boq.factor = { advance: 0, retention: 0, loanPct: 0 };   // ค่าเริ่มต้นเดิมของตัวอย่าง → 0
   S.boq.model_file = name;
   if (BoqBind.migrate(S.boq)) autosave();   // ไฟล์เดิม: ราคาที่พิมพ์ในช่อง / ไม่มีค่าวัสดุ → การผูกเอง (6.52)
+  if (typeof cuPruneOpen === 'function') cuPruneOpen();   // มวลรวมสร้างเองที่ถูกลบจากคลังกลางแล้ว → เลิกผูก (เมื่อโหลดคลังสำเร็จ)
   const p = S.boq.project;
   p.name = p.name || m.meta.name || '';
   p.location = p.location || [m.meta.district, m.meta.province].filter(Boolean).join(' ');
@@ -451,6 +453,7 @@ async function svMode(force) {
   S.libPend = mode === 'central' || mode === 'pending' ? (await svPendingList(force)).length : 0;
   if (run !== svMode._n) return;
   if (typeof BQ !== 'undefined') BQ.lib = null; libStatus(); renderSurvey();
+  if (typeof CU !== 'undefined' && !CU.loaded) cuLoad();   // เพิ่งตั้งคลังกลาง / เชื่อมใหม่ได้
 }
 /** รายการในเครื่องที่ยังไม่ขึ้นคลังกลาง: มีราคา และ (ไม่มีในคลังกลาง หรือในเครื่องใหม่กว่า) — ไม่นับรายการที่ถูกลบจากคลังกลางหลังสืบ */
 async function svPendingList(force) {
@@ -510,6 +513,7 @@ function bindSurvey() {
   if (window.UDAuth) hook(); else window.addEventListener('udauth-loaded', hook);
   setTimeout(() => { if (!svAuth.ready) { svAuth.late = true; svMode(); } }, 8000);   // ระบบล็อกอินโหลดไม่ขึ้น → ดูแบบสาธารณะ
   $('#sv-libview').onclick = () => svLibOpen();
+  $('#sv-culist').onclick = () => cuListOpen();
   $('#sv-libst').addEventListener('click', e => { const a = e.target.dataset.libact; if (a === 'push') svPushPending(); else if (a === 'retry') svMode(true); });
   $('#sv-libcfg').onclick = libConfig;
   $('#sv-list').addEventListener('click', e => {
@@ -1808,7 +1812,7 @@ function bind() {
       S.boq = Object.assign(newBoq(), b);
       S.boq.plan = Object.assign(newPlan(), S.boq.plan || {}); normProject();
       if (S.model && b.model_file && b.model_file !== S.modelName) toast(`หมายเหตุ: ไฟล์ BOQ นี้ทำกับ ${b.model_file}`);
-      applySurvey(); autosave(); renderAll(); toast('เปิดงาน BOQ แล้ว');
+      applySurvey(); if (typeof cuPruneOpen === 'function') cuPruneOpen(); autosave(); renderAll(); toast('เปิดงาน BOQ แล้ว');
     } catch (er) { if (er) alert('เปิดไฟล์ไม่ได้: ' + er.message); }
     e.target.value = '';
   };

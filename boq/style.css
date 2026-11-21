@@ -689,3 +689,17 @@ html.plain .dsg-sec .pc-pile{stroke:#c62828;fill:none}html.plain .dsg-sec .pc-pi
 .lv-q{width:100%;border-collapse:collapse;font-size:12px;margin:2px 0 6px}
 .lv-q th,.lv-q td{padding:3px 6px;border-bottom:1px dashed var(--border);text-align:left}.lv-q .r{text-align:right}
 .btn.small.lv-del{color:var(--red);border-color:var(--red)}
+/* วัสดุมวลรวมที่สร้างเอง (cucomp.js · ก้อน 5e) */
+#cu-modal .cu-box,#cul-modal .cu-box{max-width:1200px;max-height:90vh}
+#cu-modal{z-index:310}
+.cu-head{display:grid;grid-template-columns:2fr 1fr 1.2fr;gap:10px;margin:8px 0 12px;font-size:12px;color:var(--text2)}
+.cu-head label input{width:100%;margin-top:3px}
+.cu-scroll{overflow-x:auto}
+table.cu-tbl td{vertical-align:middle}
+table.cu-tbl select{max-width:100%}
+.cu-res{margin-top:4px;border:1px solid var(--border2);max-height:220px;overflow:auto}
+.cu-res .bq-item{padding:4px 6px;font-size:12px}
+.cu-foot{margin-bottom:6px}
+.btn.danger,html.plain .btn.danger,html.dos .btn.danger{color:var(--red,#c00);border-color:var(--red,#c00)}
+table.cu-tbl td:nth-child(2){min-width:200px}
+@media (max-width:700px){.cu-head{grid-template-columns:1fr}}

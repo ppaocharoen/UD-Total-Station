@@ -139,9 +139,9 @@ function bqEl() {
   m.addEventListener('click', e => { if (e.target === m || e.target.dataset.close) bqClose(); });
   $('#bq-q', m).addEventListener('input', bqList);
   $('#bq-tabs', m).addEventListener('click', e => { const t = e.target.closest('[data-tab]'); if (t) { BQ.tab = t.dataset.tab; BQ.fl = {}; BQ.fprov = ''; bqList(); } });
-  $('#bq-foot', m).addEventListener('click', e => { const t = e.target.closest('[data-tab]'); if (t) { BQ.tab = t.dataset.tab; bqList(); } if (e.target.dataset.unbind) bqUnbind(); if (e.target.dataset.svnew) bqSurveyNew(); });
+  $('#bq-foot', m).addEventListener('click', e => { if (cuBindClick(e)) return; const t = e.target.closest('[data-tab]'); if (t) { BQ.tab = t.dataset.tab; bqList(); } if (e.target.dataset.unbind) bqUnbind(); if (e.target.dataset.svnew) bqSurveyNew(); });
   $('#bq-filt', m).addEventListener('change', e => { const k = e.target.dataset.flt; if (!k) return; if (k === 'prov') BQ.fprov = e.target.value; else { BQ.fl[k] = e.target.value; BQ.lvKeys.slice(BQ.lvKeys.indexOf(k) + 1).forEach(x => { BQ.fl[x] = ''; }); } bqList(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && m.classList.contains('on')) bqClose(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && m.classList.contains('on') && !($('#cu-modal') && $('#cu-modal').classList.contains('on'))) bqClose(); });
   return m;
 }
 const bqRow = () => S.priced.find(x => x.key === BQ.key);
@@ -209,7 +209,7 @@ function bqList() {
     if (BQ.tab === 'mat') html = items.map((d, i) => row(d, d.name, esc([d.code, d.catName, d.province].filter(Boolean).join(' · ')), d.price !== null ? bqF2(d.price) + ' / ' + esc(d.unit) : '—', i)).join('');
     else if (BQ.tab === 'comp') {
       const G = COMP_GROUPS();
-      html = items.map((c, i) => { const pr = S.db.compPrice(c.id, {}); return row(c, c.sub + ' ' + c.name, esc(G[c.group] || ''), pr && pr.price !== null ? bqF2(pr.price) + ' / ' + esc(c.unit) : `คิดไม่ครบ (${esc(c.unit)})`, i); }).join('');
+      html = items.map((c, i) => { const pr = S.db.compPrice(c.id, {}); return row(c, c.sub + ' ' + c.name, esc(G[c.group] || '') + cuItemBtns(c), pr && pr.price !== null ? bqF2(pr.price) + ' / ' + esc(c.unit) : `คิดไม่ครบ (${esc(c.unit)})`, i); }).join('');
     } else if (BQ.tab === 'survey') {
       html = items.length ? items.map((x, i) => row(x, x.name, `${x.src === 'prj' ? 'ราคาสืบในโครงการนี้' + (x.it.lib ? ' · ผูกกับคลัง' : '') : 'คลังราคาสืบ' + (x.x.project ? ' · ' + esc(x.x.project) : '') + ` · ${Survey.ageDays(x.x.updated)} วันก่อน`} · ${x.s.n} เจ้า${x.s.n < Survey.MIN_Q ? ` (ไม่ครบ ${Survey.MIN_Q})` : ''} · ไม่รวม VAT`, bqF2(x.s.price) + ' / ' + esc(x.unit), i)).join('')
         : `<div class="hint bq-note">${BQ.lib ? 'ยังไม่มีราคาสืบที่ใช้ได้' : 'กำลังโหลดคลังราคาสืบ…'}</div>`;
@@ -231,7 +231,9 @@ function bqList() {
   if (BQ.tab === 'pct' || BQ.tab === 'pctmat') $('#bq-foot', m).innerHTML = ''; else $('#bq-foot', m).innerHTML = side === 'line' ? '<span class="hint">ไม่มีในฐานข้อมูล? สืบราคาวัสดุย่อยนี้ได้ที่แท็บราคาสืบ (กลุ่ม "วัสดุย่อยในวัสดุมวลรวม") แล้วกลับมาเลือกในแท็บราคาสืบ</span>' : side === 'mat'
     ? `<span class="hint">ไม่มีในฐานข้อมูล?</span> <button class="btn small" data-svnew="1">+ สืบราคาใหม่</button> <button class="btn small" data-tab="manual">กรอกราคาเอง</button>`
     : `<button class="btn small" data-tab="manual">ไม่พบ — กรอกค่าแรงเอง</button>`;
+  if (BQ.tab === 'comp') $('#bq-foot', m).innerHTML = `<div class="cu-foot">${cuFootHtml()}</div>` + $('#bq-foot', m).innerHTML;   // มวลรวมสร้างเอง (boq/cucomp.js · ก้อน 5e)
   list.onclick = e => {
+    if (cuBindClick(e)) return;
     const it = e.target.closest('.bq-item');
     if (it && T) { if (side === 'line') bqPickLine(r, items[+it.dataset.i]); else bqPickItem(r, items[+it.dataset.i]); return; }
     if (e.target.id === 'bq-mok') { const v = $('#bq-mv', m).value.replace(/,/g, '').trim(); if (v === '' || !isFinite(+v) || +v < 0) return toast('ใส่ราคาเป็นตัวเลข ≥ 0'); bqSet(r, { kind: 'manual', price: r2(+v), note: $('#bq-mn', m).value.trim() }); }
