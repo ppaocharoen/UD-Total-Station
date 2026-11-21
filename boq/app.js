@@ -547,7 +547,9 @@ function bindSurvey() {
     const id = Survey.uid('manual:'); S.boq.surveys[id] = { id, name, unit, target: id, quotes: [], reason: '', cat }; S.svOpen = id; S.svf = 'all'; svSave(S.boq.surveys[id]); renderSurvey();
     $('#sv-an').value = ''; $('#sv-au').value = ''; $('#sv-ac').value = 'mat'; $('#sv-addbox').hidden = true;
   };
-  $('#sv-print').onclick = () => { svPrintout(); document.body.classList.add('print-survey'); setTimeout(() => { window.print(); document.body.classList.remove('print-survey'); }, 300); };
+  $('#sv-print').onclick = () => svPrint();   // svreport.js (ตาม Cost Hub)
+  $('#sv-evprint').onclick = () => svEvidencePrint();
+  $('#sv-xlsx').onclick = () => svExportExcel();
   $('#sv-libx').onclick = async () => { const all = await Survey.libAll(); download('คลังราคาสืบ-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify({ format: 'ud-survey-lib', items: all })); toast(`ส่งออกคลัง ${all.length} รายการ`); };
   $('#sv-libi').onchange = async e => {
     try { const f = await readFile(e.target), d = JSON.parse(f.text); if (d.format !== 'ud-survey-lib') throw new Error('ไม่ใช่ไฟล์คลังราคาสืบ');
@@ -556,29 +558,6 @@ function bindSurvey() {
     e.target.value = '';
   };
 }
-function svPrintout() {   // บัญชีสืบราคา + ภาคผนวกภาพหลักฐาน
-  const p = S.boq.project, items = Object.values(S.boq.surveys).filter(it => (it.quotes || []).length);
-  let h = `<h3 style="text-align:center">บัญชีสืบราคาวัสดุ</h3><div>โครงการ ${esc(p.name || '')} · สถานที่ ${esc(p.location || '')} · หน่วยงาน ${esc(p.agency || '')} · วันที่พิมพ์ ${new Date().toISOString().slice(0, 10)}</div>
-    <p class="hint">ราคาต่อหน่วยไม่รวมภาษีมูลค่าเพิ่ม (ราคาที่รวม VAT หารด้วย 1.07) แปลงเป็นหน่วยตามแบบ ปร. แล้วเลือกราคาต่ำสุด</p>`;
-  let n = 0, fig = [];
-  items.forEach((it, k) => {
-    const s = Survey.summary(it);
-    h += `<h4>${k + 1}. ${esc(it.name)} (หน่วย ${esc(it.unit)})</h4><div class="table-wrap"><table class="boq"><tr><th>เจ้า</th><th>ร้าน / ช่องทาง</th><th>ติดต่อ</th><th>วันที่</th><th>ราคาที่ได้</th><th>VAT</th><th>แปลงหน่วย</th><th>บาท/${esc(it.unit)}</th><th>หลักฐาน</th></tr>
-      ${s.list.map((x, i) => { const q = x.q, refs = (q.imgs || []).map(id => { fig.push({ id, k, item: it.name, cap: `${it.name} — ${q.shop || Survey.CHANNEL[q.channel]}` }); const d = Survey.safeImg(S.img[id]); return d ? `<figure class="sv-ev"><img src="${esc(d)}"><figcaption>ภาพ ${fig.length}</figcaption></figure>` : 'ภาพ ' + fig.length; });
-        return `<tr ${q === s.best ? 'class="total"' : ''}><td class="r">${i + 1}</td><td>${esc(q.shop || '')}<br><small>${Survey.CHANNEL[q.channel] || ''}</small></td><td style="word-break:break-all">${esc(q.contact || '')}</td><td>${esc(q.date || '')}</td>
-          <td class="r">${fmt(+q.price)}${q.qunit ? '/' + esc(q.qunit) : ''}</td><td>${q.vat ? 'รวม (หักออก)' : 'ไม่รวม'}</td><td class="r">${+(q.factor || 1) !== 1 ? `1 ${esc(q.qunit || '')} = ${esc(q.factor)} ${esc(it.unit)}` : '-'}</td>
-          <td class="r"><b>${fmt(x.up)}</b></td><td class="sv-evs">${refs.join('') || '-'}</td></tr>`; }).join('')}
-      </table></div><p>ใช้ราคา <b>${fmt(s.price)}</b> บาท/${esc(it.unit)} (${esc(s.best.shop || '')})${s.n < Survey.MIN_Q ? ` · สืบได้ ${s.n} เจ้า: ${esc(it.reason || 'ไม่ได้ระบุเหตุผล')}` : ''}</p>`;
-    n++;
-  });
-  if (fig.length) {   // ภาคผนวก (A4 แนวตั้ง): ภาพของวัสดุเดียวกันอยู่หน้าเดียวกัน ย่อตามจำนวนภาพ
-    const groups = []; fig.forEach((f, i) => { f.no = i + 1; let g = groups.find(x => x.k === f.k); if (!g) groups.push(g = { k: f.k, item: f.item, list: [] }); g.list.push(f); });
-    h += `<div class="sv-appx"><h3 style="text-align:center">ภาคผนวก ภาพหลักฐานการสืบราคา</h3>${groups.map(g => { const n = g.list.length, sz = n <= 1 ? 'n1' : n <= 2 ? 'n2' : n <= 4 ? 'n4' : n <= 6 ? 'n6' : 'n9';
-      return `<section class="sv-ag ${sz}"><h4>${g.k + 1}. ${esc(g.item)} (${n} ภาพ)</h4><div class="sv-ag-grid">${g.list.map(f => { const d = Survey.safeImg(S.img[f.id]); return d ? `<figure><img src="${esc(d)}"><figcaption>ภาพ ${f.no} ${esc(f.cap)}</figcaption></figure>` : ''; }).join('')}</div></section>`; }).join('')}</div>`;
-  }
-  $('#sv-printout').innerHTML = n ? h : '<p>ยังไม่มีรายการที่สืบราคา</p>';
-}
-
 function surveyState() {
   const out = {};
   Object.values(S.boq.surveys || {}).forEach(it => { if (it.target && it.target.startsWith('row:')) { const p = Survey.summary(it).price; if (p !== null) out[it.target.slice(4)] = { price: p, src: Survey.srcText(it) }; } });
