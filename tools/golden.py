@@ -2,7 +2,10 @@
 """ค่าอ้างอิง (golden) ของไฟล์ตัวอย่าง ท12 — M3 (Earth 22 พ.ย. 2569: golden = ปริมาณ + ผลตรวจ ไม่รวมราคา เพราะราคาพาณิชย์เปลี่ยนทุกเดือน)
 
   python3 tools/golden.py examples/t12/t12.bm.json            ตรวจเทียบ golden (ต่าง = ไม่ผ่าน, exit 1)
-  python3 tools/golden.py examples/t12/t12.bm.json --write    เขียน golden ใหม่ + รายงานให้ Earth ตรวจรับรอง (<ชื่อ>.golden.md)
+  python3 tools/golden.py examples/t12/t12.bm.json --write    เขียน golden ใหม่ + รายงานให้ Earth ตรวจรับรอง (<ชื่อ>.golden.md) — สถานะกลับเป็น "ยังไม่รับรอง"
+  python3 tools/golden.py examples/t12/t12.bm.json --certify "<วันที่> <หมายเหตุ>"   บันทึกว่า Earth รับรองแล้ว (เฉพาะเมื่อผลตรง golden ปัจจุบัน)
+
+แก้ golden ภายหลัง (เจอว่าไม่ตรงแบบ/กติกาเปลี่ยน): แก้โมเดล/โค้ด → --write → Earth ตรวจรายการที่เปลี่ยน → --certify ใหม่ · ประวัติรับรองเก็บใน certified_history
 
 ครอบคลุม: ถอดปริมาณทุกแถว (takeoff.py — คิดใหม่จากโมเดล และต้องตรงกับ quantities ที่เก็บในไฟล์) · เหล็กเสริมรายชิ้น ·
 ข้อสมมติ/คำเตือนของตัวถอด · validate (ระดับ/error/คำเตือน/ค่าสมมติ) · clash (lib/clash.js) · แผนงาน (lib/schedule.js — ระยะเวลารายงาน)
@@ -62,8 +65,13 @@ def diff(a, b, path=""):
 
 
 def report(g, path):
-    L = [f"# ค่าอ้างอิง (golden) — {g['model']}", "",
-         "**สถานะ: ยังไม่รับรอง** — ตรวจรับรองว่าตัวเลขเหล่านี้ถูกต้อง แล้วชุดทดสอบจะเทียบกับค่านี้ทุกครั้งที่แก้โค้ด (ไม่รวมราคา)", "",
+    c = g.get("certified")
+    st = (f"**สถานะ: รับรองแล้ว** โดย {c['by']} ({c['note']}) — ชุดทดสอบเทียบกับค่านี้ทุกครั้งที่แก้โค้ด (ไม่รวมราคา) · แก้ภายหลังได้: --write แล้วรับรองใหม่" if c else
+          "**สถานะ: ยังไม่รับรอง** — ตรวจรับรองว่าตัวเลขเหล่านี้ถูกต้อง แล้วชุดทดสอบจะเทียบกับค่านี้ทุกครั้งที่แก้โค้ด (ไม่รวมราคา)")
+    L = [f"# ค่าอ้างอิง (golden) — {g['model']}", "", st, ""]
+    if g.get("certified_history"):
+        L += ["ประวัติรับรอง: " + " · ".join(f"{h['note']} ({h['by']})" for h in g["certified_history"]), ""]
+    L += [
          f"model_hash `{g['model_hash']}`", "", "## 1. ถอดปริมาณ", "", "| หมวด | รายการ | ปริมาณสุทธิ | เผื่อ | ปริมาณ | หน่วย |", "|---|---|---:|---:|---:|---|"]
     for k, r in g["quantities"].items():
         L.append(f"| {r['group_code']} | {r['name']} | {r['qty_net']:,.2f} | {(r['waste'] or 0) * 100:g}% | {r['qty']:,.2f} | {r['unit']} |")
@@ -92,12 +100,25 @@ def main():
     if st:
         print(f"FAIL quantities ที่เก็บในไฟล์ไม่ตรงกับถอดใหม่ ({len(st)} จุด) — รัน takeoff.py --write"); [print("   ", x) for x in st[:10]]; bad += 1
     else: print(f"PASS quantities ในไฟล์ตรงกับถอดใหม่ ({len(stored)} แถว)")
+    old = json.load(open(gpath, encoding="utf-8")) if os.path.exists(gpath) else {}
+    g["certified_history"] = old.get("certified_history", [])
+    if "--certify" in sys.argv:
+        note = sys.argv[sys.argv.index("--certify") + 1] if len(sys.argv) > sys.argv.index("--certify") + 1 else ""
+        dd = [x for part in ("quantities", "rebar_by_element", "takeoff_notes", "validate", "clash", "schedule") for x in diff(old.get(part), g[part], part)]
+        if bad or dd or not old:
+            print("FAIL รับรองไม่ได้: ผลตอนนี้ไม่ตรง golden ที่ Earth ตรวจ — --write แล้วให้ Earth ตรวจก่อน"); [print("   ", x) for x in dd[:10]]; sys.exit(1)
+        g["certified"] = {"by": "Earth", "note": note}
+        g["certified_history"].append(g["certified"])
+        json.dump(g, open(gpath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        report(g, gpath.replace(".json", ".md")); print(f"รับรอง {gpath} แล้ว"); sys.exit(0)
     if "--write" in sys.argv:
+        g["certified"] = None   # ค่าใหม่ต้องรับรองใหม่
         json.dump(g, open(gpath, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
         report(g, gpath.replace(".json", ".md"))
         print(f"เขียน {gpath} + รายงาน .golden.md"); sys.exit(1 if bad else 0)
     if not os.path.exists(gpath): print(f"FAIL ไม่มี {gpath} — รัน --write"); sys.exit(1)
-    g0 = json.load(open(gpath, encoding="utf-8"))
+    g0 = old
+    if not g0.get("certified"): print("หมายเหตุ golden นี้ยังไม่ได้รับรอง")
     for part in ("quantities", "rebar_by_element", "takeoff_notes", "validate", "clash", "schedule"):
         d = diff(g0.get(part), g[part], part)
         if d:
