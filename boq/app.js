@@ -1743,7 +1743,7 @@ function showPick(d, pt) {
   if (sp) h += `<div class="pk-spec">${sp.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
   else if (d.info) h += `<div class="pk-spec"><div>${esc(d.info)}</div></div>`;
   h += locHtml(id, pt);
-  if (typeof matPickHtml === 'function') h += matPickHtml(id);   // วัสดุงานผิว/ผิวดิน: เปลี่ยนวัสดุ
+  if (typeof matPickHtml === 'function') h += matPickHtml(window.MatLib && S.model ? MatLib.pieceIdOf(id, S.model) : id);   // v7.5 แป/จันทันตามข้อกำหนด → โครงหลังคา   // วัสดุงานผิว/ผิวดิน: เปลี่ยนวัสดุ
   if (S.viewer.hasRebar(id)) h += `<div class="pk-sec"><button class="btn small primary" data-pk="rebar">ดูเหล็กชิ้นนี้</button> <span class="hint">ซ่อนเหล็กชิ้นอื่น · ตารางเหล็ก · เลื่อนดูชิ้นเครื่องหมายเดียวกัน</span></div>`;
   if (q.rows.length) {
     h += `<div class="pk-sec"><div class="pk-lbl">ปริมาณของชิ้นนี้ (ไม่รวมเผื่อ) · กดรายการเพื่อไปที่ ปร.1</div><table class="pk-q">${q.rows.map(r => `<tr data-pk-row="${esc(r.key)}"><td>${esc(r.name)}${r.calc.map(c => `<div class="pk-calc">${esc(c)}</div>`).join('')}</td><td class="r">${f2(r.q)}</td><td>${esc(r.unit)}</td></tr>`).join('')}</table></div>`;
@@ -1762,7 +1762,7 @@ function showPick(d, pt) {
   if (sp && sp.note) h += `<div class="pk-sec hint">หมายเหตุ: ${esc(sp.note)}</div>`;
   box.innerHTML = h; box.classList.add('on'); box.scrollTop = 0;
   box.querySelector('[data-pk=close]').onclick = () => showPick(null);
-  if (typeof matPickBind === 'function') matPickBind(box, id);
+  if (typeof matPickBind === 'function') matPickBind(box, window.MatLib && S.model ? MatLib.pieceIdOf(id, S.model) : id);
   const rbb = box.querySelector('[data-pk=rebar]'); if (rbb) rbb.onclick = () => rbOne(id);
   box.querySelectorAll('[data-pk-task]').forEach(a => a.onclick = () => { setDock('gantt'); selectTask(a.dataset.pkTask); });
   box.querySelectorAll('[data-pk-row]').forEach(tr => tr.onclick = () => gotoRow(tr.dataset.pkRow));

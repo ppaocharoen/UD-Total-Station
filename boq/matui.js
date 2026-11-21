@@ -6,6 +6,8 @@
  * BOQ: MatLib.apply แยกแถวก่อนผูกราคา (rows() ใน app.js) — ชิ้นที่เปลี่ยนย้ายไปแถวรายการใหม่ ปริมาณตรง takeoff.py
  * ป้าย "เปลี่ยนวัสดุ" ใน ปร.1 แสดงบนจอเท่านั้น · ราคาแนะนำของวัสดุ = คำแนะนำ ไม่ทับการผูกอัตโนมัติ
  * 6c แผ่นมุงหลังคา: ชิ้น = หลังคา (model.roofs) วัสดุ cls 'roof' เปลี่ยนได้เฉพาะชนิดเดียวกัน · ครอบหลังคา/เชิงชายเป็นชิ้นแยก (วัสดุกรุชนิด cap/fascia)
+ * v7.5: อุปกรณ์หลังคา (ครอบสัน/ตะเข้/ครอบข้าง/เชิงชาย/แฟลชชิ่ง) อยู่ในหมวดวัสดุหลังคา — ครอบสัน/ตะเข้ที่คิดจากหลังคาเลือกในกล่องหลังคา
+ *   ทาสีเหล็กรูปพรรณ: วัสดุทาสีชนิด 'steel' (ข้อความรายการ + สี) · ชิ้นนี้/ทั้งชนิด (แป จันทัน เสาเหล็ก …) · โครงหลังคาตามข้อกำหนด = ชิ้นเดียวต่อหลังคา
  * 6d แคตตาล็อก: ประตู-หน้าต่าง · สุขภัณฑ์ · อุปกรณ์สุขาภิบาล · จุดไฟฟ้า/โคม (วัสดุ cls 'item') — ชนิดเดียวกันเท่านั้น · ขนาดใช้ของโมเดล
  *   ชิ้นนี้ = แยกแถว · ทุกชิ้นแบบเดียวกัน = ทั้งแถวเปลี่ยนชื่อ · 3D เปลี่ยนสีวงกบ/บาน/ตัว + วิธีเปิดบาน
  * 6b ผนังทาสี ↔ ผนังกรุ: ด้านภายใน/ภายนอกหาเองจากคำในรายการ/ผนังฉาบด้านเดียว — ไม่รู้ → ถามในหน้าต่าง เก็บใน matsel.side {id: 'int'|'ext'}
@@ -38,7 +40,10 @@ function matRows(items) {
 function mtLooks() {
   if (!S.model || !S.boq) return {};
   const eff = MatLib.effective(S.model, mtSel(), mtUseMats()), L = {};
-  Object.entries(eff).forEach(([id, m]) => { L[id] = m.cls === 'item' ? Object.assign({}, m.look, m.style ? { style: m.style } : {}) : m.look; });   // 6d: วิธีเปิดบาน
+  Object.entries(eff).forEach(([id, m]) => {
+    if (MatLib.isRacc({ racc: /@(ridge|hip|valley)$/.test(id) })) return;   // v7.5 ครอบสัน/ตะเข้ที่คิดจากหลังคา: ไม่มีชิ้นใน 3D
+    L[id] = m.cls === 'item' ? Object.assign({}, m.look, m.style ? { style: m.style } : {}) : (m.kinds || [])[0] === 'steel' ? Object.assign({}, m.look, { steel: true }) : m.look;   // 6d วิธีเปิดบาน · v7.5 สีเหล็ก
+  });
   return L;
 }
 /** หลังเปลี่ยนการเลือก: 3D + BOQ + บันทึก */
@@ -96,7 +101,7 @@ function matPickHtml(id) {
   if (!g && !pc) return '';
   const cur = mtCur(id), sel = mtSel(), tk = f && MatLib.typeKey(f);
   const lk = cur ? cur.look : g ? MatLib.BUILTIN['B-soil'].look : null;
-  let h = `<div class="pk-sec mt-pk"><div class="pk-lbl">${g ? 'วัสดุผิวดิน' : pc === 'item' ? 'รุ่น/วัสดุ (แคตตาล็อก)' : 'วัสดุ'}</div><div class="mt-cur">${lk ? mtSwatchHtml(lk) : ''}<div>`;
+  let h = `<div class="pk-sec mt-pk"><div class="pk-lbl">${g ? 'วัสดุผิวดิน' : pc === 'item' ? 'รุ่น/วัสดุ (แคตตาล็อก)' : pc === 'steel' ? 'ทาสีเหล็ก' + (f.type === 'roof_frame' ? ' — ' + esc(f.room) : '') : pc === 'racc' ? 'อุปกรณ์หลังคา — ' + esc(MatLib.RPART_TH[MatLib.kindOfPiece(f)] || '') : 'วัสดุ'}</div><div class="mt-cur">${lk ? mtSwatchHtml(lk) : ''}<div>`;
   if (g) h += `<b>${esc(cur ? cur.name : 'ดิน (ค่าเริ่ม)')}</b><div class="hint">ผิวดินรอบอาคารที่ระดับ GL — แสดงใน 3D เท่านั้น ยังไม่มีแถว BOQ</div>`;
   else if (cur) h += `<b>${esc(cur.name)}</b>${cur.spec && cur.spec !== MatLib.specOf(f) ? `<div class="hint">รายการ BOQ: ${esc(cur.spec)}</div>` : ''}${cur.style ? `<div class="hint">${esc(MatLib.STYLE_TH[cur.style])}</div>` : ''}${pc === 'roof' ? `<div class="hint">${esc(mtInsTxt(cur, f))}</div>` : ''}<div class="hint">ตามแบบ: ${esc(MatLib.specOf(f))}${sel.piece[id] === undefined && sel.type[tk] ? (pc === 'item' ? ' · เปลี่ยนทั้งแบบ' : ' · เปลี่ยนทั้งชนิด') : ''}</div>`;
   else h += `<b>ตามแบบ</b><div class="hint">${esc(MatLib.specOf(f))}${pc === 'roof' && f.insulation ? ' · ฉนวน ' + esc(f.insulation) : ''}</div>`;
@@ -112,13 +117,24 @@ function matPickHtml(id) {
     if (!sd) h += `<div class="hint" style="color:var(--red)">ยังไม่รู้ว่าเป็นผนังด้านภายในหรือภายนอก — BOQ ยังไม่แยกแถว</div>`;
     else h += `<div class="hint">${what}<b>${MatLib.SIDE_TH[sd]}</b>${chosen ? ' (เลือกเอง)' : ''}</div>`;
     if (!sd || chosen) h += `<div class="btn-row"><span class="hint">ด้าน:</span><button class="btn small ${sd === 'int' ? 'primary' : ''}" data-mt="side-int">ภายใน</button><button class="btn small ${sd === 'ext' ? 'primary' : ''}" data-mt="side-ext">ภายนอก</button></div>`;
-  } else if (pc === 'roof') h += `<div class="hint">แผ่นมุงหลังคา: เปลี่ยนรายการ/สี/ความหนา/ฉนวนได้ พื้นที่เท่าเดิม · เปลี่ยนได้เฉพาะ${esc(MatLib.COVER_TH[f.cover] || f.cover)}ด้วยกัน (ต่างชนิดต้องแก้โมเดล — โครงหลังคาเปลี่ยน) · ครอบหลังคา/เชิงชายกดเปลี่ยนแยกที่ชิ้นนั้น</div>`;
+  } else if (pc === 'roof') h += `<div class="hint">แผ่นมุงหลังคา: เปลี่ยนรายการ/สี/ความหนา/ฉนวนได้ พื้นที่เท่าเดิม · เปลี่ยนได้เฉพาะ${esc(MatLib.COVER_TH[f.cover] || f.cover)}ด้วยกัน (ต่างชนิดต้องแก้โมเดล — โครงหลังคาเปลี่ยน) · ครอบข้าง/เชิงชายกดเปลี่ยนแยกที่ชิ้นนั้น</div>` + mtRaccHtml(f);
+  else if (pc === 'steel') h += `<div class="hint">${esc(MatLib.STEEL_TH[f.type] || f.type)}${f.section ? ' ' + esc(f.section) : ''} · พื้นที่ทา ${(+f.area).toFixed(2)} ตร.ม. — เปลี่ยนรายการ/สีได้ ผูกราคาเดิม (รองพื้นกันสนิม + สีน้ำมัน) · ทั้งชนิด = ทุก${esc(MatLib.STEEL_TH[f.type] || f.type)}</div>`;
+  else if (pc === 'racc') h += `<div class="hint">${MatLib.isRacc(f) ? `ยาว ${(+f.len).toFixed(2)} ม. (คิดจากรูปหลังคา) · ` : ''}เปลี่ยนรายการ/สีได้ ปริมาณเท่าเดิม · วัสดุหมวดหลังคาชนิด${esc(MatLib.RPART_TH[MatLib.kindOfPiece(f)] || '')}</div>`;
   else if (pc === 'item') h += `<div class="hint">${esc(MatLib.ITEM_KINDS[f.ik] || '')} แบบ ${esc(f.type)}${f.unit === 'open' ? ` ${f.w}×${f.h} ม.` : f.size ? ' ' + esc(f.size) : ''}: เปลี่ยนชนิด/วัสดุ/ยี่ห้อ/ข้อความรายการได้ — ขนาดใช้ของโมเดล${f.unit === 'open' ? ' (ทับหลัง/เสาเอ็นไม่เปลี่ยน)' : ''} · เปลี่ยนได้เฉพาะชนิดเดียวกัน</div>`;
   else if (pc === 'paint') h += '<div class="hint">ผนังทาสี: วัสดุทาสี = เปลี่ยนสีใน 3D (ไม่กระทบ BOQ) · วัสดุกรุ = ย้ายปริมาณจากฉาบ/ทาสีของผนังไปแถวกรุ</div>';
   return h + '</div>';
 }
+/** v7.5 กล่องหลังคา: ครอบสัน/ครอบตะเข้/ตะเข้ราง ที่คิดจากหลังคานี้ — กดเปลี่ยนวัสดุแยก */
+function mtRaccHtml(roof) {
+  const xs = MatLib.raccs(S.model).filter(x => x.roof === roof.id); if (!xs.length) return '';
+  return '<div class="pk-lbl" style="margin-top:6px">อุปกรณ์หลังคา (คิดจากรูปหลังคา)</div>' + xs.map(x => { const c = mtCur(x.id);
+    return `<div class="btn-row"><span class="hint" style="flex:1">${esc(MatLib.RPART_TH[x.racc])} ${(+x.len).toFixed(2)} ม. — <b>${esc(c ? c.name : 'ตามแบบ')}</b></span><button class="btn small" data-mtr="${esc(x.id)}">เปลี่ยน…</button>${c ? `<button class="btn small" data-mtr-rev="${esc(x.id)}">คืนตามแบบ</button>` : ''}</div>`; }).join('');
+}
 function matPickBind(box, id) {
   mtPaintSwatches(box);
+  box.querySelectorAll('[data-mtr]').forEach(b => b.onclick = () => mtOpen(b.dataset.mtr));
+  box.querySelectorAll('[data-mtr-rev]').forEach(b => b.onclick = () => { const x = b.dataset.mtrRev, sel = mtSel(), f = mtFin(x);
+    if (f && sel.type[MatLib.typeKey(f)]) sel.piece[x] = ''; else delete sel.piece[x]; mtAfterChange(id); });
   box.querySelectorAll('[data-mt]').forEach(b => b.onclick = () => {
     const a = b.dataset.mt, sel = mtSel(), f = mtFin(id);
     if (a === 'open') return mtOpen(id);
@@ -130,6 +146,7 @@ function matPickBind(box, id) {
 }
 function mtAfterChange(id) {
   mtRefresh();
+  const rm = /^(.+)@(ridge|hip|valley)$/.exec(id || ''); if (rm) id = rm[1];   // v7.5 กลับไปกล่องหลังคา
   const box = $('#pick-info'); if (!id || !box || !box.classList.contains('on') || typeof showPick !== 'function') return;
   const v = S.viewer, ud = !v ? null : id === MatLib.GROUND ? v.groundMesh && v.groundMesh.userData : v.byId[id] && v.byId[id][0] && v.byId[id][0].userData;
   showPick(ud || { id }, null);
@@ -208,7 +225,7 @@ function mtRenderList() {
   if (!list.length) { box.innerHTML = `<div class="hint" style="margin-top:8px">ยังไม่มีวัสดุที่ใช้กับ${g ? 'ผิวดิน' : MatLib.isUnit(f) ? (MatLib.ITEM_KINDS[f.ik] || 'ชิ้นนี้') : 'ผิวนี้'}ได้ — กด "+ สร้างวัสดุใหม่"</div>`; return; }
   box.innerHTML = list.map(m => `<div class="mt-item ${cur && cur.id === m.id ? 'on' : ''}">${mtSwatchHtml(m.look, 72, 48)}
     <div class="mt-iname"><b>${esc(m.name)}</b> ${m.builtin ? '<span class="pill">ค่าเริ่ม</span>' : ''}${SRC[m.src] || ''}
-      <div class="hint">${esc(m.cls === 'item' ? (m.kinds || []).map(k => MatLib.ITEM_KINDS[k]).join(', ') + (m.style ? ' · ' + MatLib.STYLE_TH[m.style] : '') : MatLib.CLS_TH[m.cls] || '')}${m.cls === 'roof' ? ' · ' + esc(MatLib.COVER_TH[m.cover] || '') + ' · ' + esc(mtInsTxt(m, null).replace(' (ไม่มี)', '')) : ''}${m.cls !== 'item' && m.kinds && m.kinds.length ? ' · ' + m.kinds.map(k => MatLib.KIND_TH[k]).join(', ') : ''}${m.byName ? ' · โดย ' + esc(m.byName) : ''}</div>
+      <div class="hint">${esc(m.cls === 'item' ? (m.kinds || []).map(k => MatLib.ITEM_KINDS[k]).join(', ') + (m.style ? ' · ' + MatLib.STYLE_TH[m.style] : '') : MatLib.CLS_TH[m.cls] || '')}${m.cls === 'roof' ? ' · ' + (m.kinds && m.kinds.length ? esc(MatLib.RPART_TH[m.kinds[0]] || '') + ' · ' + esc(m.cover === 'any' ? 'ทุกชนิดหลังคา' : MatLib.COVER_TH[m.cover] || '') : esc(MatLib.COVER_TH[m.cover] || '') + ' · ' + esc(mtInsTxt(m, null).replace(' (ไม่มี)', ''))) : ''}${m.cls !== 'item' && m.cls !== 'roof' && m.kinds && m.kinds.length ? ' · ' + m.kinds.map(k => MatLib.KIND_TH[k]).join(', ') : ''}${m.byName ? ' · โดย ' + esc(m.byName) : ''}</div>
       ${m.spec ? `<div class="hint">รายการ BOQ: ${esc(m.spec)}</div>` : ''}${m.sug ? `<div class="hint">ราคาแนะนำ: ${esc([m.sug.mat && m.sug.mat.label, m.sug.lab && m.sug.lab.label].filter(Boolean).join(' · '))}</div>` : ''}</div>
     <div class="mt-ibtn"><button class="btn small primary" data-mta="use" data-id="${esc(m.id)}">${cur && cur.id === m.id ? 'ใช้อยู่' : 'ใช้'}</button>
       ${m.builtin ? '' : `<button class="btn small" data-mta="copy" data-id="${esc(m.id)}">คัดลอก</button>`}
@@ -304,7 +321,9 @@ function mtEdit(m, forId) {
   const f = forId && forId !== MatLib.GROUND ? mtFin(forId) : null;
   const pc = f && MatLib.pieceClass(f);
   const IC = { open: ['#e9e7e1', '#d9d6cf'], fx: ['#ffffff', '#ffffff'], eq: ['#3d74c4', '#3d74c4'], pt: ['#f4f4f4', '#f4f4f4'] };   // 6d สีเริ่ม = สีที่ 3D วาดอยู่
-  const base = m ? JSON.parse(JSON.stringify(m)) : pc === 'item' ? { name: '', cls: 'item', kinds: [f.ik], spec: '', style: '', look: { pat: 'plain', color: IC[f.unit][0], color2: IC[f.unit][1] } } : pc === 'roof' ? { name: '', cls: 'roof', kinds: [], cover: f.cover, spec: '', ins: { mode: 'keep' }, look: { pat: 'plain', color: '#7d8a92' } } : {
+  const base = m ? JSON.parse(JSON.stringify(m)) : pc === 'steel' ? { name: '', cls: 'paint', kinds: ['steel'], spec: 'ทาสีกันสนิม + สีน้ำมัน 2 เที่ยว สี', look: { pat: 'plain', color: '#5a6470' } }
+    : pc === 'racc' ? { name: '', cls: 'roof', kinds: [MatLib.kindOfPiece(f)], cover: MatLib.isRacc(f) ? f.cover : 'any', spec: '', ins: { mode: 'keep' }, look: { pat: 'plain', color: '#7d8a92' } }
+    : pc === 'item' ? { name: '', cls: 'item', kinds: [f.ik], spec: '', style: '', look: { pat: 'plain', color: IC[f.unit][0], color2: IC[f.unit][1] } } : pc === 'roof' ? { name: '', cls: 'roof', kinds: [], cover: f.cover, spec: '', ins: { mode: 'keep' }, look: { pat: 'plain', color: '#7d8a92' } } : {
     name: '', cls: forId === MatLib.GROUND ? 'ground' : pc === 'paint' ? 'paint' : 'clad',
     kinds: f ? [MatLib.kindOfPiece(f)] : [], spec: '', look: forId === MatLib.GROUND ? { pat: 'grass' } : { pat: f && f.kind === 'floor' ? 'granito' : f && f.kind === 'other' ? 'plain' : 'tile' } };
   if (base.cls === 'roof') { base.ins = base.ins || { mode: 'keep' }; base.cover = base.cover || (f && f.cover) || 'metal_sheet'; }
@@ -323,18 +342,20 @@ function mtEdRender() {
   const CELL_TH = { brick: 'ขนาดก้อน (ยาว × สูง)', wood: 'ขนาดแผ่น (ยาว × กว้าง)', concrete: 'ขนาดแผงแบบหล่อ', washed: 'หน่วยลาย' };
   const isNew = !e.id;
   $('#mte-title', m).textContent = isNew ? 'สร้างวัสดุใหม่' : 'แก้วัสดุ — ' + e.name;
-  const kinds = MatLib.CLAD_KINDS.map(k => `<label><input type="checkbox" data-mtk="${k}" ${e.kinds.includes(k) ? 'checked' : ''}> ${MatLib.KIND_TH[k]}</label>`).join(' ');
+  const kinds = MatLib.CLAD_KINDS.filter(k => !(e.cls === 'paint' && k === 'steel')).map(k => `<label><input type="checkbox" data-mtk="${k}" ${e.kinds.includes(k) ? 'checked' : ''}> ${MatLib.KIND_TH[k]}</label>`).join(' ');
   const rows = (S.priced || []).filter(r => r.mat_src || r.lab_src || (S.boq.bind || {})[r.key]);
   let h = `<div class="mte-grid"><div class="mte-form">
     <label class="fld">ชื่อวัสดุ<input class="cell" data-mtf="name" value="${esc(e.name)}" placeholder="เช่น กระเบื้องแกรนิตโต้ 60x60 สีเทาอ่อน ยาแนวขาว"></label>
     <label class="fld">ประเภท<select data-mtf="cls">${['clad', 'paint', 'roof', 'item', 'ground'].map(c => `<option value="${c}" ${e.cls === c ? 'selected' : ''}>${MatLib.CLS_TH[c]}</option>`).join('')}</select></label>
-    ${e.cls === 'item' ? mtEdItemHtml(e) : e.cls === 'ground' ? '<div class="hint">ผิวดินรอบอาคาร — แสดงใน 3D อย่างเดียว ไม่มีแถว BOQ</div>' : e.cls === 'roof' ? `<label class="fld">ชนิดวัสดุมุง<select data-mtf="cover">${Object.entries(MatLib.COVER_TH).map(([k, v]) => `<option value="${k}" ${e.cover === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
-      <span class="hint">ใช้ได้กับหลังคาชนิดเดียวกันเท่านั้น (ต่างชนิดต้องแก้โมเดล)</span></label>
-      <label class="fld">ข้อความรายการ BOQ<textarea class="cell" rows="2" data-mtf="spec" placeholder="เช่น หลังคาเมทัลชีท หนา 0.40 มม. สีแดง">${esc(e.spec)}</textarea><span class="hint">ชื่อแถวใน ปร.4 · พื้นที่เท่าเดิม · ราคาผูกตามชนิดวัสดุมุง</span></label>
-      <div class="fld">ฉนวนใต้หลังคา<div>${['keep', 'none', 'set'].map(k => `<label><input type="radio" name="mte-ins" value="${k}" ${e.ins.mode === k ? 'checked' : ''}> ${MatLib.INS_TH[k]}</label>`).join(' ')}</div>
-      ${e.ins.mode === 'set' ? `<input class="cell" data-mti="desc" value="${esc(e.ins.desc || '')}" placeholder="เช่น PU โฟม หนา 25 มม.">` : ''}<span class="hint">แถวฉนวนพื้นที่เท่ากับแผ่นมุง · "ฉนวนตามแบบ" = เปลี่ยนแค่แผ่น</span></div>` : `<div class="fld">ใช้กับผิว<div class="mte-kinds">${kinds}</div></div>`}
+    ${e.cls === 'item' ? mtEdItemHtml(e) : e.cls === 'ground' ? '<div class="hint">ผิวดินรอบอาคาร — แสดงใน 3D อย่างเดียว ไม่มีแถว BOQ</div>' : e.cls === 'roof' ? `<label class="fld">ชิ้นส่วน<select data-mtp="1"><option value="" ${!e.kinds.length ? 'selected' : ''}>แผ่นมุงหลังคา</option>${Object.entries(MatLib.RPART_TH).map(([k, v]) => `<option value="${k}" ${e.kinds[0] === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
+      <label class="fld">${e.kinds.length ? 'ใช้กับหลังคา' : 'ชนิดวัสดุมุง'}<select data-mtf="cover">${(e.kinds.length ? [['any', 'ทุกชนิด']] : []).concat(Object.entries(MatLib.COVER_TH)).map(([k, v]) => `<option value="${k}" ${e.cover === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+      <span class="hint">${e.kinds.length ? 'ครอบสัน/ครอบตะเข้/ตะเข้รางที่คิดจากหลังคา: ใช้ได้กับหลังคาชนิดที่เลือก · ครอบข้าง/เชิงชาย/แฟลชชิ่งที่เป็นชิ้นในแบบ: ใช้ได้ทุกชิ้นชนิดเดียวกัน' : 'ใช้ได้กับหลังคาชนิดเดียวกันเท่านั้น (ต่างชนิดต้องแก้โมเดล)'}</span></label>
+      <label class="fld">ข้อความรายการ BOQ<textarea class="cell" rows="2" data-mtf="spec" placeholder="${e.kinds.length ? 'เช่น ครอบสันเมทัลชีท หนา 0.40 มม. สีแดง' : 'เช่น หลังคาเมทัลชีท หนา 0.40 มม. สีแดง'}">${esc(e.spec)}</textarea><span class="hint">ชื่อแถวใน ปร.4 · ${e.kinds.length ? 'ความยาว/ปริมาณเท่าเดิม' : 'พื้นที่เท่าเดิม'} · ราคาผูกตามชนิดวัสดุมุง</span></label>
+      ${e.kinds.length ? '' : `<div class="fld">ฉนวนใต้หลังคา<div>${['keep', 'none', 'set'].map(k => `<label><input type="radio" name="mte-ins" value="${k}" ${e.ins.mode === k ? 'checked' : ''}> ${MatLib.INS_TH[k]}</label>`).join(' ')}</div>
+      ${e.ins.mode === 'set' ? `<input class="cell" data-mti="desc" value="${esc(e.ins.desc || '')}" placeholder="เช่น PU โฟม หนา 25 มม.">` : ''}<span class="hint">แถวฉนวนพื้นที่เท่ากับแผ่นมุง · "ฉนวนตามแบบ" = เปลี่ยนแค่แผ่น</span></div>`}` : e.cls === 'paint' ? `<label class="fld">ใช้กับ<select data-mts="1"><option value="" ${e.kinds[0] !== 'steel' ? 'selected' : ''}>ผิวผนัง/ผิวโครงสร้าง (ฉาบทาสี)</option><option value="steel" ${e.kinds[0] === 'steel' ? 'selected' : ''}>เหล็กรูปพรรณ (ทาสีเหล็ก)</option></select></label>
+      ${e.kinds[0] === 'steel' ? `<label class="fld">ข้อความรายการ BOQ<textarea class="cell" rows="2" data-mtf="spec" placeholder="เช่น ทาสีกันสนิม + สีน้ำมัน 2 เที่ยว สีเทาเข้ม">${esc(e.spec)}</textarea><span class="hint">ชื่อแถวใน ปร.4 · พื้นที่ทาเท่าเดิม · ผูกราคาเดิม (รองพื้นกันสนิม + สีน้ำมัน 2 เที่ยว) · ชิ้นนี้/ทั้งชนิด ต่างสีแยกแถว</span></label>` : `<div class="fld">ใช้กับผิว<div class="mte-kinds">${kinds}</div></div>`}` : `<div class="fld">ใช้กับผิว<div class="mte-kinds">${kinds}</div></div>`}
     ${e.cls === 'clad' ? `<label class="fld">ข้อความรายการ BOQ<textarea class="cell" rows="2" data-mtf="spec" placeholder="เช่น พื้นปูกระเบื้องแกรนิตโต้ 60x60 ซม. ผิวด้าน">${esc(e.spec)}</textarea>
-      <span class="hint">เป็นชื่อแถวใน ปร.4 — ชิ้นที่เปลี่ยนย้ายไปแถวนี้ (ตรงกับรายการที่มีอยู่แล้ว = รวมแถว) · แกรนิตโต้ระบุขนาด "60x60 ซม." และ ฝ้ายิปซัม ผูกราคาอัตโนมัติได้</span></label>` : e.cls === 'paint' ? '<div class="hint">ฉาบทาสี: เปลี่ยนสีใน 3D · ผิวโครงสร้างที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนโครงสร้าง + ทาสีน้ำอะคริลิก · ผนังกรุที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนเรียบผนัง + ทาสีน้ำอะคริลิก (ใส่คำว่า "ภายใน" หรือ "ภายนอก" ในชื่อวัสดุ = ไม่ต้องถามด้าน)</div>' : ''}
+      <span class="hint">เป็นชื่อแถวใน ปร.4 — ชิ้นที่เปลี่ยนย้ายไปแถวนี้ (ตรงกับรายการที่มีอยู่แล้ว = รวมแถว) · แกรนิตโต้ระบุขนาด "60x60 ซม." และ ฝ้ายิปซัม ผูกราคาอัตโนมัติได้</span></label>` : e.cls === 'paint' && e.kinds[0] !== 'steel' ? '<div class="hint">ฉาบทาสี: เปลี่ยนสีใน 3D · ผิวโครงสร้างที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนโครงสร้าง + ทาสีน้ำอะคริลิก · ผนังกรุที่เปลี่ยนเป็นทาสีคิดเป็นฉาบปูนเรียบผนัง + ทาสีน้ำอะคริลิก (ใส่คำว่า "ภายใน" หรือ "ภายนอก" ในชื่อวัสดุ = ไม่ต้องถามด้าน)</div>' : ''}
     ${e.cls === 'item' ? '' : `<label class="fld">ลาย<select data-mtl="pat">${pats.map(p => `<option value="${p}" ${L.pat === p ? 'selected' : ''}>${P[p].th}</option>`).join('')}</select></label>`}
     <div class="mte-row"><label class="fld">${e.cls === 'item' ? (mtItemUnit(e) === 'open' ? 'สีวงกบ' : 'สีตัว') : 'สีหลัก'}<input type="color" data-mtl="color" value="${esc(L.color)}"></label>
       ${e.cls === 'item' && mtItemUnit(e) === 'open' ? `<label class="fld">สีบาน<input type="color" data-mtl="color2" value="${esc(L.color2 || '#d9d6cf')}"></label>` : ''}
@@ -342,7 +363,7 @@ function mtEdRender() {
       ${show('grout') ? `<label class="fld">${L.pat === 'brick' ? 'สีปูนก่อ' : 'สียาแนว'}<input type="color" data-mtl="grout" value="${esc(L.grout || '#999999')}"></label>` : ''}
       ${show('gw') ? `<label class="fld">ร่อง (มม.)<input class="cell num" type="number" min="0" max="50" step="0.5" data-mtl="gw" value="${esc(L.gw ?? '')}"></label>` : ''}</div>
     ${show('cell') ? `<div class="mte-row"><label class="fld">${CELL_TH[L.pat] || 'ขนาดแผ่น (กว้าง × ยาว)'} ซม.<span><input class="cell num" type="number" min="1" step="0.5" data-mtc="0" value="${+(L.cell[0] * 100).toFixed(2)}"> × <input class="cell num" type="number" min="1" step="0.5" data-mtc="1" value="${+(L.cell[1] * 100).toFixed(2)}"></span></label></div>` : ''}
-    ${e.cls === 'clad' || e.cls === 'roof' || e.cls === 'item' ? `<div class="fld">ราคาแนะนำ <span class="hint">(คำแนะนำในแถวที่ยังไม่มีราคา — ไม่ทับการผูกอัตโนมัติ)</span>
+    ${e.cls === 'clad' || e.cls === 'roof' || e.cls === 'item' || e.kinds[0] === 'steel' ? `<div class="fld">ราคาแนะนำ <span class="hint">(คำแนะนำในแถวที่ยังไม่มีราคา — ไม่ทับการผูกอัตโนมัติ)</span>
       <div class="hint">${e.sug ? esc([e.sug.mat && 'วัสดุ: ' + e.sug.mat.label, e.sug.lab && 'ค่าแรง: ' + e.sug.lab.label].filter(Boolean).join(' · ')) + ' <button class="btn small ghost" data-mte="sugclr">ล้าง</button>' : 'ยังไม่มี'}</div>
       ${rows.length ? `<select data-mtf="sugfrom"><option value="">คัดลอกการผูกจากแถว BOQ…</option>${rows.map(r => `<option value="${esc(r.key)}">${esc(r.name)}${r.mat_src ? ' · ' + esc(r.mat_src) : ''}</option>`).join('')}</select>` : ''}</div>` : ''}
     <div class="fld">บันทึกที่<div><label><input type="radio" name="mte-tg" value="lib" ${MT.edTarget === 'lib' ? 'checked' : ''} ${mtApproved() ? '' : 'disabled'}> คลังวัสดุกลาง (ทั้งทีม)</label>
@@ -377,6 +398,8 @@ function mtEdInput(t, changed) {
   if (t.dataset.mtf === 'sugfrom') { if (changed && t.value) { const s = mtSugFromRow(t.value); if (s) e.sug = s; else toast('แถวนี้ไม่มีการผูกที่ใช้เป็นคำแนะนำได้'); mtEdRender(); } return; }
   if (t.name === 'mte-ins') { e.ins = { mode: t.value, desc: (e.ins && e.ins.desc) || '' }; mtEdRender(); return; }
   if (t.dataset.mti) { e.ins.desc = t.value; return; }
+  if (t.dataset.mtp !== undefined) { if (changed) { e.kinds = t.value ? [t.value] : []; if (!e.kinds.length && e.cover === 'any') e.cover = 'metal_sheet'; e.ins = { mode: 'keep' }; mtEdRender(); } return; }   // v7.5 ชิ้นส่วนหลังคา
+  if (t.dataset.mts !== undefined) { if (changed) { e.kinds = t.value ? ['steel'] : []; if (t.value && !e.spec) e.spec = 'ทาสีกันสนิม + สีน้ำมัน 2 เที่ยว สี'; mtEdRender(); } return; }   // v7.5 ทาสีเหล็ก
   if (t.dataset.mtu !== undefined) { if (changed) { e.kinds = []; e.style = ''; MT.edUnit = t.value; mtEdRender(); } return; }   // 6d หมวด
   if (t.dataset.mtik) { const k = t.dataset.mtik; e.kinds = e.kinds.filter(x => x !== k); if (t.checked) e.kinds.push(k); if (changed) mtEdRender(); return; }
   if (t.dataset.mtf) { e[t.dataset.mtf] = t.value; if (t.dataset.mtf === 'cls' && changed) { if (e.cls === 'ground' || e.cls === 'roof' || e.cls === 'item') e.kinds = []; if (e.cls === 'item') e.look = MatLib.lookOf({ pat: 'plain' }); if (e.cls === 'roof') { e.ins = e.ins || { mode: 'keep' }; e.cover = e.cover || 'metal_sheet'; } mtEdRender(); } return; }

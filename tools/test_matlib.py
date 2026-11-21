@@ -145,8 +145,8 @@ def roof_cases(model, settings, pm):
             "RPU": rm("RPU", "หลังคาเมทัลชีท หนา 0.40 มม. สีเทา", {"mode": "set", "desc": "PU โฟม หนา 25 มม."}),
             "RNO": rm("RNO", "หลังคาเมทัลชีท หนา 0.40 มม. สีเทา", {"mode": "none"}),
             "RSAME": rm("RSAME", "", {"mode": "keep"}),
-            "CAP": {"id": "CAP", "name": "CAP", "cls": "clad", "kinds": ["cap"], "spec": "ครอบหลังคาเมทัลชีท สีแดง", "look": {"pat": "plain"}},
-            "FA": {"id": "FA", "name": "FA", "cls": "clad", "kinds": ["fascia"], "spec": "เชิงชายไม้ฝาไฟเบอร์ซีเมนต์ 8\"", "look": {"pat": "plain"}}}
+            "CAP": {"id": "CAP", "name": "CAP", "cls": "roof", "kinds": ["cap"], "cover": "any", "ins": {"mode": "keep"}, "spec": "ครอบหลังคาเมทัลชีท สีแดง", "look": {"pat": "plain"}},
+            "FA": {"id": "FA", "name": "FA", "cls": "roof", "kinds": ["fascia"], "cover": "any", "ins": {"mode": "keep"}, "spec": "เชิงชายไม้ฝาไฟเบอร์ซีเมนต์ 8\"", "look": {"pat": "plain"}}}
     others = [f for f in model.get("finishes", []) if f["kind"] == "other"]
     caps = [f for f in others if "ครอบ" in f.get("spec", "") and "เชิงชาย" not in f["spec"]]
     fas = [f for f in others if "เชิงชาย" in f.get("spec", "") or "ปั้นลม" in f.get("spec", "")]
@@ -289,6 +289,69 @@ def unit_cases(model, settings, pm):
     return ok
 
 
+def v75_cases(model, settings, pm):
+    """v7.5 อุปกรณ์หลังคา (ครอบสัน/ตะเข้ที่คิดจากหลังคา) + ทาสีเหล็กรูปพรรณ — ตรวจตาม by_src ของ takeoff.py"""
+    import subprocess as sp
+    base, _, _ = takeoff.run(model, settings, pm)
+    m = copy.deepcopy(model); m.setdefault("quantities", {})["items"] = base
+    js = ("const M=require(process.argv[1]);let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const m=JSON.parse(s);"
+          "process.stdout.write(JSON.stringify({r:M.raccs(m),s:M.steels(m),cl:M.clean({cls:'clad',kinds:['cap'],name:'x',spec:'y',look:{}})}))})")
+    P = json.loads(sp.run(["node", "-e", js, os.path.abspath(os.path.join(HERE, "..", "lib", "matlib.js"))], input=json.dumps(m), capture_output=True, text=True, encoding="utf-8").stdout)
+    ok = True
+    cl = P["cl"]
+    g = cl["cls"] == "roof" and cl["kinds"] == ["cap"] and cl["cover"] == "any"
+    print(("ผ่าน" if g else "ไม่ผ่าน"), "v7.5 วัสดุกรุครอบเดิม → หมวดหลังคา (ครอบข้าง ทุกชนิดหลังคา)", "" if g else cl); ok &= g
+    B = {x["key"]: x for x in base}
+    r2 = lambda v: round(v + 1e-9, 2)
+    def mv(tag, sel, mats, key, srcs, nk, name):
+        nonlocal ok
+        r = node_apply(m, base, sel, mats)
+        A = {x["key"]: x for x in r["items"]}
+        w = B[key].get("waste") or 0
+        moved = sum(B[key]["by_src"][s] for s in srcs)
+        rest = sum(v for s, v in B[key]["by_src"].items() if s not in srcs)
+        g = nk in A and abs(A[nk]["qty"] - r2(moved * (1 + w))) < 0.011 and A[nk]["name"] == name and A[nk]["unit"] == B[key]["unit"] \
+            and ((rest <= 1e-9 and key not in A) or (key in A and abs(A[key]["qty"] - r2(rest * (1 + w))) < 0.011)) \
+            and [x["key"] for x in r["items"]].index(nk) <= [x["key"] for x in base].index(key) + 1
+        others = [k for k in A if k not in (key, nk) and A[k]["qty"] != (B.get(k) or {}).get("qty")]
+        g = g and not others
+        print(("ผ่าน" if g else "ไม่ผ่าน"), f"v7.5 {tag}", "" if g else (A.get(nk, {}).get("qty"), r2(moved * (1 + w)), A.get(key, {}).get("qty"), others[:3])); ok &= g
+    for f in P["r"]:
+        mats = {"RG": {"id": "RG", "name": "RG", "cls": "roof", "kinds": [f["racc"]], "cover": f["cover"], "ins": {"mode": "keep"}, "spec": f"{f['racc']} ทดสอบ สีแดง", "look": {"pat": "plain"}},
+                "RX": {"id": "RX", "name": "RX", "cls": "roof", "kinds": [f["racc"]], "cover": "cpac_tile" if f["cover"] != "cpac_tile" else "metal_sheet", "ins": {"mode": "keep"}, "spec": "x", "look": {"pat": "plain"}}}
+        mv(f"{f['racc']} ของ {f['roof']} (คิดจากหลังคา) → แถวใหม่", {"piece": {f["id"]: "RG"}}, mats, f["row"], [f["roof"]], f"{f['row']}~RG", mats["RG"]["spec"])
+        r = node_apply(m, base, {"piece": {f["id"]: "RX"}}, mats)
+        print(("ผ่าน" if not r["eff"] else "ไม่ผ่าน"), f"v7.5 {f['racc']} วัสดุต่างชนิดหลังคาใช้ไม่ได้"); ok &= not r["eff"]
+    st = P["s"]
+    if st:
+        SP = {"id": "SP", "name": "SP", "cls": "paint", "kinds": ["steel"], "spec": "ทาสีกันสนิม + สีน้ำมัน 2 เที่ยว สีเทาเข้ม", "look": {"pat": "plain", "color": "#444444"}}
+        WP = {"id": "WP", "name": "WP", "cls": "paint", "kinds": ["wall"], "spec": "", "look": {"pat": "plain"}}
+        mats = {"SP": SP, "WP": WP}
+        s0 = st[0]
+        mv(f"ทาสีเหล็ก ชิ้นนี้ ({s0['id']})", {"piece": {s0["id"]: "SP"}}, mats, "paint_rust", [s0["src"]], "paint_rust~SP", SP["spec"])
+        same = [x for x in st if x["type"] == s0["type"]]
+        mv(f"ทาสีเหล็ก ทั้งชนิด {s0['type']} ({len(same)} ชิ้น)", {"type": {"steel|" + s0["type"]: "SP"}}, mats, "paint_rust", [x["src"] for x in same], "paint_rust~SP", SP["spec"])
+        mv(f"ทาสีเหล็ก ทุกชิ้น ({len(st)} ชิ้น) → แถวเดิมหาย", {"type": {"steel|" + t: "SP" for t in {x["type"] for x in st}}}, mats, "paint_rust", [x["src"] for x in st], "paint_rust~SP", SP["spec"])
+        rf = [x for x in st if x["type"] == "roof_frame"]
+        if rf:
+            mv(f"ทาสีโครงหลังคาตามข้อกำหนด ({rf[0]['id']})", {"piece": {rf[0]["id"]: "SP"}}, mats, "paint_rust", [rf[0]["src"]], "paint_rust~SP", SP["spec"])
+        r = node_apply(m, base, {"piece": {s0["id"]: "WP"}}, mats)
+        print(("ผ่าน" if not r["eff"] else "ไม่ผ่าน"), "v7.5 สีทาผนังใช้กับเหล็กไม่ได้"); ok &= not r["eff"]
+        wall = [f for f in m.get("finishes", []) if f.get("counted_by") == "wall"]
+        if wall:
+            r = node_apply(m, base, {"piece": {wall[0]["id"]: "SP"}}, mats)
+            print(("ผ่าน" if not r["eff"] else "ไม่ผ่าน"), "v7.5 สีทาเหล็กใช้กับผนังไม่ได้"); ok &= not r["eff"]
+        import subprocess as sp2
+        pid = json.loads(sp2.run(["node", "-e", "const M=require(process.argv[1]);let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const m=JSON.parse(s);const r=(m.roofs||[])[0];process.stdout.write(JSON.stringify(r?M.pieceIdOf(r.id+'-แป-1',m):null))})",
+                                   os.path.abspath(os.path.join(HERE, "..", "lib", "matlib.js"))], input=json.dumps(m), capture_output=True, text=True, encoding="utf-8").stdout)
+        if rf:
+            g = pid == rf[0]["id"]
+            print(("ผ่าน" if g else "ไม่ผ่าน"), "v7.5 กดแปในหลังคา 3D → ชิ้นโครงหลังคา", "" if g else pid); ok &= g
+    else:
+        print("ข้าม ทาสีเหล็ก (ไม่มีแถว paint_rust)")
+    return ok
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "examples", "sample-building.bm.json")
     model = json.load(open(path, encoding="utf-8"))
@@ -392,6 +455,7 @@ def main():
         ok &= compare(r["items"], exp, f"{tag} — {len(r['eff'])} ชิ้น" + (f" · ด้าน {sorted(set(sides.values()))}" if sides else ""))
     ok &= roof_cases(model, settings, pm)
     ok &= unit_cases(model, settings, pm)
+    ok &= v75_cases(model, settings, pm)
     print("\nรวม:", "ผ่านทั้งหมด" if ok else "มีข้อที่ไม่ผ่าน")
     sys.exit(0 if ok else 1)
 
