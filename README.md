@@ -17,6 +17,7 @@
 | `tools/price_map.json` | ร่างการผูกรายการกับรหัสราคา UD-Cost Hub (รอตรวจ) |
 | `tools/test_takeoff.py` | ทดสอบตัวถอดปริมาณเทียบค่าคำนวณมือ |
 | `tools/sap_export.py` | ส่งออก `.bm.json` เป็น SAP2000 `.s2k` (ทดสอบกับ v23.3.1) + ไฟล์ประกอบ `.sap.json` |
+| `tools/purlingen.py` | สร้างแปเป็นชิ้นส่วน (`members` type=purlin) จากข้อกำหนดแปของหลังคา — ตำแหน่ง/ความยาวตรงกับที่ตัวถอดปริมาณคิดจากข้อกำหนด (`--write`) |
 | `tools/sap_results.py` | อ่านผลจาก Excel ที่ SAP export กลับเข้า `results` (`--write`) |
 | `tools/test_sap.py` | ทดสอบส่งออก/อ่านผล เทียบแรงปฏิกิริยารวมกับน้ำหนักที่ใส่ |
 
@@ -39,6 +40,13 @@ python tools/test_sap.py
 2. SAP: File > Import > SAP2000 .s2k Text File > New model แล้วรัน
 3. SAP: File > Export > SAP2000 MS Excel Spreadsheet เลือก Analysis Results: Joint Output > Reactions, Displacements และ Element Output > Frame Output > Element Forces - Frames บันทึกชื่อเดียวกับ `.s2k` (เช่น `โครงการ.xlsx`)
 4. `python tools/sap_results.py โครงการ.bm.json โครงการ.xlsx --write`
+
+ตัวส่งออกแปลงโมเดลตำแหน่งจริงเป็นโมเดลวิเคราะห์ให้เอง (ไม่แก้ .bm.json):
+- ไม่ส่งเสาเอ็น/ทับหลัง (น้ำหนักคิดรวมในผนัง)
+- ปลายชิ้นที่วางชน/วางบนชิ้นอื่น (หัวเสาใต้อะเส ดั้งบนอะเส จันทันบนอะเส/คอร์ดบน อะเสชนข้างอะเส) → จุดบนแนวแกนชิ้นที่รองรับ + Body constraint (ข้อต่อแข็ง)
+- แปที่วางบนหลังจันทัน → ลดลงมาที่แนวแกนจันทันและต่อที่จุดตัดทุกตัว
+- ท่อเหล็กกล่อง → Box/Tube · 2C ประกบคู่ (กล่องปิด) → General ค่าหน้าตัดจาก `double_c_props` · ทั้งสองใช้วัสดุเหล็ก `<วัสดุ>-ST`
+- เตือนกลุ่มชิ้นส่วนที่ไม่ต่อถึงฐานราก
 ถ้าแก้โมเดลหลังส่งออก ผลที่อ่านกลับจะถูกนับว่าเก่า (stale) จนกว่าจะส่งออกและวิเคราะห์ใหม่
 
 ## การนับเวอร์ชัน

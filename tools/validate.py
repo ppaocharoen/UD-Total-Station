@@ -302,7 +302,7 @@ def completeness(m, ctx, flagged, stale):
     if not res.get("members"): l2.append("ยังไม่มีผลวิเคราะห์")
     elif stale["results"]: l2.append("ผลวิเคราะห์เก่า (โมเดลเปลี่ยนหลังวิเคราะห์)")
     else:
-        lack = [x["id"] for x in members if x["id"] not in res["members"]]
+        lack = [x["id"] for x in members if x["id"] not in res["members"] and x.get("type") not in ("stiffener", "lintel")]   # เสาเอ็น/ทับหลังไม่ส่ง SAP (sap_export.SAP_SKIP)
         if lack: l2.append(f"ไม่มีผลวิเคราะห์ของ {len(lack)} ชิ้น เช่น {', '.join(lack[:3])}")
     if l2: return 1, l2
     # L3 พร้อมส่งมอบ

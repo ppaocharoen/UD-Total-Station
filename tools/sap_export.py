@@ -12,6 +12,14 @@
     ตามความกว้างรับน้ำหนัก; roof_live คิดต่อพื้นที่ราบ กลุ่มอื่นคิดต่อพื้นที่ลาด
   - ชิ้นส่วนที่มีจุดต่ออื่นอยู่กลางช่วง (จันทันที่แปวางทับ) ตั้ง auto mesh ที่จุดต่อ
   - พื้นวางบนดิน (kind=ground) ไม่ส่งเข้า SAP; พื้นลอยยังไม่รองรับ (เตือน)
+  - M4 ก้อน 1 (22 พ.ย. 2569 · ท12):
+    · ไม่ส่งเสาเอ็น/ทับหลัง (stiffener, lintel) — ไม่ใช่โครงสร้างหลัก น้ำหนักรวมอยู่ในน้ำหนักผนัง
+    · ท่อเหล็กกล่อง (box) → Box/Tube · 2C ประกบคู่ (ปากชนปาก = กล่องปิด) → General ใส่ค่าหน้าตัดที่คำนวณเอง
+      (ทั้งสองแบบใช้วัสดุเหล็ก "<วัสดุ>-ST" ชนิด Steel ที่ fy เดียวกัน — SAP ไม่ให้วัสดุ ColdFormed กับหน้าตัดชนิดนี้)
+    · แปในโมเดลวางบนหลังจันทัน (ตำแหน่งจริง) → ตอนส่งออกลดแปลงมาที่แนวแกนจันทัน และสร้างจุดต่อที่จุดตัดทุกจันทัน
+      (แป/จันทันแบ่งช่วงที่จุดนั้นด้วย auto mesh — ชื่อชิ้นส่วนเดิม อ่านผลกลับได้ตรงตัว)
+    · ตรวจชิ้นส่วนที่ไม่ต่อถึงฐานราก (กลุ่มลอย) แล้วเตือน
+    · วัสดุเหล็กที่แบบไม่ระบุเกรด: fy 2,450 ksc (SSC400 มอก. 1228) + เตือนเป็นค่าสมมติ
 
 ทดสอบกับ SAP2000 v23.3.1 แล้ว (18 ต.ค. 2569): import ไม่มี error, รันได้, แรงปฏิกิริยารวมตรงกับน้ำหนักที่ใส่
   (DL 13,643.96 = คอนกรีต 5.548 ลบ.ม. + C100 73.9 + C75 254.9 กก.; SDL 11,804.1 = ผนัง 11,232 + หลังคา 572.1; LR 2,688)
@@ -25,6 +33,8 @@ from collections import defaultdict
 PATTERN_TYPE = {"dead": "Dead", "super_dead": "Super Dead", "live": "Live", "roof_live": "Roof Live",
                 "wind": "Wind", "seismic": "Quake", "other": "Other"}
 E_STEEL = 2.04e6  # ksc
+FY_DEFAULT = 2450  # ksc — เหล็กขึ้นรูปเย็น SSC400 (มอก. 1228) เมื่อแบบไม่ระบุเกรด
+SAP_SKIP = {"stiffener": "เสาเอ็น", "lintel": "ทับหลัง/คานเอ็น"}
 KSC = 1e4         # ksc -> kgf/m2
 G = 9.80665
 
@@ -67,10 +77,50 @@ def row(**kw):
 
 
 def parse_cf_name(name):
-    """C100x50x20x2.3 -> (d, b, lip, t) เมตร"""
-    p = name.upper().lstrip("C").split("X")
-    d, b, lip, t = [float(v) / 1000 for v in p[:4]]
+    """C100x50x20x2.3 / C-100x50x20x2.3 -> (d, b, lip, t) เมตร"""
+    import re
+    g = re.search(r"(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)\s*[xX]\s*(\d+(?:\.\d+)?)", name)
+    if not g:
+        raise ValueError("อ่านขนาดหน้าตัด C จากชื่อ %r ไม่ได้" % name)
+    d, b, lip, t = [float(v) / 1000 for v in g.groups()]
     return d, b, lip, t
+
+
+def double_c(s):
+    """หน้าตัด 2C ประกบคู่ → (h, b, lip, t) ของ C ตัวเดียว (เมตร) หรือ None"""
+    import re
+    for txt in (s.get("id", ""), s.get("name", "")):
+        g = re.match(r"\s*2C[-\s]?(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)", txt, re.I)
+        if g:
+            return tuple(float(v) / 1000 for v in g.groups())
+    return None
+
+
+def double_c_props(h, b, c, t):
+    """C มีขอบ 2 ตัวประกบปากชนปาก (ปลายปีกชนกัน ขอบพับอยู่ด้านในกล่อง) — กล่องกว้าง 2b สูง h
+    วิธี: แบ่งเป็นแผ่นสี่เหลี่ยมบาง (ไม่คิดมุมโค้ง) · แกน 3 = แนวนอน (I33 = ∫y²dA ดัดในระนาบตั้ง) · แกน 2 = แนวตั้ง
+    J: กล่องปิดเซลล์เดียว (Bredt) J = 4·Am²·t / ความยาวเส้นรอบรูปกลางแผ่น — ถือว่าปลายปีกเชื่อมติดกันตลอด
+    AS2 = เอว 2 แผ่น (h·t·2) · AS3 = ปีกบน-ล่างตลอดความกว้าง (2b·t·2)"""
+    R = []   # (x0, x1, y0, y1) — ตัว C ซ้าย (ปากหันขวา) แล้วสะท้อนเป็นตัวขวา
+    R.append((-b, -b + t, -h / 2, h / 2))                 # เอว
+    R.append((-b + t, 0, h / 2 - t, h / 2))               # ปีกบน
+    R.append((-b + t, 0, -h / 2, -h / 2 + t))             # ปีกล่าง
+    R.append((-t, 0, h / 2 - c, h / 2 - t))               # ขอบพับบน (ชี้ลง)
+    R.append((-t, 0, -h / 2 + t, -h / 2 + c))             # ขอบพับล่าง (ชี้ขึ้น)
+    R += [(-x1, -x0, y0, y1) for x0, x1, y0, y1 in R]
+    A = sum((x1 - x0) * (y1 - y0) for x0, x1, y0, y1 in R)
+    I33 = sum((x1 - x0) * (y1 ** 3 - y0 ** 3) / 3 for x0, x1, y0, y1 in R)
+    I22 = sum((y1 - y0) * (x1 ** 3 - x0 ** 3) / 3 for x0, x1, y0, y1 in R)
+    def zpl(lo, hi):   # ∫|s| ds ของช่วง [lo, hi]
+        f = lambda v: v * abs(v) / 2
+        return f(hi) - f(lo)
+    Z33 = sum((x1 - x0) * zpl(y0, y1) for x0, x1, y0, y1 in R)
+    Z22 = sum((y1 - y0) * zpl(x0, x1) for x0, x1, y0, y1 in R)
+    W, H = 2 * b - t, h - t
+    J = 4 * (W * H) ** 2 * t / (2 * (W + H))
+    return {"t3": h, "t2": 2 * b, "A": A, "I33": I33, "I22": I22, "J": J, "AS2": 2 * h * t, "AS3": 2 * (2 * b) * t,
+            "S33": I33 / (h / 2), "S22": I22 / b, "Z33": Z33, "Z22": Z22,
+            "R33": math.sqrt(I33 / A), "R22": math.sqrt(I22 / A)}
 
 
 class Exporter:
@@ -78,8 +128,20 @@ class Exporter:
         self.m, self.version = m, version
         self.warn = []
         self.nodes = {n["id"]: n for n in m.get("nodes", [])}
-        self.members = {x["id"]: x for x in m.get("members", [])}
+        self.members = {}
+        skipped = defaultdict(int)
+        for x in m.get("members", []):
+            if x["type"] in SAP_SKIP:
+                skipped[x["type"]] += 1
+            else:
+                self.members[x["id"]] = x
+        for t, k in skipped.items():
+            self.warn.append("ไม่ส่ง%s %d ชิ้นเข้า SAP (ไม่ใช่โครงสร้างหลัก — น้ำหนักคิดรวมในผนัง)" % (SAP_SKIP[t], k))
         self.tables = []
+        self.extra_mats = {}     # วัสดุเหล็กที่สร้างให้หน้าตัด Box/Tube/General: id ใหม่ -> วัสดุต้นทาง
+        self.sec_mat = {}
+        self.extra_joints = set()
+        self._snap_purlins()
         self._oh_warned = set()
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from validate import model_hash
@@ -104,6 +166,7 @@ class Exporter:
         used = set()
         for x in self.members.values():
             used.update((x["i"], x["j"]))
+        used |= self.extra_joints
         rows = []
         for nid, n in self.nodes.items():
             if nid not in used:
@@ -175,7 +238,10 @@ class Exporter:
                 if not mt.get("E"):
                     self.warn.append("วัสดุ %s: E = 15100√f'c = %.0f ksc (คำนวณ)" % (mt["id"], E))
             elif k in ("steel", "cold_formed"):
-                fy = mt["fy"]
+                fy = mt.get("fy")
+                if not fy:
+                    fy = FY_DEFAULT
+                    self.warn.append("วัสดุ %s: แบบไม่ระบุ fy — ใช้ %d ksc (SSC400 มอก. 1228) เป็นค่าสมมติ" % (mt["id"], fy))
                 fu = mt.get("fu") or {"SSC400": 4100, "SS400": 4100, "SM520": 5300}.get(mt.get("grade"), 4100)
                 E = mt.get("E") or E_STEEL
                 gen.append(row(Material=mt["id"], Type=("ColdFormed" if k == "cold_formed" else "Steel"),
@@ -193,11 +259,211 @@ class Exporter:
                     self.warn.append("วัสดุ %s: Fu = %s ksc (ค่าตามเกรด)" % (mt["id"], fu))
             else:
                 self.warn.append("วัสดุ %s ชนิด %s ไม่ส่งเข้า SAP" % (mt["id"], k))
+        mats = {mt["id"]: mt for mt in self.m.get("materials", [])}
+        for nid_, src in self.extra_mats.items():   # วัสดุเหล็ก (Steel) ของหน้าตัด Box/Tube / General
+            mt = mats.get(src, {})
+            fy = mt.get("fy") or FY_DEFAULT
+            fu = mt.get("fu") or {"SSC400": 4100, "SS400": 4100, "SM520": 5300}.get(mt.get("grade"), 4100)
+            E = mt.get("E") or E_STEEL
+            gen.append(row(Material=nid_, Type="Steel", Grade=mt.get("grade", src), SymType="Isotropic", TempDepend="No",
+                           Color="Red", Notes="from bm.json %s (tube/general)" % src))
+            mech.append(row(Material=nid_, UnitWeight=7850, UnitMass=round(7850 / G, 4), E1=E * KSC,
+                            G12=round(E * KSC / 2.6, 2), U12=0.3, A1=1.17e-5))
+            steel.append(row(Material=nid_, Fy=fy * KSC, Fu=fu * KSC, EffFy=fy * 1.1 * KSC,
+                             EffFu=fu * 1.1 * KSC, SSCurveOpt="Simple", SSHysType="Kinematic", SHard=0.02,
+                             SMax=0.14, SRup=0.2, FinalSlope=-0.1))
         self.table("MATERIAL PROPERTIES 01 - GENERAL", gen)
         self.table("MATERIAL PROPERTIES 02 - BASIC MECHANICAL PROPERTIES", mech)
         self.table("MATERIAL PROPERTIES 03A - STEEL DATA", steel)
         self.table("MATERIAL PROPERTIES 03B - CONCRETE DATA", conc)
         self.table("MATERIAL PROPERTIES 03D - COLD FORMED DATA", cf)
+
+    def _steel_mat(self, mat):
+        mt = next((x for x in self.m.get("materials", []) if x["id"] == mat), {})
+        if mt.get("kind") == "steel":
+            return mat
+        nid_ = "%s-ST" % mat
+        self.extra_mats[nid_] = mat
+        return nid_
+
+    def _snap_purlins(self):
+        """แปที่วางบนหลังจันทัน → ย้ายแนวแกนลงมาที่แนวแกนจันทัน + สร้างจุดต่อที่จุดตัด (เฉพาะใน .s2k)"""
+        purl = [x for x in self.members.values() if x["type"] == "purlin"]
+        raf = [x for x in self.members.values() if x["type"] == "rafter"]
+        if not purl or not raf:
+            return
+        P = lambda nid_: self.nodes[nid_]
+        n_snap = 0
+        for x in purl:
+            a, b = P(x["i"]), P(x["j"])
+            hits = []   # (t ตามแป, จุดบนแกนจันทัน)
+            for r in raf:
+                c, d = P(r["i"]), P(r["j"])
+                # จุดตัดในแปลน (xy) ของเส้น a-b กับ c-d
+                d1 = (b["x"] - a["x"], b["y"] - a["y"]); d2 = (d["x"] - c["x"], d["y"] - c["y"])
+                den = d1[0] * d2[1] - d1[1] * d2[0]
+                if abs(den) < 1e-12:
+                    continue
+                ex, ey = c["x"] - a["x"], c["y"] - a["y"]
+                t = (ex * d2[1] - ey * d2[0]) / den
+                u = (ex * d1[1] - ey * d1[0]) / den
+                if -1e-6 <= t <= 1 + 1e-6 and -1e-6 <= u <= 1 + 1e-6:
+                    hits.append((t, (c["x"] + u * d2[0], c["y"] + u * d2[1], c["z"] + u * (d["z"] - c["z"]))))
+            if len(hits) < 2:
+                self.warn.append("แป %s: ตัดจันทันน้อยกว่า 2 ตัว — ส่งตามตำแหน่งเดิม (ไม่ต่อกับจันทัน)" % x["id"])
+                continue
+            hits.sort()
+            # แนวแกนใหม่ผ่านจุดตัดแรกและสุดท้าย (แปตรง) — ตรวจว่าจุดตัดอื่นอยู่บนแนวนี้
+            (t0, p0), (t1, p1) = hits[0], hits[-1]
+            if t1 - t0 < 1e-6:
+                self.warn.append("แป %s: ตัดจันทันจุดเดียว — ส่งตามตำแหน่งเดิม" % x["id"])
+                continue
+            def at(t):
+                k = (t - t0) / (t1 - t0)
+                return tuple(p0[i] + k * (p1[i] - p0[i]) for i in range(3))
+            bad = max(math.dist(at(t), p) for t, p in hits)
+            if bad > 0.005:
+                self.warn.append("แป %s: จุดตัดจันทันไม่อยู่ในแนวเดียวกัน (คลาด %.1f มม.) — ส่งตามตำแหน่งเดิม" % (x["id"], bad * 1000))
+                continue
+            ni, nj = "%s-SI" % x["id"], "%s-SJ" % x["id"]
+            for nn, t in ((ni, 0.0), (nj, 1.0)):
+                p = at(t)
+                self.nodes[nn] = {"id": nn, "x": round(p[0], 6), "y": round(p[1], 6), "z": round(p[2], 6)}
+            for k, (t, p) in enumerate(hits):
+                if t < 1e-4 or t > 1 - 1e-4:
+                    continue
+                jn = "%s-X%02d" % (x["id"], k + 1)
+                self.nodes[jn] = {"id": jn, "x": round(p[0], 6), "y": round(p[1], 6), "z": round(p[2], 6)}
+                self.extra_joints.add(jn)
+            self.members[x["id"]] = dict(x, i=ni, j=nj)
+            n_snap += 1
+        if n_snap:
+            self.warn.append("แป %d เส้น: ลดแนวแกนลงมาที่แนวแกนจันทันและต่อที่จุดตัด (ระยะเยื้องบนหลังจันทันไม่คิดใน SAP)" % n_snap)
+
+    def _half(self, x):
+        """(ครึ่งความลึก, ครึ่งความกว้าง) ของหน้าตัด (ม.)"""
+        sc = next((q for q in self.m.get("sections", []) if q["id"] == x["section"]), {})
+        d = sc.get("dims") or {}
+        h = d.get("h") or sc.get("h") or sc.get("d") or 0.1
+        b = d.get("b") or sc.get("b") or sc.get("d") or h
+        return h / 2, b / 2
+
+    def _contacts(self):
+        """จุดที่ปลายชิ้นส่วนวางชน/วางบนชิ้นอื่น (โมเดลเก็บตำแหน่งจริง เช่น หัวเสา +3.30 ใต้อะเสแนวแกน +3.35)
+        → สร้างจุดบนแนวแกนชิ้นที่รองรับ แล้วผูกกับปลายชิ้นด้วย Body constraint (ข้อต่อแข็ง = ไม่มีการปลดแรง ตามที่ Earth ใช้)
+        เกณฑ์ชน: ห่างในแปลน ≤ ครึ่งกว้างชิ้นรองรับ + ครึ่งกว้างชิ้นที่วาง + 6 มม.
+                 ห่างแนวตั้ง ≤ ครึ่งลึกชิ้นรองรับ + ครึ่งลึกชิ้นที่วาง (ปลายเสา/ชิ้นตั้ง = 0 เพราะจุดอยู่ที่ผิวปลาย) + 6 มม.
+        แปไม่อยู่ในเกณฑ์นี้ (จัดการใน _snap_purlins)"""
+        TOL = 0.006
+        mem = [x for x in self.members.values() if x["type"] != "purlin"]
+        geo = {}
+        for x in mem:
+            a, b = self.nodes[x["i"]], self.nodes[x["j"]]
+            A, B = (a["x"], a["y"], a["z"]), (b["x"], b["y"], b["z"])
+            L = math.dist(A, B)
+            if L < 1e-6:
+                continue
+            vert = abs(B[2] - A[2]) > 0.9 * L
+            geo[x["id"]] = (A, B, L, vert, self._half(x))
+        def on_axis(Q, g):
+            A, B, L = g[0], g[1], g[2]
+            t = sum((Q[k] - A[k]) * (B[k] - A[k]) for k in range(3)) / L
+            return -1e-3 <= t <= L + 1e-3 and math.dist(Q, [A[k] + (B[k] - A[k]) * t / L for k in range(3)]) < 2e-3
+        groups = defaultdict(set)    # จุดปลาย -> จุดบนแนวแกนที่ผูก
+        made = {}
+        def joint_at(p):
+            for nid_, n in self.nodes.items():
+                if abs(n["x"] - p[0]) < 1e-3 and abs(n["y"] - p[1]) < 1e-3 and abs(n["z"] - p[2]) < 1e-3:
+                    return nid_
+            k = (round(p[0], 3), round(p[1], 3), round(p[2], 3))
+            if k not in made:
+                nn = "CJ-%.3f_%.3f_%.3f" % k
+                self.nodes[nn] = {"id": nn, "x": p[0], "y": p[1], "z": p[2]}
+                self.extra_joints.add(nn)
+                made[k] = nn
+            return made[k]
+        for x in mem:
+            if x["id"] not in geo:
+                continue
+            _, _, _, vm, (hm, bm) = geo[x["id"]]
+            for end in (x["i"], x["j"]):
+                n = self.nodes[end]
+                E = (n["x"], n["y"], n["z"])
+                for y in mem:
+                    if y is x or y["id"] not in geo or end in (y["i"], y["j"]):
+                        continue
+                    A, B, L, vs, (hs, bs) = geo[y["id"]]
+                    if vs:   # ชิ้นรองรับเป็นแนวตั้ง (เสา): ปลายชิ้นอื่นชนข้างเสา
+                        if not (min(A[2], B[2]) - TOL <= E[2] <= max(A[2], B[2]) + TOL):
+                            continue
+                        P = (A[0], A[1], E[2])
+                        if math.hypot(E[0] - P[0], E[1] - P[1]) > max(hs, bs) + (0 if vm else hm) + TOL:
+                            continue
+                    else:
+                        dx, dy = B[0] - A[0], B[1] - A[1]
+                        ll = dx * dx + dy * dy
+                        if ll < 1e-12:
+                            continue
+                        t = ((E[0] - A[0]) * dx + (E[1] - A[1]) * dy) / ll
+                        if t < -1e-6 or t > 1 + 1e-6:
+                            continue
+                        P = (A[0] + t * dx, A[1] + t * dy, A[2] + t * (B[2] - A[2]))
+                        dpl = math.hypot(E[0] - P[0], E[1] - P[1])
+                        dz = abs(E[2] - P[2])
+                        if dpl > bs + bm + TOL or dz > hs + (0 if vm else hm) + TOL:
+                            continue
+                        if dpl > bs + TOL and dz > TOL:   # ห่างทั้งแปลนและแนวตั้ง = ไม่ชนกันจริง
+                            continue
+                    if math.dist(E, P) < 1e-3:
+                        continue   # อยู่บนแนวแกนแล้ว (auto mesh ต่อให้)
+                    if any(on_axis(E, g) and on_axis(P, g) for g in geo.values()):
+                        continue   # E กับ P อยู่บนแกนชิ้นเดียวกันอยู่แล้ว (เช่น 2 จุดบนเสาต้นเดียว) — ต่อกันแล้ว
+                    groups[end].add(joint_at(P))
+        rows_def, rows_as = [], []
+        for k, (end, ps) in enumerate(sorted(groups.items()), 1):
+            nm = "BC%03d" % k
+            rows_def.append(row(Name=nm, CoordSys="GLOBAL", UX="Yes", UY="Yes", UZ="Yes", RX="Yes", RY="Yes", RZ="Yes"))
+            for j in [end] + sorted(ps):
+                rows_as.append(row(Joint=j, Constraint=nm, Type="Body"))
+                self.extra_joints.add(j)
+        self.body = groups
+        self.table("CONSTRAINT DEFINITIONS - BODY", rows_def)
+        self.table("JOINT CONSTRAINT ASSIGNMENTS", rows_as)
+        if groups:
+            self.warn.append("ปลายชิ้นส่วนวางชนชิ้นอื่น %d จุด: ผูกกับแนวแกนชิ้นที่รองรับด้วย Body constraint (BC001–BC%03d)" % (len(groups), len(groups)))
+
+    def _islands(self):
+        """กลุ่มชิ้นส่วนที่ไม่ต่อถึงจุดรองรับ (ต่อกันที่จุดปลาย หรือจุดที่อยู่กลางชิ้นอื่น)"""
+        par = {}
+        def f(a):
+            par.setdefault(a, a)
+            while par[a] != a:
+                par[a] = par[par[a]]; a = par[a]
+            return a
+        def u(a, b):
+            par[f(a)] = f(b)
+        pts = {nid_: (n["x"], n["y"], n["z"]) for nid_, n in self.nodes.items() if nid_ in self.used_nodes}
+        for x in self.members.values():
+            u(x["i"], x["j"])
+            a, b = pts[x["i"]], pts[x["j"]]
+            L = math.dist(a, b)
+            if L < 1e-6:
+                continue
+            for nid_, p in pts.items():
+                t = sum((p[k] - a[k]) * (b[k] - a[k]) for k in range(3)) / L
+                if 1e-3 < t < L - 1e-3 and math.dist(p, [a[k] + (b[k] - a[k]) * t / L for k in range(3)]) < 2e-3:
+                    u(nid_, x["i"])
+        for e, ps in getattr(self, "body", {}).items():
+            for p in ps:
+                u(e, p)
+        sup = {f(s["node"]) for s in self.m.get("supports", []) if s["node"] in pts}
+        lost = defaultdict(list)
+        for x in self.members.values():
+            r = f(x["i"])
+            if r not in sup:
+                lost[r].append(x["id"])
+        for ids in lost.values():
+            self.warn.append("ชิ้นส่วน %d ชิ้นไม่ต่อถึงฐานราก (SAP จะ unstable) เช่น %s" % (len(ids), ", ".join(sorted(ids)[:5])))
 
     def sap_shape(self, s):
         if s["kind"] == "rc_rect":
@@ -206,6 +472,8 @@ class Exporter:
             return "Circle"
         if s["kind"] == "cold_formed" and s.get("shape") == "lipped_C":
             return "Cold Formed C"
+        if s["kind"] in ("cold_formed", "steel") and s.get("shape") == "box":
+            return "General" if double_c(s) else "Box/Tube"
         raise ValueError("หน้าตัด %s ชนิด %s/%s ยังไม่รองรับ" % (s["id"], s["kind"], s.get("shape")))
 
     def _sections(self):
@@ -225,6 +493,25 @@ class Exporter:
                 rows.append(row(SectionName=sid, Material=mat, Shape=shape, t3=s["d"],
                                 Color="Cyan", FromFile="No", AMod=1, A2Mod=1, A3Mod=1, JMod=1, I2Mod=1, I3Mod=1,
                                 MMod=1, WMod=1))
+            elif shape in ("Box/Tube", "General"):
+                smat = self._steel_mat(mat)
+                if shape == "Box/Tube":
+                    d = s.get("dims") or {}
+                    h, b, t = d.get("h") or s["h"], d.get("b") or s["b"], d.get("t")
+                    rows.append(row(SectionName=sid, Material=smat, Shape=shape, t3=h, t2=b, tf=t, tw=t,
+                                    Color="Yellow", FromFile="No", AMod=1, A2Mod=1, A3Mod=1, JMod=1, I2Mod=1,
+                                    I3Mod=1, MMod=1, WMod=1))
+                else:
+                    P = double_c_props(*double_c(s))
+                    rows.append(row(SectionName=sid, Material=smat, Shape=shape, t3=P["t3"], t2=P["t2"],
+                                    Area=P["A"], TorsConst=P["J"], I33=P["I33"], I22=P["I22"], I23=0,
+                                    AS2=P["AS2"], AS3=P["AS3"], S33=P["S33"], S22=P["S22"], Z33=P["Z33"],
+                                    Z22=P["Z22"], R33=P["R33"], R22=P["R22"], Color="Yellow", FromFile="No",
+                                    AMod=1, A2Mod=1, A3Mod=1, JMod=1, I2Mod=1, I3Mod=1, MMod=1, WMod=1,
+                                    Notes="2C ประกบคู่ปากชนปาก (กล่องปิด) — ค่าจาก sap_export.double_c_props"))
+                    self.warn.append("หน้าตัด %s: General A=%.3f ซม.² I33=%.1f I22=%.1f J=%.1f ซม.⁴ (คำนวณเอง — SAP ไม่ตรวจออกแบบเหล็กขึ้นรูปเย็นให้)"
+                                     % (sid, P["A"] * 1e4, P["I33"] * 1e8, P["I22"] * 1e8, P["J"] * 1e8))
+                self.sec_mat[sid] = smat
             else:
                 d, b, lip, t = parse_cf_name(s["name"])
                 rows.append(row(SectionName=sid, Material=mat, Shape=shape, t3=d, t2=b, tw=t,
@@ -419,11 +706,13 @@ class Exporter:
     def build(self):
         self._sections()
         self._grids()
+        self._contacts()
         self._joints()
         self._restraints()
         self._materials()
         self._frames()
         self._automesh()
+        self._islands()
         self._patterns()
         self._member_loads()
         self._combos()

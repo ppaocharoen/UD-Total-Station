@@ -63,5 +63,34 @@ check("validate หลังใส่ results", not r["errors"] and not r["stale
 m2["members"][0]["section"] = "RC-20x40"
 check("แก้โมเดลแล้ว results ต้อง stale", validate(m2)["stale"]["results"])
 
+# ---------- ท12 (M4 ก้อน 1 · 22 พ.ย. 2569): ส่งออกได้ครบ ต่อถึงฐานรากทุกชิ้น ----------
+from sap_export import double_c_props, SAP_SKIP  # noqa: E402
+from purlingen import gen as purlin_gen  # noqa: E402
+t12 = json.load(open(os.path.join(EX, "t12", "t12.bm.json"), encoding="utf-8"))
+ex12 = Exporter(t12)
+txt12 = ex12.build()
+T12 = dict(ex12.tables)
+n_struct = sum(1 for x in t12["members"] if x["type"] not in SAP_SKIP)
+check("ท12 ส่งชิ้นส่วนโครงสร้างครบ (ไม่รวมเสาเอ็น/ทับหลัง)", len(T12["CONNECTIVITY - FRAME"]) == n_struct, n_struct)
+check("ท12 ไม่มีกลุ่มชิ้นส่วนลอย (ต่อถึงฐานรากทุกชิ้น)", not [w for w in ex12.warn if "ไม่ต่อถึงฐานราก" in w],
+      [w for w in ex12.warn if "ไม่ต่อถึงฐานราก" in w][:2])
+check("ท12 จุดวางชนผูก Body constraint", len(T12.get("CONSTRAINT DEFINITIONS - BODY", [])) == 61, len(T12.get("CONSTRAINT DEFINITIONS - BODY", [])))
+check("ท12 หัวเสา 1B ผูกกับแนวแกนอะเส RB-B", any("N-1B-T" in r for r in T12["JOINT CONSTRAINT ASSIGNMENTS"]))
+check("ท12 หน้าตัด 2C = General · ท่อกล่อง = Box/Tube · C ลึกเป็นบวก",
+      "Shape=General" in txt12 and "Shape=Box/Tube" in txt12 and "t3=-" not in txt12)
+check("ท12 แป 8 เส้นต่อกับจันทันทุกตัว (13 แนว)", sum(1 for j in ex12.extra_joints if re.match(r"PL-R1-\d+-X", j)) == 8 * 13,
+      sum(1 for j in ex12.extra_joints if re.match(r"PL-R1-\d+-X", j)))
+P = double_c_props(0.1, 0.05, 0.02, 0.0023)
+c1 = 0.1 * 0.0023 + 2 * (0.05 - 0.0023) * 0.0023 + 2 * (0.02 - 0.0023) * 0.0023
+check("2C ประกบคู่: A = 2 × C เดี่ยว", abs(P["A"] - 2 * c1) < 1e-12, P["A"])
+check("2C ประกบคู่: I33 = 2 × I33 ของ C เดี่ยว (แกนเดียวกัน)", abs(P["I33"] / 2 - (0.0023 * 0.1 ** 3 / 12 + 2 * ((0.05 - 0.0023) * 0.0023 ** 3 / 12 + (0.05 - 0.0023) * 0.0023 * (0.05 - 0.00115) ** 2) + 2 * (0.0023 * (0.02 - 0.0023) ** 3 / 12 + 0.0023 * (0.02 - 0.0023) * (0.05 - 0.0023 - (0.02 - 0.0023) / 2) ** 2))) < 1e-12)
+check("purlingen: ท12 มีแปแล้ว ไม่สร้างซ้ำ", purlin_gen(t12)[1] == [])
+t12b = json.loads(json.dumps(t12))
+t12b["members"] = [x for x in t12b["members"] if x["type"] != "purlin"]
+nn, mm2, _ = purlin_gen(t12b)
+NN = {n["id"]: n for n in t12b["nodes"] + nn}
+Lp = sum(math.dist(*[(NN[x[k]]["x"], NN[x[k]]["y"], NN[x[k]]["z"]) for k in ("i", "j")]) for x in mm2)
+check("purlingen: แป 8 เส้น ยาวรวม 104.00 ม. (= ตัวถอดจากข้อกำหนดเดิม)", len(mm2) == 8 and abs(Lp - 104.0) < 0.01, round(Lp, 3))
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)
