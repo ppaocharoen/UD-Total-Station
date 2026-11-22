@@ -61,7 +61,7 @@ def build(m, tables, sidecar=None):
         if need not in tables:
             raise SystemExit("ไม่พบตาราง %s ในไฟล์ Excel" % need)
 
-    members = {x["id"] for x in m.get("members", [])}
+    members = {x["id"] for x in m.get("members", []) if x.get("type") not in ("stiffener", "lintel")}   # เสาเอ็น/ทับหลังไม่ส่ง SAP (sap_export.SAP_SKIP)
     nodes = {n["id"] for n in m.get("nodes", [])}
     combos = [c["id"] for c in m.get("combos", [])]
     ef = tables["Element Forces - Frames"]["rows"]

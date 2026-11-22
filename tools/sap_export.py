@@ -166,13 +166,16 @@ class Exporter:
         used = set()
         for x in self.members.values():
             used.update((x["i"], x["j"]))
+        ends = set(used)
         used |= self.extra_joints
         rows = []
         for nid, n in self.nodes.items():
             if nid not in used:
                 continue
+            # จุดที่ไม่ใช่ปลายชิ้นส่วน (จุดกลางคานที่ผูก Body / จุดตัดแป) ต้องเป็น SpecialJt ไม่งั้น SAP ลบทิ้งตอน import
+            sp = "Yes" if nid in self.extra_joints and nid not in ends else "No"
             rows.append(row(Joint=nid, CoordSys="GLOBAL", CoordType="Cartesian", XorR=n["x"], Y=n["y"], Z=n["z"],
-                            SpecialJt="No", GlobalX=n["x"], GlobalY=n["y"], GlobalZ=n["z"]))
+                            SpecialJt=sp, GlobalX=n["x"], GlobalY=n["y"], GlobalZ=n["z"]))
         self.used_nodes = used
         self.table("JOINT COORDINATES", rows)
 
@@ -561,6 +564,9 @@ class Exporter:
                 a, b = ml.get("at", [0, None])
                 Lm = self._len(ml["member"])
                 b = Lm if b is None else b
+                if b - a < 1e-4:
+                    self.warn.append("น้ำหนัก %s: ช่วงยาวศูนย์ ข้าม" % ml["id"])
+                    continue
                 dist.append(row(Frame=ml["member"], LoadPat=ml["pattern"], CoordSys=cs, Type="Force", Dir=d,
                                 DistType="AbsDist", AbsDistA=a, AbsDistB=b, FOverLA=ml["value"][0],
                                 FOverLB=ml["value"][1]))
@@ -598,8 +604,11 @@ class Exporter:
                 if r["form"] not in ("gable", "shed"):
                     self.warn.append("หลังคา %s แบบ %s: ยังไม่แปลงน้ำหนักลงแป/จันทันอัตโนมัติ" % (tgt, r["form"]))
                     continue
-                proj = self.pattern_kind.get(al["pattern"]) == "roof_live"
-                got = self._to_purlins(r, al, proj) or self._to_rafters(r, al, proj)
+                proj = self.pattern_kind.get(al["pattern"]) == "roof_live" or al.get("per") == "plan"
+                if al.get("on") == "rafter":   # เช่น ฝ้าแขวนใต้จันทัน — ลงจันทันโดยตรง ไม่ผ่านแป
+                    got = self._to_rafters(r, al, proj)
+                else:
+                    got = self._to_purlins(r, al, proj) or self._to_rafters(r, al, proj)
                 if not got:
                     self.warn.append("หลังคา %s: ไม่พบแปหรือจันทันในโมเดล" % tgt)
                 out += got
@@ -748,6 +757,9 @@ def main():
                "exported_at": datetime.now().isoformat(timespec="seconds")},
               open(side, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print("เขียน", out, "และ", side)
+    if any(ord(c) > 127 for c in os.path.abspath(out)):
+        print("  ! path มีอักษรไม่ใช่ภาษาอังกฤษ — SAP2000 import ได้ แต่รันวิเคราะห์ไม่ได้ (Illegal characters in file name):"
+              " หลัง import ให้ Save As .sdb ไว้ในโฟลเดอร์/ชื่อไฟล์ภาษาอังกฤษก่อนกด Run")
     for w in ex.warn:
         print("  ! " + w)
 

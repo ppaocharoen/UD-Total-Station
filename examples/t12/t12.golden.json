@@ -1,6 +1,6 @@
 {
  "model": "t12.bm.json",
- "model_hash": "99a6c2639fa3d046",
+ "model_hash": "440871a0b0157a7e",
  "quantities": {
   "excav": {
    "group_code": "1.1.2",
@@ -2796,7 +2796,7 @@
   "บ่อ ST-2 ขุดลึก 2.12 ม. เกิน 2 ม. — พิจารณาค่าใช้จ่ายพิเศษระบบป้องกันดินพัง"
  ],
  "validate": {
-  "level": 0,
+  "level": 1,
   "counts": {
    "nodes": 351,
    "members": 264,
@@ -2814,8 +2814,7 @@
   ],
   "missing": [],
   "next_level_blockers": [
-   "ไม่มี load pattern",
-   "ไม่มี combo"
+   "ยังไม่มีผลวิเคราะห์"
   ]
  },
  "clash": [

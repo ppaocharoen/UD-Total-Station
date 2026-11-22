@@ -39,13 +39,16 @@ def model_hash(model):
     return canonical_hash(model, HASH_SECTIONS)
 
 
+QTY_BASE = [k for k in HASH_SECTIONS if k not in ("loads", "combos")]   # น้ำหนักบรรทุก/ชุดผสมไม่กระทบปริมาณ (M4 22 พ.ย. 2569)
+
+
 def qty_hash(model):
-    return canonical_hash(model, HASH_SECTIONS + QTY_EXTRA)
+    return canonical_hash(model, QTY_BASE + QTY_EXTRA)
 
 
 def qty_base_hash(model):
     """ส่วนที่มีผลต่อปริมาณ ยกเว้น design — เว็บถอดเหล็กเสริมใหม่ได้เอง (lib/rebartk.js) แล้วเขียน design_hash ใหม่"""
-    return canonical_hash(model, HASH_SECTIONS + [k for k in QTY_EXTRA if k != "design"])
+    return canonical_hash(model, QTY_BASE + [k for k in QTY_EXTRA if k != "design"])
 
 
 def design_hash(model):
@@ -310,7 +313,7 @@ def completeness(m, ctx, flagged, stale):
     des = m.get("design") or {}
     dm = des.get("members") or {}
     if stale["design"]: l3.append("ผลออกแบบเก่า")
-    rc = [x["id"] for x in members if x.get("type") in RC_TYPES]
+    rc = [x["id"] for x in members if x.get("type") in RC_TYPES and x.get("type") not in ("stiffener", "lintel")]   # เสาเอ็น/ทับหลังตามแบบมาตรฐาน A-19/A-20 คิดมวลรวม ไม่ออกแบบเหล็ก
     lack = [i for i in rc if not (dm.get(i) or {}).get("rebar")]
     if lack: l3.append(f"ชิ้นส่วน คสล. ยังไม่มีเหล็กเสริม {len(lack)} ชิ้น เช่น {', '.join(lack[:3])}")
     ds = des.get("supports") or {}

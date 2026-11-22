@@ -92,5 +92,36 @@ NN = {n["id"]: n for n in t12b["nodes"] + nn}
 Lp = sum(math.dist(*[(NN[x[k]]["x"], NN[x[k]]["y"], NN[x[k]]["z"]) for k in ("i", "j")]) for x in mm2)
 check("purlingen: แป 8 เส้น ยาวรวม 104.00 ม. (= ตัวถอดจากข้อกำหนดเดิม)", len(mm2) == 8 and abs(Lp - 104.0) < 0.01, round(Lp, 3))
 
+# ---------- loadgen (M4 ก้อน 2): น้ำหนักตามที่ Earth กำหนด 22 พ.ย. 2569 ----------
+from loadgen import Gen, load_lib  # noqa: E402
+g = Gen(json.loads(json.dumps(t12)), load_lib(os.path.join(HERE, "unit_weights.json")))
+LD, CB = g.run()
+AL = {a["id"]: a for a in LD["area_loads"]}
+check("loadgen: DL ใช้น้ำหนักตัวเองจาก SAP อย่างเดียว (ไม่มีน้ำหนักชิ้นส่วนซ้ำ)",
+      next(p for p in LD["patterns"] if p["id"] == "DL")["self_weight"] and not [a for a in LD["area_loads"] + LD["member_loads"] if a["pattern"] == "DL"])
+check("loadgen: เมทัลชีท 0.40 มม. × 7.85 = 3.14", abs(AL["AL-R1-SHEET"]["value"] - 3.14) < 1e-9)
+check("loadgen: ฝ้าสมาร์ทบอร์ด 9.1 ลงจันทัน ต่อพื้นที่ราบ", AL["AL-R1-CEIL"]["value"] == 9.1 and AL["AL-R1-CEIL"]["on"] == "rafter" and AL["AL-R1-CEIL"]["per"] == "plan")
+check("loadgen: LR หลังคา 50", AL["AL-R1-LR"]["value"] == 50)
+ops = {}
+for o in t12["openings"]:
+    t_ = t12["opening_types"][o["type"]]
+    ops[o["wall"]] = ops.get(o["wall"], 0) + t_["w"] * t_["h"]
+per = {}
+for ml in LD["member_loads"]:
+    per[ml["src"]] = per.get(ml["src"], 0) + ml["value"][0] * (ml["at"][1] - ml["at"][0])
+W12 = {w["id"]: w for w in t12["walls"]}
+bad = []
+for wid, v in per.items():
+    w = W12[wid]
+    Lw = sum(math.dist(w["path"][i], w["path"][i + 1]) for i in range(len(w["path"]) - 1))
+    exp = g.wall_w(w)[0] * ((w["top"] - w["bottom"]) * Lw - ops.get(wid, 0))
+    if abs(exp - v) > 0.5:
+        bad.append((wid, round(v, 1), round(exp, 1)))
+check("loadgen: น้ำหนักผนังที่ลงคาน = หน่วยน้ำหนัก × (พื้นที่ผนัง − ช่องเปิด) ทุกแผง", not bad, bad[:3])
+check("loadgen: อิฐครึ่งแผ่น 180 · เต็มแผ่น 360 · บล็อกช่องลม 135",
+      g.wall_w(W12["W-G1"])[0] == 180 and g.wall_w(W12["W-1A"])[0] == 360 and g.wall_w(W12["W-A1"])[0] == 135)
+check("loadgen: แผงเหล็ก 75x38x1.6 @0.10 คิดน้ำหนักเหล็ก", abs(g.wall_w(W12["W-A2S"])[0] - round((2 * (75 + 38) - 4 * 1.6) * 1.6 * 7.85e-3 / 0.10, 3)) < 1e-9)
+check("loadgen: ผนังรวมลงคาน 24,521.7 กก.", abs(sum(per.values()) - 24521.7) < 0.5, round(sum(per.values()), 1))
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

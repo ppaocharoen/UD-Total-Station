@@ -13094,6 +13094,13 @@
    "sections": [
     "quantities"
    ]
+  },
+  {
+   "at": "2026-11-22T22:09:19+07:00",
+   "by": "tools/takeoff.py",
+   "sections": [
+    "quantities"
+   ]
   }
  ],
  "finishes": [
@@ -31460,8 +31467,8 @@
   }
  },
  "quantities": {
-  "model_hash": "115f9bb46cb44e42",
-  "base_hash": "c23a53d0607d9ebe",
+  "model_hash": "bc8bfc3d8b47ac9b",
+  "base_hash": "6252754eb4dcacb8",
   "design_hash": "052ff1416609f615",
   "stale": false,
   "generated_by": "tools/takeoff.py",
@@ -43969,5 +43976,1295 @@
    }
   ],
   "routes": []
- }
+ },
+ "loads": {
+  "patterns": [
+   {
+    "id": "DL",
+    "kind": "dead",
+    "self_weight": true
+   },
+   {
+    "id": "SDL",
+    "kind": "super_dead"
+   },
+   {
+    "id": "LR",
+    "kind": "roof_live"
+   }
+  ],
+  "area_loads": [
+   {
+    "id": "AL-R1-SHEET",
+    "pattern": "SDL",
+    "targets": [
+     "R1"
+    ],
+    "value": 3.14,
+    "status": "computed",
+    "ref": "เมทัลชีท 0.40 มม. × 7.85 = 3.14 กก./ตร.ม. (Earth 22 พ.ย. 2569)"
+   },
+   {
+    "id": "AL-R1-LR",
+    "pattern": "LR",
+    "targets": [
+     "R1"
+    ],
+    "value": 50,
+    "status": "computed",
+    "ref": "กฎกระทรวงกำหนดการออกแบบโครงสร้างอาคาร พ.ศ. 2566 ข้อ 11 — หลังคา 50 กก./ตร.ม."
+   },
+   {
+    "id": "AL-R1-CEIL",
+    "pattern": "SDL",
+    "targets": [
+     "R1"
+    ],
+    "value": 9.1,
+    "on": "rafter",
+    "per": "plan",
+    "status": "computed",
+    "ref": "ฝ้าสมาร์ทบอร์ด หนา 6 มม. (CL1, CL1-E) 9.1 กก./ตร.ม. ต่อพื้นที่ราบ แขวนใต้จันทัน — Earth 22 พ.ย. 2569"
+   }
+  ],
+  "member_loads": [
+   {
+    "id": "ML-W-W-G1-GB-30-1",
+    "pattern": "SDL",
+    "member": "GB-30",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.1,
+     0.7
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G1-GB-30-2",
+    "pattern": "SDL",
+    "member": "GB-30",
+    "kind": "trapezoid",
+    "value": [
+     153.0,
+     153.0
+    ],
+    "at": [
+     0.7,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.85 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-G1-GB-30-3",
+    "pattern": "SDL",
+    "member": "GB-30",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     1.5,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G1-GB-31-4",
+    "pattern": "SDL",
+    "member": "GB-31",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.0,
+     2.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G4-GB-53-5",
+    "pattern": "SDL",
+    "member": "GB-53",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.1,
+     0.7
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G4-GB-53-6",
+    "pattern": "SDL",
+    "member": "GB-53",
+    "kind": "trapezoid",
+    "value": [
+     153.0,
+     153.0
+    ],
+    "at": [
+     0.7,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.85 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-G4-GB-53-7",
+    "pattern": "SDL",
+    "member": "GB-53",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     1.5,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G4-GB-54-8",
+    "pattern": "SDL",
+    "member": "GB-54",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.0,
+     0.3
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G4-GB-54-9",
+    "pattern": "SDL",
+    "member": "GB-54",
+    "kind": "trapezoid",
+    "value": [
+     153.0,
+     153.0
+    ],
+    "at": [
+     0.3,
+     0.9
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.85 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-G4-GB-54-10",
+    "pattern": "SDL",
+    "member": "GB-54",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.9,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-G4-GB-55-11",
+    "pattern": "SDL",
+    "member": "GB-55",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.0,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-G4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-C1-GB-20-12",
+    "pattern": "SDL",
+    "member": "GB-20",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.1,
+     0.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-C1-GB-20-13",
+    "pattern": "SDL",
+    "member": "GB-20",
+    "kind": "trapezoid",
+    "value": [
+     9.0,
+     9.0
+    ],
+    "at": [
+     0.5,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.05 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-C1-GB-20-14",
+    "pattern": "SDL",
+    "member": "GB-20",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     1.5,
+     2.0
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-C1-GB-21-15",
+    "pattern": "SDL",
+    "member": "GB-21",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.0,
+     0.05
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   },
+   {
+    "id": "ML-W-W-C2-GB-21-16",
+    "pattern": "SDL",
+    "member": "GB-21",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.05,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C2",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C2-GB-22-17",
+    "pattern": "SDL",
+    "member": "GB-22",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.0,
+     1.0
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C2",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C3-GB-23-18",
+    "pattern": "SDL",
+    "member": "GB-23",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.1,
+     1.15
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C3",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C3-GB-24-19",
+    "pattern": "SDL",
+    "member": "GB-24",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.0,
+     1.05
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C3",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C4-GB-25-20",
+    "pattern": "SDL",
+    "member": "GB-25",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.1,
+     1.0
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C4-GB-26-21",
+    "pattern": "SDL",
+    "member": "GB-26",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.0,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C4-GB-27-22",
+    "pattern": "SDL",
+    "member": "GB-27",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.0,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-C4-GB-28-23",
+    "pattern": "SDL",
+    "member": "GB-28",
+    "kind": "trapezoid",
+    "value": [
+     531.0,
+     531.0
+    ],
+    "at": [
+     0.0,
+     1.0
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-C4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-B1-GB-05-24",
+    "pattern": "SDL",
+    "member": "GB-05",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.1,
+     0.2
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-B1-GB-05-25",
+    "pattern": "SDL",
+    "member": "GB-05",
+    "kind": "trapezoid",
+    "value": [
+     261.0,
+     261.0
+    ],
+    "at": [
+     0.2,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 1.45 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-B1-GB-05-26",
+    "pattern": "SDL",
+    "member": "GB-05",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     1.1,
+     2.0
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-B1-GB-06-27",
+    "pattern": "SDL",
+    "member": "GB-06",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.0,
+     0.4
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-B3-GB-06-28",
+    "pattern": "SDL",
+    "member": "GB-06",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.4,
+     2.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B3",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-B4-GB-07-29",
+    "pattern": "SDL",
+    "member": "GB-07",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.1,
+     1.8
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B4",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-B6-GB-07-30",
+    "pattern": "SDL",
+    "member": "GB-07",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     1.8,
+     2.7
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B6",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-B6-GB-08-31",
+    "pattern": "SDL",
+    "member": "GB-08",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.0,
+     0.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B6",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-B6-GB-08-32",
+    "pattern": "SDL",
+    "member": "GB-08",
+    "kind": "trapezoid",
+    "value": [
+     261.0,
+     261.0
+    ],
+    "at": [
+     0.5,
+     1.4
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B6",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 1.45 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-B6-GB-08-33",
+    "pattern": "SDL",
+    "member": "GB-08",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     1.4,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B6",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-B6R-GB-49-34",
+    "pattern": "SDL",
+    "member": "GB-49",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.0,
+     0.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-B6R",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-SL-B3-GB-06-35",
+    "pattern": "SDL",
+    "member": "GB-06",
+    "kind": "trapezoid",
+    "value": [
+     10.55,
+     10.55
+    ],
+    "at": [
+     0.4,
+     2.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "SL-B3",
+    "status": "computed",
+    "ref": "แผง/ระแนงเหล็ก 25x25x1 @0.05 = 0.75 กก./ม. ÷ 0.05 15.072 กก./ตร.ม. × สูง 0.70 ม."
+   },
+   {
+    "id": "ML-W-SL-B4-GB-07-36",
+    "pattern": "SDL",
+    "member": "GB-07",
+    "kind": "trapezoid",
+    "value": [
+     10.55,
+     10.55
+    ],
+    "at": [
+     0.1,
+     1.8
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "SL-B4",
+    "status": "computed",
+    "ref": "แผง/ระแนงเหล็ก 25x25x1 @0.05 = 0.75 กก./ม. ÷ 0.05 15.072 กก./ตร.ม. × สูง 0.70 ม."
+   },
+   {
+    "id": "ML-W-SL-D1-GB-37-37",
+    "pattern": "SDL",
+    "member": "GB-37",
+    "kind": "trapezoid",
+    "value": [
+     10.55,
+     10.55
+    ],
+    "at": [
+     0.05,
+     0.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "SL-D1",
+    "status": "computed",
+    "ref": "แผง/ระแนงเหล็ก 25x25x1 @0.05 = 0.75 กก./ม. ÷ 0.05 15.072 กก./ตร.ม. × สูง 0.70 ม."
+   },
+   {
+    "id": "ML-W-SL-D2-GB-43-38",
+    "pattern": "SDL",
+    "member": "GB-43",
+    "kind": "trapezoid",
+    "value": [
+     10.55,
+     10.55
+    ],
+    "at": [
+     0.05,
+     0.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "SL-D2",
+    "status": "computed",
+    "ref": "แผง/ระแนงเหล็ก 25x25x1 @0.05 = 0.75 กก./ม. ÷ 0.05 15.072 กก./ตร.ม. × สูง 0.70 ม."
+   },
+   {
+    "id": "ML-W-SL-D0-GB-04-39",
+    "pattern": "SDL",
+    "member": "GB-04",
+    "kind": "trapezoid",
+    "value": [
+     10.55,
+     10.55
+    ],
+    "at": [
+     0.05,
+     2.25
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "SL-D0",
+    "status": "computed",
+    "ref": "แผง/ระแนงเหล็ก 25x25x1 @0.05 = 0.75 กก./ม. ÷ 0.05 15.072 กก./ตร.ม. × สูง 0.70 ม."
+   },
+   {
+    "id": "ML-W-W-A1B-GB-01-40",
+    "pattern": "SDL",
+    "member": "GB-01",
+    "kind": "trapezoid",
+    "value": [
+     18.0,
+     18.0
+    ],
+    "at": [
+     0.1,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-A1B",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.10 ม."
+   },
+   {
+    "id": "ML-W-W-A1-GB-01-41",
+    "pattern": "SDL",
+    "member": "GB-01",
+    "kind": "trapezoid",
+    "value": [
+     378.0,
+     378.0
+    ],
+    "at": [
+     0.1,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-A1",
+    "status": "computed",
+    "ref": "ผนังบล็อกช่องลม (ค่ามากสุด) 135 กก./ตร.ม. × สูง 2.80 ม."
+   },
+   {
+    "id": "ML-W-W-A2B-GB-03-42",
+    "pattern": "SDL",
+    "member": "GB-03",
+    "kind": "trapezoid",
+    "value": [
+     18.0,
+     18.0
+    ],
+    "at": [
+     2.7,
+     4.2
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-A2B",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.10 ม."
+   },
+   {
+    "id": "ML-W-W-A2S-GB-03-43",
+    "pattern": "SDL",
+    "member": "GB-03",
+    "kind": "trapezoid",
+    "value": [
+     81.367,
+     81.367
+    ],
+    "at": [
+     2.7,
+     4.2
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-A2S",
+    "status": "computed",
+    "ref": "แผง/ระแนงเหล็ก 75x38x1.6 @0.1 = 2.76 กก./ม. ÷ 0.1 27.582 กก./ตร.ม. × สูง 2.95 ม."
+   },
+   {
+    "id": "ML-W-W-1A-GB-29-44",
+    "pattern": "SDL",
+    "member": "GB-29",
+    "kind": "trapezoid",
+    "value": [
+     1116.0,
+     1116.0
+    ],
+    "at": [
+     0.1,
+     0.3
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-1A",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญเต็มแผ่น 360 กก./ตร.ม. × สูง 3.10 ม."
+   },
+   {
+    "id": "ML-W-W-D0-GB-04-45",
+    "pattern": "SDL",
+    "member": "GB-04",
+    "kind": "trapezoid",
+    "value": [
+     432.0,
+     432.0
+    ],
+    "at": [
+     0.1,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-D0",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.40 ม."
+   },
+   {
+    "id": "ML-W-W-D0-GB-04-46",
+    "pattern": "SDL",
+    "member": "GB-04",
+    "kind": "trapezoid",
+    "value": [
+     54.0,
+     54.0
+    ],
+    "at": [
+     1.1,
+     2.2
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-D0",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 0.30 ม. (หักช่องเปิด)"
+   },
+   {
+    "id": "ML-W-W-D0L-GB-37-47",
+    "pattern": "SDL",
+    "member": "GB-37",
+    "kind": "trapezoid",
+    "value": [
+     432.0,
+     432.0
+    ],
+    "at": [
+     0.0,
+     0.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-D0L",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.40 ม."
+   },
+   {
+    "id": "ML-W-W-D0R-GB-43-48",
+    "pattern": "SDL",
+    "member": "GB-43",
+    "kind": "trapezoid",
+    "value": [
+     432.0,
+     432.0
+    ],
+    "at": [
+     0.0,
+     0.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-D0R",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.40 ม."
+   },
+   {
+    "id": "ML-W-W-DL-GB-38-49",
+    "pattern": "SDL",
+    "member": "GB-38",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.1,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-DL",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-DR-GB-44-50",
+    "pattern": "SDL",
+    "member": "GB-44",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.1,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-DR",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-DB-GB-10-51",
+    "pattern": "SDL",
+    "member": "GB-10",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.1,
+     1.15
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-DB",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-DB-GB-11-52",
+    "pattern": "SDL",
+    "member": "GB-11",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.0,
+     1.05
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-DB",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-MF-GB-41-53",
+    "pattern": "SDL",
+    "member": "GB-41",
+    "kind": "trapezoid",
+    "value": [
+     567.0,
+     567.0
+    ],
+    "at": [
+     0.0,
+     2.7
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-MF",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 3.15 ม."
+   },
+   {
+    "id": "ML-W-W-P205-GB-33-54",
+    "pattern": "SDL",
+    "member": "GB-33",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.1,
+     1.1
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P205",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P205-GB-34-55",
+    "pattern": "SDL",
+    "member": "GB-34",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P205",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P315-GB-35-56",
+    "pattern": "SDL",
+    "member": "GB-35",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P315",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P425-GB-40-57",
+    "pattern": "SDL",
+    "member": "GB-40",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P425",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P645-GB-46-58",
+    "pattern": "SDL",
+    "member": "GB-46",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.5
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P645",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P755-GB-47-59",
+    "pattern": "SDL",
+    "member": "GB-47",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P755",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P865-GB-48-60",
+    "pattern": "SDL",
+    "member": "GB-48",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P865",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-P975-GB-51-61",
+    "pattern": "SDL",
+    "member": "GB-51",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-P975",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-U1-GB-09-62",
+    "pattern": "SDL",
+    "member": "GB-09",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     0.0,
+     0.4
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-U1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-U2-GB-09-63",
+    "pattern": "SDL",
+    "member": "GB-09",
+    "kind": "trapezoid",
+    "value": [
+     441.0,
+     441.0
+    ],
+    "at": [
+     1.6,
+     2.0
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-U2",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.45 ม."
+   },
+   {
+    "id": "ML-W-W-F1-GB-12-64",
+    "pattern": "SDL",
+    "member": "GB-12",
+    "kind": "trapezoid",
+    "value": [
+     477.0,
+     477.0
+    ],
+    "at": [
+     0.55,
+     1.6
+    ],
+    "dir": "gravity",
+    "source": "wall",
+    "src": "W-F1",
+    "status": "computed",
+    "ref": "ผนังอิฐมอญครึ่งแผ่น 180 กก./ตร.ม. × สูง 2.65 ม."
+   }
+  ]
+ },
+ "combos": [
+  {
+   "id": "D",
+   "method": "WSD",
+   "factors": {
+    "DL": 1,
+    "SDL": 1
+   },
+   "ref": "น้ำหนักคงที่ (ตรวจแรงปฏิกิริยา)"
+  },
+  {
+   "id": "D+LR",
+   "method": "WSD",
+   "factors": {
+    "DL": 1,
+    "SDL": 1,
+    "LR": 1
+   },
+   "ref": "WSD — ชุดลมเพิ่มในก้อน 3"
+  }
+ ]
 }

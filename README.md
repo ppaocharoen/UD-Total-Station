@@ -17,6 +17,7 @@
 | `tools/price_map.json` | ร่างการผูกรายการกับรหัสราคา UD-Cost Hub (รอตรวจ) |
 | `tools/test_takeoff.py` | ทดสอบตัวถอดปริมาณเทียบค่าคำนวณมือ |
 | `tools/sap_export.py` | ส่งออก `.bm.json` เป็น SAP2000 `.s2k` (ทดสอบกับ v23.3.1) + ไฟล์ประกอบ `.sap.json` |
+| `tools/loadgen.py` | คิดน้ำหนักบรรทุกลง `loads` + `combos` (M4) |
 | `tools/purlingen.py` | สร้างแปเป็นชิ้นส่วน (`members` type=purlin) จากข้อกำหนดแปของหลังคา — ตำแหน่ง/ความยาวตรงกับที่ตัวถอดปริมาณคิดจากข้อกำหนด (`--write`) |
 | `tools/sap_results.py` | อ่านผลจาก Excel ที่ SAP export กลับเข้า `results` (`--write`) |
 | `tools/test_sap.py` | ทดสอบส่งออก/อ่านผล เทียบแรงปฏิกิริยารวมกับน้ำหนักที่ใส่ |
@@ -40,6 +41,10 @@ python tools/test_sap.py
 2. SAP: File > Import > SAP2000 .s2k Text File > New model แล้วรัน
 3. SAP: File > Export > SAP2000 MS Excel Spreadsheet เลือก Analysis Results: Joint Output > Reactions, Displacements และ Element Output > Frame Output > Element Forces - Frames บันทึกชื่อเดียวกับ `.s2k` (เช่น `โครงการ.xlsx`)
 4. `python tools/sap_results.py โครงการ.bm.json โครงการ.xlsx --write`
+
+**SAP2000 รันวิเคราะห์ไม่ได้ถ้า path ของไฟล์ .sdb มีภาษาไทย** — import แล้ว Save As ไปโฟลเดอร์/ชื่อภาษาอังกฤษก่อนกด Run (ท12 ทดสอบที่ `_sap_test\t12.sdb` 22 พ.ย. 2569: ΣFz SDL 25,795.1 · LR 5,200 ตรงกับที่ loadgen ใส่ · DL 23,262.9 = น้ำหนักตัวเองจาก SAP)
+
+น้ำหนักบรรทุก: `python tools/loadgen.py โครงการ.bm.json --write` (DL = น้ำหนักตัวเองจาก SAP อย่างเดียว · SDL แผ่นมุง/ฝ้า/ผนัง · LR) — หน่วยน้ำหนักจาก `_claude_kb/น้ำหนักวัสดุ.json` ถ้ามี ไม่งั้น `tools/unit_weights.json`
 
 ตัวส่งออกแปลงโมเดลตำแหน่งจริงเป็นโมเดลวิเคราะห์ให้เอง (ไม่แก้ .bm.json):
 - ไม่ส่งเสาเอ็น/ทับหลัง (น้ำหนักคิดรวมในผนัง)
