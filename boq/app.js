@@ -599,7 +599,7 @@ function priceAll() {
 /** ปุ่มผูกราคาในช่องราคา ปร.1 (บนจอเท่านั้น) */
 function bindBtns(r, side, b) {
   if (!S.db) return '';
-  return `<span class="bq-btns no-print">${b[side] ? `<span class="pill warn" title="ผูกเอง${b.by ? ' โดย ' + esc(b.by) : ''}${b.at ? ' ' + esc(b.at) : ''}">ผูกเอง</span><button class="btn small" data-unb="${side}" title="กลับไปใช้การผูกอัตโนมัติ">↺</button>` : ''}<button class="btn small" data-bind="${side}" title="${side === 'mat' ? 'เลือกค่าวัสดุจากพาณิชย์ / มวลรวม / ราคาสืบ หรือกรอกเอง' : 'เลือกค่าแรงจาก ว480 หรือกรอกเอง'}">ผูก…</button></span>`;
+  return `<span class="bq-btns no-print">${b[side] ? `<span class="pill warn" title="ผูกเอง${b.by ? ' โดย ' + esc(b.by) : ''}${b.at ? ' ' + esc(b.at) : ''}">ผูกเอง</span><button class="btn small" data-unb="${side}" title="กลับไปใช้การผูกอัตโนมัติ">↺</button>` : ''}<button class="btn small" data-bind="${side}" title="${side === 'mat' ? 'เลือกค่าวัสดุจากพาณิชย์ / มวลรวม / ราคาสืบ หรือกรอกเอง' : 'เลือกค่าแรงจาก ว480 หรือกรอกเอง'}">${side === 'mat' ? 'ผูกค่าวัสดุ' : 'ผูกค่าแรง'}</button></span>`;
 }
 /** ค่าแรงที่ผูกเองคิดต่อ ตร.ม. แต่แถวเป็นชุด/บาน → ช่องพื้นที่ต่อหน่วย (ค่าเริ่ม: ขนาดจากโมเดล หรือเดาจากชื่อ) */
 function areaBox(r, b) {
