@@ -71,14 +71,22 @@ ex12 = Exporter(t12)
 txt12 = ex12.build()
 T12 = dict(ex12.tables)
 n_struct = sum(1 for x in t12["members"] if x["type"] not in SAP_SKIP)
-check("ท12 ส่งชิ้นส่วนโครงสร้างครบ (ไม่รวมเสาเอ็น/ทับหลัง)", len(T12["CONNECTIVITY - FRAME"]) == n_struct, n_struct)
+n_stub = sum(1 for x in t12["members"] if re.match(r"C-\w+j$", x["id"]))
+check("ท12 ส่งชิ้นส่วนโครงสร้างครบ (ไม่รวมเสาเอ็น/ทับหลัง · ท่อนเสาในความลึกคานรวมเข้าตอม่อ)",
+      len(T12["CONNECTIVITY - FRAME"]) == n_struct - n_stub and n_stub == 10, (len(T12["CONNECTIVITY - FRAME"]), n_struct, n_stub))
+EM = ex12.members
+check("ท12 ตอม่อ 12 ต้นยาวถึงเส้นคาน (หลังคาน) — Earth 22 พ.ย. 2569",
+      all(max(ex12.nodes[EM[k]["i"]]["z"], ex12.nodes[EM[k]["j"]]["z"]) in (0.15, 0.2) for k in EM if k.startswith("PD-"))
+      and sum(k.startswith("PD-") for k in EM) == 12 and not any(re.match(r"C-\w+j$", k) for k in EM))
+check("ท12 คาน คสล. แสดงผลห้อยจากเส้น (Top Center)", "FRAME INSERTION POINT ASSIGNMENTS" in T12
+      and all('CardinalPt="8 (Top Center)"' in r for r in T12["FRAME INSERTION POINT ASSIGNMENTS"]))
 check("ท12 ไม่มีกลุ่มชิ้นส่วนลอย (ต่อถึงฐานรากทุกชิ้น)", not [w for w in ex12.warn if "ไม่ต่อถึงฐานราก" in w],
       [w for w in ex12.warn if "ไม่ต่อถึงฐานราก" in w][:2])
 check("ท12 จุดวางชนผูก Body constraint", len(T12.get("CONSTRAINT DEFINITIONS - BODY", [])) == 61, len(T12.get("CONSTRAINT DEFINITIONS - BODY", [])))
 check("ท12 หัวเสา 1B ผูกกับแนวแกนอะเส RB-B", any("N-1B-T" in r for r in T12["JOINT CONSTRAINT ASSIGNMENTS"]))
 check("ท12 หน้าตัด 2C = General · ท่อกล่อง = Box/Tube · C ลึกเป็นบวก",
       "Shape=General" in txt12 and "Shape=Box/Tube" in txt12 and "t3=-" not in txt12)
-check("ท12 แป 8 เส้นต่อกับจันทันทุกตัว (13 แนว)", sum(1 for j in ex12.extra_joints if re.match(r"PL-R1-\d+-X", j)) == 8 * 13,
+check("ท12 แป 9 เส้นต่อกับจันทันทุกตัว (13 แนว)", sum(1 for j in ex12.extra_joints if re.match(r"PL-R1-\d+-X", j)) == 9 * 13,
       sum(1 for j in ex12.extra_joints if re.match(r"PL-R1-\d+-X", j)))
 P = double_c_props(0.1, 0.05, 0.02, 0.0023)
 c1 = 0.1 * 0.0023 + 2 * (0.05 - 0.0023) * 0.0023 + 2 * (0.02 - 0.0023) * 0.0023
@@ -90,7 +98,10 @@ t12b["members"] = [x for x in t12b["members"] if x["type"] != "purlin"]
 nn, mm2, _ = purlin_gen(t12b)
 NN = {n["id"]: n for n in t12b["nodes"] + nn}
 Lp = sum(math.dist(*[(NN[x[k]]["x"], NN[x[k]]["y"], NN[x[k]]["z"]) for k in ("i", "j")]) for x in mm2)
-check("purlingen: แป 8 เส้น ยาวรวม 104.00 ม. (= ตัวถอดจากข้อกำหนดเดิม)", len(mm2) == 8 and abs(Lp - 104.0) < 0.01, round(Lp, 3))
+check("purlingen: แป 9 เส้น ยาวรวม 117.00 ม. (มีแปที่ปลายจันทันด้านสูง — Earth 22 พ.ย. 2569)", len(mm2) == 9 and abs(Lp - 117.0) < 0.01, round(Lp, 3))
+ys = sorted(NN[x["i"]]["y"] for x in mm2)
+check("purlingen: แปริมสองด้านห่างขอบหลังคา ~0.05 (วัดตามลาด)", abs(ys[0] - (-1.1 + 0.05 * math.cos(math.radians(2.96)))) < 0.01
+      and abs(ys[-1] - (6.9 - 0.05 * math.cos(math.radians(2.96)))) < 0.01, (ys[0], ys[-1]))
 
 # ---------- loadgen (M4 ก้อน 2): น้ำหนักตามที่ Earth กำหนด 22 พ.ย. 2569 ----------
 from loadgen import Gen, load_lib  # noqa: E402
@@ -122,6 +133,44 @@ check("loadgen: อิฐครึ่งแผ่น 180 · เต็มแผ�
       g.wall_w(W12["W-G1"])[0] == 180 and g.wall_w(W12["W-1A"])[0] == 360 and g.wall_w(W12["W-A1"])[0] == 135)
 check("loadgen: แผงเหล็ก 75x38x1.6 @0.10 คิดน้ำหนักเหล็ก", abs(g.wall_w(W12["W-A2S"])[0] - round((2 * (75 + 38) - 4 * 1.6) * 1.6 * 7.85e-3 / 0.10, 3)) < 1e-9)
 check("loadgen: ผนังรวมลงคาน 24,521.7 กก.", abs(sum(per.values()) - 24521.7) < 0.5, round(sum(per.values()), 1))
+
+# ---------- ลม (M4 ก้อน 3) มยผ.1311 ภาคผนวก ค · ท12: V50 25 ภูมิประเทศ B Iw 1 กรณี 3 (Earth 22 พ.ย. 2569) ----------
+from windgen import Wind, combos as wcombos  # noqa: E402
+wi = {"V50": 25, "terrain": "B", "Iw": 1.0, "cpi_case": 3}
+wp, wz, wd = Wind(t12, wi).run()
+check("ลม: 16 กลุ่ม (4 มุมต้นลม × ตั้งฉาก/ขนานสัน × Cpi ±)", len(wp) == 16 and len({p["id"] for p in wp}) == 16, [p["id"] for p in wp][:4])
+check("ลม: z 1.00 · y 6.00 · ค-4 B h 3.47 = 0.70", (wd["z"], wd["y_E"], wd["Ce_C4"]) == (1.0, 6.0, 0.7), wd)
+Z = {(z["pattern"], z["on"], z["zone"]): z for z in wz}
+check("ลม: WYA1P หลังคาโซน 2 = −107.5 × 0.7 (ตาราง ค-3 C3b แถว 0–5°)", abs(Z[("WYA1P", "roof", "2")]["value"] + 75.25) < 1e-6)
+check("ลม: WYA1N หลังคาโซน 2E = −23.9 × 0.7 (C3a)", abs(Z[("WYA1N", "roof", "2E")]["value"] + 16.73) < 1e-6)
+check("ลม: ผนัง 1 แบ่งต้นลม/ท้ายลม 0.75 : 0.55 (รูป ข.1) รวม = 51.8 × 0.7",
+      abs(Z[("WYA1P", "face", "1")]["value"] - Z[("WYA1P", "face", "4")]["value"] - 36.26) < 1e-3
+      and abs(Z[("WYA1P", "face", "1")]["value"] / 36.26 - 0.75 / 1.3) < 1e-4)
+check("ลม: ชุดผสม 2 + 16×3 = 50", len(wcombos([p["id"] for p in wp])) == 50)
+t12w = json.loads(json.dumps(t12))
+t12w["loads"]["patterns"] = [p for p in t12w["loads"]["patterns"] if p["kind"] != "wind"] + wp
+t12w["loads"]["wind"] = {"input": wi, "derived": wd, "zones": wz}
+exw = Exporter(t12w)
+txtw = exw.build()
+Tw = dict(exw.tables)
+S = exw.wind_sum
+# แรงลมรวมจากโซน (ไม่ผ่านการกระจาย): หลังคา ΣFz = −Σ ค่า × พื้นที่แปลน
+for pid in ("WYA1P", "WX4CN"):
+    fz = -sum(z["value"] * (z["rect"][2] - z["rect"][0]) * (z["rect"][3] - z["rect"][1]) for z in wz if z["pattern"] == pid and z["on"] == "roof")
+    check("ลม %s: ΣFz ที่ลงแป = แรงจากโซน (%.1f กก.)" % (pid, fz), abs(S[pid][2] - fz) < 0.5, round(S[pid][2], 1))
+# ผนังสกัด x = 0 (ลม WX1AP โซน 5E ทั้งผนัง): ΣFx ≈ ค่ารวม 5E × กว้าง 5.80 × สูงเฉลี่ย (หลังคาน 0.20 → ผิวหลังคา)
+hx = sum(exw._roof_z(t12["roofs"][0], 0, 5.8 * (i + 0.5) / 100) for i in range(100)) / 100 - 0.2
+fx = 77.7 * 0.7 * 5.8 * hx
+check("ลม WX1AP: ΣFx ผนังสกัด ≈ หน่วยแรง × พื้นที่ (คลาดไม่เกิน 3%% · ช่วงอะเสไม่มีเสาไม่นับ) %.1f" % fx, abs(S["WX1AP"][0] - fx) / fx < 0.03, round(S["WX1AP"][0], 1))
+check("ลม: ปลายเสาใช้ RelDist (กัน AbsDist เกินความยาว)", all("RelDist=" in r for r in Tw["FRAME LOADS - POINT"] if "LoadPat=W" in r))
+th = math.radians(2.96)
+check("ลม: ΣFy หลังคาเพิง = ΣFz × tan(ลาด) (แรงตั้งฉากผิวหลังคา)", abs((S["WX1AP"][1]) - S["WX1AP"][2] * math.tan(th)) < 0.5)
+check("ลม: แปหมุนแกน 2 ตั้งฉากหลังคา (±2.96°)", all(abs(abs(exw.members[k].get("angle", 0)) - 2.96) < 1e-6 for k in exw.members if k.startswith("PL-")))
+dist = Tw["FRAME LOADS - DISTRIBUTED"]
+check("ลม: แรงบนแปทิศ Local 2 · แรงบนเสาทิศ X/Y", any("LoadPat=WYA1P" in r and "CoordSys=Local" in r and "Dir=2" in r for r in dist)
+      and any("LoadPat=WYA1P" in r and "Frame=C-1A " in r and "Dir=Y" in r for r in dist))
+check("ลม: กลุ่มลมเป็น Wind ใน SAP · ชุดผสม 50", sum("DesignType=Wind" in r for r in Tw["LOAD PATTERN DEFINITIONS"]) == 16
+      and len({re.search(r"ComboName=(\S+)", r).group(1) for r in Tw["COMBINATION DEFINITIONS"]}) == len(t12w["combos"]))
 
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

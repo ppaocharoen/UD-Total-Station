@@ -98,7 +98,9 @@ def build(m, tables, sidecar=None):
                 d[k] = r4(d[k])
     if unknown:
         warn.append("ชิ้นส่วนใน SAP ที่ไม่มีใน .bm.json (ไม่ได้อ่าน): " + ", ".join(sorted(unknown)[:10]))
-    nores = sorted(members - set(env))
+    from sap_export import Exporter
+    merged = Exporter(m).merged      # ท่อนเสาในความลึกคานที่รวมเข้าตอม่อตอนส่งออก (ผลอยู่ที่ตอม่อ)
+    nores = sorted(members - set(env) - set(merged))
     if nores:
         warn.append("ชิ้นส่วนที่ไม่มีผล: " + ", ".join(nores[:10]))
 
@@ -129,6 +131,8 @@ def build(m, tables, sidecar=None):
         warn.append("ไม่พบไฟล์ .sap.json — ใช้ hash ปัจจุบัน ต้องแน่ใจว่าวิเคราะห์จากโมเดลล่าสุด")
     res = {"source": sidecar.get("s2k") if sidecar else None, "analyzed_at": datetime.now().isoformat(timespec="seconds"),
            "model_hash": h, "stale": h != h_now, "cases_used": use, "members": env, "reactions": reac}
+    if merged:
+        res["merged"] = merged
     if disp:
         res["displacements"] = disp
     if not res["source"]:

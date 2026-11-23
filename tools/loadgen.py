@@ -4,7 +4,8 @@
   DL   น้ำหนักตัวเองของ frame — SAP คิดให้เอง (SelfWtMult = 1) · loadgen ไม่ใส่น้ำหนักชิ้นส่วนโครงสร้างซ้ำ (Earth 22 พ.ย. 2569)
   SDL  แผ่นมุงหลังคา (ลงแป · ต่อพื้นที่ลาด) · ฝ้าที่แขวนใต้จันทัน (ลงจันทัน · ต่อพื้นที่ราบ) · ผนังลงคานที่รองรับ (หักช่องเปิด)
   LR   น้ำหนักจรหลังคา 50 กก./ตร.ม. ต่อพื้นที่ราบ (กฎกระทรวง 2566 ข้อ 11)
-  (ลม WX/WY — ก้อน 3)
+  W*   ลม (ก้อน 3) — tools/windgen.py: มยผ.1311 ภาคผนวก ค แบ่งโซนเป็น loads.wind.zones ให้ sap_export กระจายลงแป/เสา
+       ข้อมูลลมของโครงการเก็บใน loads.wind.input (ใส่ครั้งแรกด้วย --wind "V50=25,terrain=B,Iw=1,cpi=3,by=Earth …")
 
 น้ำหนักวัสดุจากคลัง: _claude_kb/น้ำหนักวัสดุ.json (ถ้ามี) ไม่งั้น tools/unit_weights.json
 
@@ -216,14 +217,26 @@ class Gen:
             {"id": "D+LR", "method": "WSD", "factors": {"DL": 1, "SDL": 1, "LR": 1}, "ref": "WSD — ชุดลมเพิ่มในก้อน 3"},
         ]
 
-    def run(self):
+    def run(self, wind_input=None):
         self.roofs()
         self.walls()
         loads = {"patterns": [{"id": "DL", "kind": "dead", "self_weight": True},
                               {"id": "SDL", "kind": "super_dead"},
                               {"id": "LR", "kind": "roof_live"}],
                  "area_loads": self.area, "member_loads": self.mem}
-        return loads, self.combos()
+        combos = self.combos()
+        if wind_input:
+            from windgen import Wind, combos as wcombos
+            w = Wind(self.m, wind_input)
+            pats, zones, derived = w.run()
+            loads["patterns"] += pats
+            loads["wind"] = {"input": wind_input, "derived": derived, "zones": zones}
+            combos = wcombos([p["id"] for p in pats])
+            self.notes += w.notes
+            self.warn += w.warn
+        else:
+            self.notes.append("ยังไม่มีข้อมูลลมของโครงการ (loads.wind.input) — ไม่ใส่ลม")
+        return loads, combos
 
 
 def main():
@@ -231,11 +244,17 @@ def main():
     ap.add_argument("model")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--lib")
+    ap.add_argument("--wind", help='ข้อมูลลมของโครงการ เช่น "V50=25,terrain=B,Iw=1,cpi=3,by=Earth 22 พ.ย. 2569"')
     a = ap.parse_args()
     m = json.load(open(a.model, encoding="utf-8"))
     lib = load_lib(a.lib)
     g = Gen(m, lib)
-    loads, combos = g.run()
+    wi = ((m.get("loads") or {}).get("wind") or {}).get("input")
+    if a.wind:
+        kv = dict(x.split("=", 1) for x in a.wind.split(","))
+        wi = {"V50": float(kv["V50"]), "terrain": kv["terrain"].upper(), "Iw": float(kv["Iw"]), "cpi_case": int(kv["cpi"]),
+              "status": "from_engineer", "by": kv.get("by", "")}
+    loads, combos = g.run(wi)
     print("คลังน้ำหนัก:", os.path.relpath(lib["_path"]))
     for al in loads["area_loads"]:
         print("  %-16s %-4s %7.2f กก./ตร.ม.  %s" % (al["id"], al["pattern"], al["value"], al["ref"]))
@@ -243,6 +262,10 @@ def main():
     for ml in loads["member_loads"]:
         tot[ml["member"]] += ml["value"][0] * (ml["at"][1] - ml["at"][0])
     print("  ผนังลงคาน %d ช่วง บนคาน %d ตัว รวม %.1f กก." % (len(loads["member_loads"]), len(tot), sum(tot.values())))
+    if loads.get("wind"):
+        from collections import Counter
+        zs = loads["wind"]["zones"]
+        print("  ลม %d กลุ่ม · โซน %d รายการ · ชุดผสม %d" % (sum(p["kind"] == "wind" for p in loads["patterns"]), len(zs), len(combos)))
     for s in g.notes:
         print("  · " + s)
     for s in g.warn:

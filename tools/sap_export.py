@@ -141,7 +141,10 @@ class Exporter:
         self.extra_mats = {}     # วัสดุเหล็กที่สร้างให้หน้าตัด Box/Tube/General: id ใหม่ -> วัสดุต้นทาง
         self.sec_mat = {}
         self.extra_joints = set()
+        self.merged = {}          # ท่อนเสาในความลึกคานที่รวมเข้าตอม่อ: id → ตอม่อ
+        self._merge_pedestals()
         self._snap_purlins()
+        self._set_purlin_angles()
         self._oh_warned = set()
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from validate import model_hash
@@ -191,7 +194,7 @@ class Exporter:
         self.table("JOINT RESTRAINT ASSIGNMENTS", rows)
 
     def _frames(self):
-        conn, sec, rel, ang = [], [], [], []
+        conn, sec, rel, ang, ins = [], [], [], [], []
         for x in self.members.values():
             a, b = self.nodes[x["i"]], self.nodes[x["j"]]
             L = math.dist((a["x"], a["y"], a["z"]), (b["x"], b["y"], b["z"]))
@@ -212,12 +215,18 @@ class Exporter:
                         kw[c + tag] = "Yes" if c in r.get(end, []) else "No"
                 kw["PartialFix"] = "No"
                 rel.append(row(**kw))
+            if s.get("kind") == "rc_rect" and abs(a["z"] - b["z"]) < 1e-6:
+                # คาน คสล.: เส้นคานในโมเดลอยู่ระดับหลังคาน → แสดงผลห้อยลงจากเส้น (ไม่ย้ายแกนวิเคราะห์)
+                ins.append(row(Frame=x["id"], CardinalPt="8 (Top Center)", Mirror2="No", Mirror3="No",
+                               StiffTrans="No", OffsetXI=0, OffsetYI=0, OffsetZI=0, OffsetXJ=0, OffsetYJ=0, OffsetZJ=0,
+                               CoordSys="GLOBAL"))
             if x.get("angle"):
                 ang.append(row(Frame=x["id"], Angle=x["angle"], MirrorAbt2="No", MirrorAbt3="No", AdvanceAxes="No"))
         self.table("CONNECTIVITY - FRAME", conn)
         self.table("FRAME SECTION ASSIGNMENTS", sec)
         self.table("FRAME RELEASE ASSIGNMENTS 1 - GENERAL", rel)
         self.table("FRAME LOCAL AXES ASSIGNMENTS 1 - TYPICAL", ang)
+        self.table("FRAME INSERTION POINT ASSIGNMENTS", ins)
 
     # ---------- properties ----------
     def _materials(self):
@@ -288,6 +297,72 @@ class Exporter:
         nid_ = "%s-ST" % mat
         self.extra_mats[nid_] = mat
         return nid_
+
+    def _area(self, sid):
+        s = next((x for x in self.m.get("sections", []) if x["id"] == sid), {})
+        return (s.get("b") or 0) * (s.get("h") or 0)
+
+    def _merge_pedestals(self):
+        """ตอม่อ (เสา คสล. ใหญ่) ต่อด้วยท่อนเสาเล็กสั้น ๆ ถึงเส้นคาน → ตอม่อยาวถึงเส้นคานเลย (Earth 22 พ.ย. 2569)
+        ในโมเดลตอม่อหยุดใต้ท้องคาน (ถูกตามแบบ) แต่เส้นคานใน SAP อยู่ระดับหลังคาน ช่วงความลึกคานเป็นจุดต่อคาน-เสา
+        จึงให้ช่วงนั้นใช้หน้าตัดตอม่อ (ไม่ใช่เสาเล็ก) · คานแสดงผลห้อยลงจากเส้น (top center) ดู _insertion"""
+        def vert(x):
+            a, b = self.nodes[x["i"]], self.nodes[x["j"]]
+            return abs(a["x"] - b["x"]) < 1e-6 and abs(a["y"] - b["y"]) < 1e-6
+        def lo_hi(x):
+            a, b = self.nodes[x["i"]], self.nodes[x["j"]]
+            return (x["i"], x["j"]) if a["z"] <= b["z"] else (x["j"], x["i"])
+        cols = [x for x in self.members.values() if x["type"] == "column" and vert(x)]
+        by_bot = defaultdict(list)
+        for x in cols:
+            by_bot[lo_hi(x)[0]].append(x)
+        horiz = defaultdict(list)
+        for x in self.members.values():
+            if x["type"] != "column" and abs(self.nodes[x["i"]]["z"] - self.nodes[x["j"]]["z"]) < 1e-6:
+                horiz[x["i"]].append(x); horiz[x["j"]].append(x)
+        sec_h = {x["id"]: x.get("h") or 0 for x in self.m.get("sections", [])}
+        at = {}
+        for nid in horiz:
+            n = self.nodes[nid]
+            at.setdefault((round(n["x"], 4), round(n["y"], 4)), []).append(nid)
+        k = 0
+        for pd in cols:
+            bot, top = lo_hi(pd)
+            nt = self.nodes[top]
+            if horiz.get(top):
+                continue                      # ตอม่อต่อคานที่ปลายบนอยู่แล้ว
+            stubs = [x for x in by_bot.get(top, []) if x["id"] in self.members]
+            if len(stubs) > 1:
+                continue
+            if stubs:
+                st = stubs[0]
+                if self._area(pd["section"]) <= self._area(st["section"]) + 1e-9:
+                    continue
+                s_top = lo_hi(st)[1]
+            else:                             # ไม่มีเสาต่อขึ้น: หาจุดคานเหนือหัวตอม่อ
+                st = None
+                cand = [n for n in at.get((round(nt["x"], 4), round(nt["y"], 4)), []) if self.nodes[n]["z"] > nt["z"]]
+                if not cand:
+                    continue
+                s_top = min(cand, key=lambda n: self.nodes[n]["z"])
+            beams = [b for b in horiz.get(s_top, []) if (b.get("section") or "").startswith("RC")]
+            if not beams:
+                continue
+            hb = max(sec_h.get(b["section"], 0) for b in beams)
+            if self.nodes[s_top]["z"] - nt["z"] > hb + 0.06:   # ยาวเกินความลึกคาน = เสาจริง ไม่ใช่ช่วงจุดต่อ
+                continue
+            pd2 = dict(pd)
+            if pd2["i"] == top:
+                pd2["i"] = s_top
+            else:
+                pd2["j"] = s_top
+            self.members[pd["id"]] = pd2
+            if st:
+                del self.members[st["id"]]
+                self.merged[st["id"]] = pd["id"]
+            k += 1
+        if k:
+            self.warn.append("ตอม่อ %d ต้น: ยาวถึงเส้นคาน (หลังคาน) แทนท่อนเสาเล็กในช่วงความลึกคาน" % k)
 
     def _snap_purlins(self):
         """แปที่วางบนหลังจันทัน → ย้ายแนวแกนลงมาที่แนวแกนจันทัน + สร้างจุดต่อที่จุดตัด (เฉพาะใน .s2k)"""
@@ -550,7 +625,7 @@ class Exporter:
     def _member_loads(self):
         dist, point = [], []
         L = self.m.get("loads", {})
-        items = list(L.get("member_loads", [])) + self._roof_to_rafters()
+        items = list(L.get("member_loads", [])) + self._roof_to_rafters() + self._wind_loads()
         for ml in items:
             if ml["member"] not in self.members:
                 self.warn.append("น้ำหนัก %s: ไม่พบชิ้นส่วน %s" % (ml["id"], ml["member"]))
@@ -571,8 +646,13 @@ class Exporter:
                                 DistType="AbsDist", AbsDistA=a, AbsDistB=b, FOverLA=ml["value"][0],
                                 FOverLB=ml["value"][1]))
             elif ml["kind"] == "point":
-                point.append(row(Frame=ml["member"], LoadPat=ml["pattern"], CoordSys=cs, Type="Force", Dir=d,
-                                 DistType="AbsDist", AbsDist=ml.get("at", 0), Force=ml["value"]))
+                at, L = ml.get("at", 0), self._len(ml["member"])
+                if at >= L - 1e-4 or at <= 1e-4:     # ปลายชิ้น: ใช้ RelDist กัน AbsDist เกินความยาวเพราะทศนิยม
+                    point.append(row(Frame=ml["member"], LoadPat=ml["pattern"], CoordSys=cs, Type="Force", Dir=d,
+                                     DistType="RelDist", RelDist=1 if at >= L - 1e-4 else 0, Force=ml["value"]))
+                else:
+                    point.append(row(Frame=ml["member"], LoadPat=ml["pattern"], CoordSys=cs, Type="Force", Dir=d,
+                                     DistType="AbsDist", AbsDist=at, Force=ml["value"]))
         self.table("FRAME LOADS - DISTRIBUTED", dist)
         self.table("FRAME LOADS - POINT", point)
 
@@ -675,6 +755,199 @@ class Exporter:
         cs = [p[1 if k == "y" else 0] for p in r["outline"]]
         return any(abs(self.nodes[n][k] - c) < 0.02 for n in (x["i"], x["j"]) for c in (min(cs), max(cs)))
 
+    # ---------- ลม (M4 ก้อน 3) ----------
+    @staticmethod
+    def _roof_normal(r, x, y):
+        """เวกเตอร์ตั้งฉากผิวหลังคาชี้ขึ้น ที่ตำแหน่งแปลน (x, y)"""
+        th = math.radians(r["pitch"])
+        sn, cs = math.sin(th), math.cos(th)
+        xs = [p[0] for p in r["outline"]]; ys = [p[1] for p in r["outline"]]
+        if r["form"] == "shed":
+            low = r.get("low", "y2")
+            d = {"y2": (0, sn), "y1": (0, -sn), "x2": (sn, 0), "x1": (-sn, 0)}[low]
+            return (d[0], d[1], cs)
+        if r.get("ridge", "X") == "X":
+            return (0, sn if y > (min(ys) + max(ys)) / 2 else -sn, cs)
+        return (sn if x > (min(xs) + max(xs)) / 2 else -sn, 0, cs)
+
+    @staticmethod
+    def _roof_z(r, x, y):
+        """ระดับผิวหลังคาที่ตำแหน่งแปลน (ใช้หาความสูงผนังรับลมเหนือหัวเสา)"""
+        t = math.tan(math.radians(r["pitch"]))
+        xs = [p[0] for p in r["outline"]]; ys = [p[1] for p in r["outline"]]
+        if r["form"] == "shed":
+            low = r.get("low", "y2")
+            d = {"y2": max(ys) - y, "y1": y - min(ys), "x2": max(xs) - x, "x1": x - min(xs)}[low]
+        elif r.get("ridge", "X") == "X":
+            d = min(y - min(ys), max(ys) - y)
+        else:
+            d = min(x - min(xs), max(xs) - x)
+        return r["eave"] + d * t
+
+    def _purlin_bands(self, r):
+        """แปของหลังคา r พร้อมแถบรับแรง (ตั้งฉากแนวแป วัดราบ) — แบบเดียวกับ _to_purlins"""
+        along = 0 if r.get("ridge", "X") == "X" or (r["form"] == "shed" and str(r.get("low", "y")).startswith("y")) else 1
+        k_c = "yx"[along]
+        pur = [x for x in self.members.values() if x["type"] == "purlin" and self._in_outline(x, r)
+               and abs(self.nodes[x["i"]][k_c] - self.nodes[x["j"]][k_c]) < 0.01]
+        cs = [p[1 - along] for p in r["outline"]]
+        lo, hi = min(cs), max(cs)
+        groups = ([(lo, (lo + hi) / 2), ((lo + hi) / 2, hi)] if r["form"] == "gable" else [(lo, hi)])
+        out = []
+        for g0, g1 in groups:
+            mine = [x for x in pur if g0 - 1e-6 <= self.nodes[x["i"]][k_c] <= g1 + 1e-6]
+            pos = sorted({round(self.nodes[x["i"]][k_c], 6) for x in mine})
+            for x in mine:
+                c = round(self.nodes[x["i"]][k_c], 6)
+                k = pos.index(c)
+                left = g0 if k == 0 else (pos[k - 1] + c) / 2
+                right = g1 if k == len(pos) - 1 else (pos[k + 1] + c) / 2
+                out.append((x, along, (left, right)))
+        return out
+
+    def _set_purlin_angles(self):
+        """หมุนแกน local ของแปให้แกน 2 ตั้งฉากผิวหลังคา (แปกล่องวางแนบหลังจันทัน) → แรงลมใส่ทิศ Local 2 ได้ตรง ๆ"""
+        roofs = self.m.get("roofs", [])
+        k = 0
+        for mid, x in list(self.members.items()):
+            if x["type"] != "purlin":
+                continue
+            a, b = self.nodes[x["i"]], self.nodes[x["j"]]
+            r = next((r for r in roofs if self._in_outline(x, r)), None)
+            if not r:
+                continue
+            L = math.dist((a["x"], a["y"], a["z"]), (b["x"], b["y"], b["z"]))
+            l1 = ((b["x"] - a["x"]) / L, (b["y"] - a["y"]) / L, (b["z"] - a["z"]) / L)
+            n = self._roof_normal(r, (a["x"] + b["x"]) / 2, (a["y"] + b["y"]) / 2)
+            l1xz = (l1[1], -l1[0], 0.0)
+            ang = math.degrees(math.atan2(n[0] * l1xz[0] + n[1] * l1xz[1], n[2]))
+            if abs(ang) > 1e-6:
+                x2 = dict(x); x2["angle"] = round(ang, 4)
+                self.members[mid] = x2
+                k += 1
+        if k:
+            self.warn.append("แป %d เส้น: หมุนแกน local ให้แกน 2 ตั้งฉากผิวหลังคา (ลมใส่ Local 2)" % k)
+
+    def _wind_loads(self):
+        W = (self.m.get("loads") or {}).get("wind")
+        if not W:
+            return []
+        if "zones" not in W or "derived" not in W:
+            self.warn.append("loads.wind รูปแบบเก่า (ไม่มี zones จาก windgen) — ไม่ส่งแรงลม: รัน loadgen ใหม่")
+            return []
+        roofs = {r["id"]: r for r in self.m.get("roofs", [])}
+        faces = W["derived"]["faces"]
+        out = []
+        self.wind_sum = defaultdict(lambda: [0.0, 0.0, 0.0])
+        by_pat = defaultdict(list)
+        for zn in W["zones"]:
+            by_pat[zn["pattern"]].append(zn)
+        # แถบแปของทุกหลังคา
+        bands = {rid: self._purlin_bands(r) for rid, r in roofs.items()}
+        cols = []
+        for x in self.members.values():
+            if x["type"] not in ("column", "steel_column"):
+                continue
+            a, b = self.nodes[x["i"]], self.nodes[x["j"]]
+            if abs(a["x"] - b["x"]) > 1e-6 or abs(a["y"] - b["y"]) > 1e-6 or min(a["z"], b["z"]) < -0.05:
+                continue
+            cols.append(x)
+        for pid, zs in by_pat.items():
+            # หลังคา → แป
+            for rid in {z["target"] for z in zs if z["on"] == "roof"}:
+                r = roofs[rid]
+                cosp = math.cos(math.radians(r["pitch"]))
+                rz = [z for z in zs if z["on"] == "roof" and z["target"] == rid]
+                for x, along, (bl, br) in bands[rid]:
+                    a, b = self.nodes[x["i"]], self.nodes[x["j"]]
+                    ka, kb = "xy"[along], "yx"[along]
+                    ca, cb = a[ka], b[ka]
+                    pts = {ca, cb}
+                    contrib = []
+                    for z in rz:
+                        R = z["rect"]
+                        a0, a1 = (R[0], R[2]) if along == 0 else (R[1], R[3])
+                        b0, b1 = (R[1], R[3]) if along == 0 else (R[0], R[2])
+                        ov = min(br, b1) - max(bl, b0)
+                        if ov <= 1e-9:
+                            continue
+                        contrib.append((a0, a1, -z["value"] * ov / cosp))
+                        pts |= {min(max(a0, min(ca, cb)), max(ca, cb)), min(max(a1, min(ca, cb)), max(ca, cb))}
+                    pts = sorted(pts)
+                    segs = []
+                    for s0, s1 in zip(pts, pts[1:]):
+                        if s1 - s0 < 1e-6:
+                            continue
+                        m_ = (s0 + s1) / 2
+                        w = sum(v for a0, a1, v in contrib if a0 - 1e-9 <= m_ <= a1 + 1e-9)
+                        if segs and abs(segs[-1][2] - w) < 1e-9 and abs(segs[-1][1] - s0) < 1e-9:
+                            segs[-1][1] = s1
+                        else:
+                            segs.append([s0, s1, w])
+                    n = self._roof_normal(r, (a["x"] + b["x"]) / 2, (a["y"] + b["y"]) / 2)
+                    for k, (s0, s1, w) in enumerate(segs):
+                        if abs(w) < 1e-9:
+                            continue
+                        d0, d1 = sorted((abs(s0 - ca), abs(s1 - ca)))
+                        out.append({"id": "%s@%s#%d" % (pid, x["id"], k), "pattern": pid, "member": x["id"], "kind": "trapezoid",
+                                    "at": [round(d0, 5), round(d1, 5)], "value": [round(w, 4), round(w, 4)], "dir": "local2"})
+                        F = w * (d1 - d0)
+                        for i in range(3):
+                            self.wind_sum[pid][i] += F * n[i]
+            # ผนัง → เสา
+            for axis in ("X", "Y"):
+                fz = [z for z in zs if z["on"] == "face" and z["axis"] == axis]
+                for at in sorted({z["at"] for z in fz}):
+                    ka, kb = ("x", "y") if axis == "X" else ("y", "x")
+                    mine = sorted([c for c in cols if abs(self.nodes[c["i"]][ka] - at) < 1e-3], key=lambda c: self.nodes[c["i"]][kb])
+                    if not mine:
+                        self.warn.append("ลม %s: ไม่พบเสาบนผนังแนว %s = %.2f" % (pid, ka, at))
+                        continue
+                    lo_f, hi_f = faces["Y" if axis == "X" else "X"]
+                    sgn = 1 if abs(at - min(faces[axis])) < 1e-6 else -1     # ทิศแรง = −(ค่า) × เวกเตอร์ออกนอกผนัง
+                    # เสาที่ตำแหน่งเดียวกัน (เช่น เสา คสล. + เสาเหล็กต่อบน) = แนวเดียว รับแถบเดียวกัน
+                    stacks = defaultdict(list)
+                    for c in mine:
+                        stacks[round(self.nodes[c["i"]][kb], 4)].append(c)
+                    pos = sorted(stacks)
+                    for k, sp in enumerate(pos):
+                        t0 = lo_f if k == 0 else (pos[k - 1] + sp) / 2
+                        t1 = hi_f if k == len(pos) - 1 else (sp + pos[k + 1]) / 2
+                        f = 0.0
+                        for z in fz:
+                            if abs(z["at"] - at) > 1e-6:
+                                continue
+                            ov = min(t1, z["range"][1]) - max(t0, z["range"][0])
+                            if ov > 1e-9:
+                                f += z["value"] * ov
+                        if abs(f) < 1e-9:
+                            continue
+                        f *= sgn
+                        stk = sorted(stacks[sp], key=lambda c: max(self.nodes[c["i"]]["z"], self.nodes[c["j"]]["z"]))
+                        for c in stk:
+                            a, b = self.nodes[c["i"]], self.nodes[c["j"]]
+                            Lc = abs(a["z"] - b["z"])
+                            out.append({"id": "%s@%s" % (pid, c["id"]), "pattern": pid, "member": c["id"], "kind": "uniform",
+                                        "value": round(f, 4), "dir": axis})
+                            self.wind_sum[pid]["XYZ".index(axis)] += f * Lc
+                        c = stk[-1]
+                        a, b = self.nodes[c["i"]], self.nodes[c["j"]]
+                        zt = max(a["z"], b["z"])
+                        top = c["i"] if a["z"] > b["z"] else c["j"]
+                        r = next(iter(roofs.values()))
+                        hz = self._roof_z(r, a["x"], a["y"]) - zt
+                        if hz > 1e-6:
+                            P = f * hz
+                            out.append({"id": "%s@%s-top" % (pid, c["id"]), "pattern": pid, "member": c["id"], "kind": "point",
+                                        "at": round(abs(a["z"] - b["z"]) if top == c["j"] else 0.0, 5), "value": round(P, 4), "dir": axis})
+                            self.wind_sum[pid]["XYZ".index(axis)] += P
+        return out
+
+    def wind_report(self):
+        if not getattr(self, "wind_sum", None):
+            return []
+        return ["ลม %-7s ΣFx %9.1f  ΣFy %9.1f  ΣFz %9.1f กก." % (p, *v) for p, v in sorted(self.wind_sum.items())]
+
     def _automesh(self):
         """ชิ้นส่วนที่มีจุดต่อของชิ้นอื่นอยู่กลางช่วง (เช่น จันทันที่แปวางทับ) ให้ SAP แบ่งช่วงที่จุดนั้น"""
         pts = {nid: (n["x"], n["y"], n["z"]) for nid, n in self.nodes.items() if nid in self.used_nodes}
@@ -762,6 +1035,8 @@ def main():
               " หลัง import ให้ Save As .sdb ไว้ในโฟลเดอร์/ชื่อไฟล์ภาษาอังกฤษก่อนกด Run")
     for w in ex.warn:
         print("  ! " + w)
+    for w in ex.wind_report():
+        print("  " + w)
 
 
 if __name__ == "__main__":

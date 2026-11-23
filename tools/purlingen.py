@@ -9,7 +9,7 @@
 
 หลังคาโค้ง (curved) / custom ยังไม่รองรับ — ข้ามพร้อมเตือน
 
-รัน: python tools/purlingen.py model.bm.json [--write]
+รัน: python tools/purlingen.py model.bm.json [--write] [--regen]
 """
 import argparse, json, math, os, sys
 
@@ -84,8 +84,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("model")
     ap.add_argument("--write", action="store_true", help="เขียนกลับลงไฟล์โมเดล")
+    ap.add_argument("--regen", action="store_true", help="ลบแปที่ purlingen สร้างไว้เดิมแล้วสร้างใหม่ (หลังแก้กติกา/ข้อกำหนดแป)")
     a = ap.parse_args()
     m = json.load(open(a.model, encoding="utf-8"))
+    if a.regen:
+        old = [x for x in m.get("members", []) if x["type"] == "purlin" and "purlingen" in (x.get("src") or "")]
+        keep = [x for x in m.get("members", []) if x not in old]
+        used = {n for x in keep for n in (x["i"], x["j"])}
+        used |= {s_["node"] for s_ in m.get("supports", [])}
+        drop = {n for x in old for n in (x["i"], x["j"])} - used
+        m["members"] = keep
+        m["nodes"] = [n for n in m.get("nodes", []) if n["id"] not in drop]
+        print("ลบแปเดิม %d เส้น · จุด %d" % (len(old), len(drop)))
     nn, mm, warn = gen(m)
     for w in warn:
         print("เตือน:", w)
