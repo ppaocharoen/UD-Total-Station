@@ -3214,7 +3214,14 @@
   {
    "by": "Earth",
    "note": "22 พ.ย. 2569 Earth รับรอง (v7.14: แปเป็นชิ้นส่วน + loads/combos)"
+  },
+  {
+   "by": "Earth",
+   "note": "25 พ.ย. 2569 Earth รับรอง (v7.15: แป 9 เส้น + ลม 16 กลุ่ม + ผล SAP)"
   }
  ],
- "certified": null
+ "certified": {
+  "by": "Earth",
+  "note": "25 พ.ย. 2569 Earth รับรอง (v7.15: แป 9 เส้น + ลม 16 กลุ่ม + ผล SAP)"
+ }
 }
