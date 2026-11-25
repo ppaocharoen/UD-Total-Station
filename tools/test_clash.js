@@ -112,6 +112,17 @@ m = clone(); m.roofs[0].outline = [[-0.8, -0.8], [8.8, -0.8], [8.8, 11.8], [-0.8
 L = C.classify(m); check('โครงหลังคาช่วง 11 ม. → อาคารพิเศษ (ค)', L.roofSpan === 11 && L.items.find(i => i.name.startsWith('อาคารพิเศษ')).yes);
 m = clone(); m.roofs.forEach(r => { r.form = 'flat'; }); m.slabs.push({ id: 'S-R', kind: 'roof', level: 'ROOF', t: 0.1, top: 24.0, polygon: [[0, 0], [8, 0], [8, 4], [0, 4]] });
 L = C.classify(m); check('หลังคาแบน ดาดฟ้า +24.00 → อาคารสูง', L.H === 24 && L.items[0].yes);
+// นับชั้นจากพื้นที่ใช้งาน (M5 · 25 พ.ย. 2569)
+const T12 = require('../examples/t12/t12.bm.json');
+L = C.classify(T12);
+check('ท12: พื้นหลายระดับ (+0.05/+0.15/+0.20) + ถัง + ทางลาด = 1 ชั้น', L.storeys === 1, `ได้ ${L.storeys}`);
+check('ท12: ไม่เข้าวัสดุทนไฟ/บันไดหนีไฟ', !L.items.some(i => i.yes), L.items.filter(i => i.yes).map(i => i.name).join(' / '));
+check('ท12: พื้นที่ไม่รวมพื้นถัง/ทางลาด แต่รวมทางเดินรอบอาคาร', L.areaTotal > 80 && L.areaTotal < 100, L.areaTotal);
+const sq = (z, s) => ({ id: 'X' + z, kind: 'cast', t: 0.12, top: z, polygon: [[0, 0], [10, 0], [10, 10], [0, 10]], ...(s ? { storey: s } : {}) });
+m = clone(); m.slabs = [sq(0.3), sq(1.2), sq(3.5), sq(6.7)];
+L = C.classify(m); check('ไม่มี storey: +0.30/+1.20 ชั้นเดียว · +3.50 · +6.70 → 3 ชั้น', L.storeys === 3 && L.areaMax === 200, `${L.storeys} ${L.areaMax}`);
+m = clone(); m.slabs = [sq(0.3, 1), sq(1.8, 2), sq(3.5, 2)];
+L = C.classify(m); check('ใช้ storey ตามแปลนเมื่อมี → 2 ชั้น (ชั้นลอยต่างระดับ 1.5 ม.)', L.storeys === 2, L.storeys);
 
 // กฎกระทรวง 55 ข้อ 33/41/44/50
 const SB = clone().site.existing.boundary, st = (r, c) => (r.find(x => x.code === c) || {}).status;
