@@ -1144,6 +1144,25 @@ function renderSiteLaw(L) {
   const nf = res.filter(r => r.status === 'fail').length, nm = res.filter(r => r.status === 'missing').length;
   $('#legal-sum').textContent += (nf ? ` · ไม่ผ่าน ${nf} ข้อ` : '') + (nm ? ` · ข้อมูลไม่ครบ ${nm} ข้อ` : '');
 }
+// ตารางตรวจกฎหมายรายข้อ (กฎ 55 + ผู้พิการ 2548/2564) — สรุปจากผล Clash ชุดเดียวกัน · กดแถวเพื่อกรองรายการ Clash ตามข้อนั้น
+function renderLawTable(all, ack, bt) {
+  const box = $('#law-table'); if (!box) return;
+  const rows = BmClash.lawTable(S.model, { buildingType: bt }, all, ack);
+  const ST = { pass: ['ผ่าน', 'ok'], fail: ['ไม่ผ่าน', 'err'], note: ['ข้อสังเกต', 'warn'], na: ['ไม่บังคับ', ''], manual: ['ตรวจในแบบ', ''] };
+  const TT = { 'กฎ 55': 'ห้อง ทางเดิน บันได (กฎกระทรวง 55)', 'ผู้พิการ': 'สิ่งอำนวยความสะดวกผู้พิการและคนชรา (กฎกระทรวง 2548 แก้ไขฉบับที่ 2 พ.ศ. 2564)' };
+  let h = '', last = '';
+  rows.forEach((r, i) => {
+    if (r.law !== last) { last = r.law; h += `<tr><td colspan="3" style="color:var(--green);padding-top:8px"><b>${esc(TT[r.law] || r.law)}</b></td></tr>`; }
+    const can = r.codes.length && r.status !== 'na';
+    h += `<tr data-law="${i}" style="${can ? 'cursor:pointer' : ''}" title="${can ? 'กดเพื่อดูรายการในตารางตรวจด้านล่าง' : ''}"><td><span class="pill ${ST[r.status][1]}">${ST[r.status][0]}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(r.code)}</td><td>${esc(r.title)}<span class="src">${esc(r.detail)}</span></td></tr>`;
+  });
+  box.innerHTML = `<h4 style="margin:10px 0 4px;color:var(--green)">ตรวจกฎหมายรายข้อ</h4><table class="mini-boq">${h}</table>
+    <div class="hint">ผลมาจากตารางตรวจด้านล่าง (ยอมรับแล้ว = ไม่นับ) · ข้อสังเกต = ผ่านเกณฑ์เดิม 2548 แต่ไม่ผ่านฉบับที่ 2 (2564) หรือต้องตรวจเพิ่มในแบบ · ประเภทอาคาร อยู่อาศัย/อาคารอื่น เลือกที่ช่อง "ประเภทอาคาร" ด้านบน</div>`;
+  box.querySelectorAll('tr[data-law]').forEach(tr => tr.onclick = () => { const r = rows[+tr.dataset.law]; if (!r.codes.length || r.status === 'na') return;
+    S.clashFilter = { codes: r.codes, label: `${r.law} ${r.code}` }; renderClash(); const t = $('#clash-table'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  const nf = rows.filter(r => r.status === 'fail').length, nn = rows.filter(r => r.status === 'note').length;
+  $('#legal-sum').textContent += (nf ? ` · กฎหมายไม่ผ่าน ${nf} ข้อ` : '') + (nn ? ` · ข้อสังเกต ${nn} ข้อ` : '');
+}
 function renderClash() {
   if (!S.model) return;
   const L = BmClash.classify(S.model), yes = L.items.filter(i => i.yes);
@@ -1151,6 +1170,7 @@ function renderClash() {
   $('#legal').innerHTML = `<div class="kv" style="margin:6px 0"><b>ความสูงตามกฎหมาย</b><span>${L.H.toFixed(2)} ม. (วัดจากพื้นดินถึง${esc(L.how)})</span><b>จำนวนชั้น / พื้นที่</b><span>${L.storeys} ชั้น · รวม ${L.areaTotal.toLocaleString()} ตร.ม. · ชั้นมากสุด ${L.areaMax.toLocaleString()} ตร.ม.</span><b>ช่วงยาวสุด</b><span>คาน ${L.span.toFixed(2)} ม. · โครงหลังคา ${L.roofSpan.toFixed(2)} ม.</span></div>
     <table class="mini-boq">${L.items.map(i => `<tr><td><span class="pill ${i.yes ? 'warn' : 'ok'}">${i.yes ? 'เข้าข่าย' : 'ไม่เข้าข่าย'}</span></td><td class="mono" style="color:var(--text3);white-space:nowrap">${esc(i.law)}</td><td>${esc(i.name)}<span class="src">${esc(i.why)}${i.note ? ' · ' + esc(i.note) : ''}</span></td></tr>`).join('')}</table>
     <ul class="hint" style="margin:6px 0 0 18px">${L.notes.map(n => `<li>${esc(n)}</li>`).join('')}</ul>
+    <div id="law-table"></div>
     <div id="site-law"></div>
     <div class="hint" style="margin-top:4px">อ้างอิง: พ.ร.บ.ควบคุมอาคาร 2522 (แก้ไขถึงฉบับที่ 5 พ.ศ. 2558) · กฎกระทรวงฉบับที่ 55 (2543) · กฎกระทรวงสิ่งอำนวยความสะดวกฯ ผู้พิการ 2548 แก้ไขฉบับที่ 2 (2564) — รายการ D ในตารางตรวจ · ตรวจกับราชกิจจานุเบกษาก่อนใช้อ้างอิงทางกฎหมาย</div>`;
   renderSiteLaw(L);
@@ -1159,10 +1179,14 @@ function renderClash() {
   const all = BmClash.check(S.model, { buildingType: bt }), ack = S.boq.clash_ack || {};
   S.clashAll = all.filter(c => !ack[c.key]);
   const showInfo = $('#clash-info').checked, showAck = $('#clash-ack').checked;
-  const list = all.filter(c => (showInfo || c.sev !== 'info') && (showAck || !ack[c.key]));
+  renderLawTable(all, ack, bt);
+  const flt = S.clashFilter;
+  const list = all.filter(c => (showInfo || c.sev !== 'info' || (flt && flt.codes.includes(c.code))) && (showAck || !ack[c.key]) && (!flt || flt.codes.includes(c.code)));
   const nErr = all.filter(c => c.sev === 'error' && !ack[c.key]).length, nWarn = all.filter(c => c.sev === 'warn' && !ack[c.key]).length;
   $('#clash-n').innerHTML = nErr ? `<span class="pill err">${nErr}</span>` : nWarn ? `<span class="pill warn">${nWarn}</span>` : '<span class="pill ok">0</span>';
   S.clashes = list;
+  $('#clash-flt').innerHTML = flt ? `<span class="pill warn">กรอง: ${esc(flt.label)}</span> <button class="btn small" id="clash-flt-x">แสดงทั้งหมด</button>` : '';
+  if (flt) $('#clash-flt-x').onclick = () => { S.clashFilter = null; renderClash(); };
   $('#clash-table').innerHTML = list.length ? list.map((c, i) => `<tr data-i="${i}"><td><span class="pill ${SEV[c.sev][1]}">${SEV[c.sev][0]}</span></td><td class="mono" style="color:var(--text3)">${c.code}</td>
     <td>${esc(c.title)}<span class="src">${esc(c.detail)}</span></td>
     <td><button class="btn small" data-ack="${esc(c.key)}">${ack[c.key] ? 'ยกเลิกยอมรับ' : 'ยอมรับ'}</button></td></tr>`).join('')

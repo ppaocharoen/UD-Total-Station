@@ -213,5 +213,16 @@ check('D3 มีราวทางลาด → ไม่เตือน', !dOf(
 m = two(); check('D4 อาคาร 2 ชั้นไม่มีลิฟต์/ทางลาด → error', C.check(m).some(x => x.code === 'D4'));
 check('D5 บันได 16.5/25 ซม. รวม 41.5 < 43 → error', C.check(m).some(x => x.code === 'D5' && x.detail.includes('41.5')));
 check('ปิดการตรวจผู้พิการ opts.access=false', !C.check(m, { access: false }).some(x => /^D/.test(x.code)));
+
+// M5 ก้อน 3: ตารางตรวจกฎหมายรายข้อ
+const LT = (v, o, ack) => { const res = C.check(v, o); return Object.fromEntries(C.lawTable(v, o, res, ack).map(x => [x.law + ' ' + x.code, x])); };
+let T = LT(T12);
+check('ตาราง ท12: ทางลาดข้อ 8 = ข้อสังเกต · ห้องส้วมผู้พิการผ่าน · ไม่มีบันได/ห้องนอนไม่บังคับ', T['ผู้พิการ ข้อ 8'].status === 'note' && T['ผู้พิการ ข้อ 21'].status === 'pass' && T['กฎ 55 ข้อ 24'].status === 'na' && T['กฎ 55 ข้อ 20'].status === 'na' && T['ผู้พิการ ตรวจในแบบ'].status === 'manual');
+check('ตาราง ท12: ข้อ 22 ไม่ตรวจพื้นถัง/ทางลาด/ทางเดินรอบอาคาร', T['กฎ 55 ข้อ 22'].detail.startsWith('ตรวจ 8 ') && !C.check(T12).some(x => x.code === 'B3' && /ST1R|S-RB|S-WK/.test(x.ids.join())), T['กฎ 55 ข้อ 22'].detail);
+const k8 = C.check(T12).find(x => x.code === 'D3').key;
+T = LT(T12, {}, { [k8]: true }); check('ยอมรับรายการทางลาด → ข้อ 8 ผ่าน + บอกยอมรับแล้ว', T['ผู้พิการ ข้อ 8'].status === 'pass' && T['ผู้พิการ ข้อ 8'].detail.includes('ยอมรับแล้ว 1'));
+T = LT(base); check('ตาราง ตัวอย่างเดิม: ข้อ 20 ผู้พิการไม่ผ่าน', T['ผู้พิการ ข้อ 20'].status === 'fail');
+T = LT(base, { buildingType: 'residential' }); check('ตาราง อาคารอยู่อาศัย: ผู้พิการไม่บังคับ · บันไดเป็นข้อ 23', T['ผู้พิการ ข้อ 3'].status === 'na' && T['ผู้พิการ ข้อ 20'].status === 'na' && !!T['กฎ 55 ข้อ 23']);
+T = LT(two()); check('ตาราง 2 ชั้น: ข้อ 24/25 ตรวจ · ข้อ 9 ไม่ผ่าน', T['กฎ 55 ข้อ 24'].status === 'fail' && T['ผู้พิการ ข้อ 9'].status === 'fail' && T['กฎ 55 ข้อ 25'].status !== 'na');
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);
