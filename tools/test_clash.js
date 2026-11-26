@@ -210,6 +210,9 @@ v = t12(); v.slabs.find(x => x.id === 'S-RAMP').polygon = [[2.4, -1.1], [5.4, -1
 check('D3 ทางลาดยาว 3.00 ไม่มีราว (ไม่ผ่านทั้ง 2548) → error', dOf(v, 'D3').some(x => x.sev === 'error' && x.title.includes('ราวจับ')));
 v = t12(); v.finishes.push({ id: 'RL', kind: 'other', spec: 'ราวจับสแตนเลส Ø 1½"', room: 'ทางลาด', note: 'สองด้านทางลาด' });
 check('D3 มีราวทางลาด → ไม่เตือน', !dOf(v, 'D3').length);
+v = t12(); const rail = (y) => ({ id: 'RL' + y, kind: 'other', spec: 'ราวจับสแตนเลส', place: [{ shape: 'rail', segs: [[[3.0, y, 0.85], [5.4, y, 1.05]]] }] });
+v.finishes.push(rail(-1.05)); check('D3 ราวตามตำแหน่งด้านเดียว → ข้อสังเกต ด้านเดียว', dOf(v, 'D3').some(x => x.sev === 'warn' && x.title.includes('ด้านเดียว')));
+v.finishes.push(rail(-0.15)); check('D3 ราวตามตำแหน่งสองด้าน → ผ่าน', !dOf(v, 'D3').length);
 m = two(); check('D4 อาคาร 2 ชั้นไม่มีลิฟต์/ทางลาด → error', C.check(m).some(x => x.code === 'D4'));
 check('D5 บันได 16.5/25 ซม. รวม 41.5 < 43 → error', C.check(m).some(x => x.code === 'D5' && x.detail.includes('41.5')));
 check('ปิดการตรวจผู้พิการ opts.access=false', !C.check(m, { access: false }).some(x => /^D/.test(x.code)));
