@@ -127,8 +127,8 @@ L = C.classify(m); check('ใช้ storey ตามแปลนเมื่อ�
 // กฎกระทรวง 55 ข้อ 33/41/44/50
 const SB = clone().site.existing.boundary, st = (r, c) => (r.find(x => x.code === c) || {}).status;
 let R = C.siteCheck(clone(), {});
-check('ไม่มีข้อมูลที่ดิน → ข้อมูลไม่ครบทุกข้อ (ไม่ตัดสิน) · ข้อ 42/45–46 ไม่บังคับเมื่อไม่ระบุ', R.every(x => x.status === (/ข้อ 4[2-6]\b|ข้อ 45\/46/.test(x.code) && x.code !== 'ข้อ 44' ? 'na' : 'missing')), JSON.stringify(R.map(x => x.code + ':' + x.status)));
-R = C.siteCheck(clone(), { boundary: SB, off: { c33: 1, c41: 1, c42: 1, c44: 1, c45: 1, c50: 1 } });
+check('ไม่มีข้อมูลที่ดิน → ข้อมูลไม่ครบทุกข้อ (ไม่ตัดสิน) · ข้อ 42/45–46 ไม่บังคับเมื่อไม่ระบุ', R.every(x => x.status === (/ข้อ 4[256]\b|ข้อ 45\/46/.test(x.code) && x.code !== 'ข้อ 44' ? 'na' : 'missing')), JSON.stringify(R.map(x => x.code + ':' + x.status)));
+R = C.siteCheck(clone(), { boundary: SB, off: { c33: 1, c41: 1, c42: 1, c43: 1, c44: 1, c45: 1, c50: 1 } });
 check('ปิดทุกข้อ → ไม่คิด', R.every(x => x.status === 'off'));
 R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }] });
 check('ตัวอย่าง ถนน 8 ม. ด้านใต้ → ผ่านทุกข้อ', ['ข้อ 33', 'ข้อ 41', 'ข้อ 44', 'ข้อ 50'].every(c => st(R, c) === 'pass'));
@@ -156,5 +156,36 @@ check('ถนนสองสายกว้างเท่ากัน → ข�
 const tall = clone(); tall.levels.push({ name: 'X', z: 40 }); tall.slabs.push({ id: 'S-T', kind: 'roof', level: 'X', t: 0.1, top: 40, polygon: [[0, 0], [8, 0], [8, 4], [0, 4]] }); tall.roofs.forEach(r => { r.form = 'flat'; });
 R = C.siteCheck(tall, { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }, { edge: 1, width: 12 }] });
 check('สูง 40 ม. หัวมุม ระยะถึงฝั่งตรงข้ามถนนกว้าง 17 ม. → ข้อ 46 ไม่ผ่าน', st(R, 'ข้อ 46') === 'fail', JSON.stringify(R.filter(x => x.code === 'ข้อ 46')));
+
+// M5 ก้อน 2: ข้อ 20 ห้องนอน · ข้อ 21 ทางเดิน · ข้อ 24 ชานพัก/1.50 ม. · ข้อ 25 ระยะถึงบันได · ข้อ 43 · ข้อ 50 ระเบียง
+const pg = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+m = clone(); m.slabs[0].use = 'ห้องนอน'; m.slabs[0].polygon = pg(0, 0, 2.4, 4);
+check('B5 ห้องนอนแคบ 2.40 ม.', has(C.check(m, { buildingType: 'residential' }), 'B5', 'error', m.slabs[0].id));
+m.slabs[0].polygon = pg(0, 0, 2.6, 3); check('B5 ห้องนอน 7.8 ตร.ม. < 8', has(C.check(m, { buildingType: 'residential' }), 'B5', 'error', m.slabs[0].id));
+m.slabs[0].polygon = pg(0, 0, 2.6, 3.2); check('B5 ห้องนอน 2.60×3.20 ผ่าน', !C.check(m, { buildingType: 'residential' }).some(x => x.code === 'B5'));
+m = clone(); m.slabs[0].use = 'ทางเดิน'; m.slabs[0].polygon = [[0, 0], [8, 0], [8, 1.2], [1.6, 1.2], [1.6, 6], [0, 6]];   // รูป L แขนกว้าง 1.20/1.60
+r = C.check(m); check('B6 ทางเดินรูป L แคบสุด 1.20 < 1.50 (สาธารณะ)', r.some(x => x.code === 'B6' && x.title.includes('1.20')), r.filter(x => x.code === 'B6').map(x => x.title).join());
+check('B6 อาคารอยู่อาศัย 1.20 ≥ 1.00 ผ่าน', !C.check(m, { buildingType: 'residential' }).some(x => x.code === 'B6'));
+m.slabs[0].use = 'ทางเดินรอบอาคาร'; check('B6 ทางเดินรอบอาคารไม่ตรวจ', !C.check(m).some(x => x.code === 'B6'));
+const two = () => { const v = clone(); v.slabs = [{ id: 'G', kind: 'cast', t: 0.12, top: 0.3, polygon: pg(0, 0, 20, 20) }, { id: 'U', kind: 'cast', t: 0.12, top: 3.6, polygon: pg(0, 0, 20, 20) }];
+  v.stairs = [{ id: 'ST1', flights: [{ start: [1, 1], dir: '+Y', width: 1.2, bottom: 0.3, top: 1.95, risers: 10, going: 0.25 }, { start: [2.2, 3.5], dir: '-Y', width: 1.2, bottom: 1.95, top: 3.6, risers: 10, going: 0.25 }],
+    landings: [{ rect: [1, 3.5, 3.4, 4.5], top: 1.95, t: 0.15 }] }]; return v; };
+m = two(); r = C.check(m);
+check('B4 ชานพักลึก 1.00 < กว้างบันได 1.20', has(r, 'B4', 'error', 'ST1') && r.some(x => x.title.includes('ชานพัก')));
+check('B4 พื้นชั้นบน 400 ตร.ม. > 300 → บันได 1.20 < 1.50', r.some(x => x.code === 'B4' && x.title.includes('< 1.50')));
+m.stairs.push({ id: 'ST2', flights: [{ start: [15, 15], dir: '+Y', width: 1.2, bottom: 0.3, top: 3.6, risers: 18, going: 0.25 }] });
+check('B4 มี 2 บันไดกว้าง ≥ 1.20 → ไม่ต้อง 1.50', !C.check(m).some(x => x.code === 'B4' && x.title.includes('< 1.50')));
+m = two(); m.slabs[1].polygon = pg(0, 0, 40, 10); r = C.check(m);
+check('B7 มุมไกลสุด (40,10) ห่างหัวบันได > 40 ม.', r.some(x => x.code === 'B7' && x.sev === 'error'), r.filter(x => x.code === 'B7').map(x => x.title).join());
+m.slabs[1].polygon = pg(0, 0, 20, 20); check('B7 ชั้นบน 20×20 ผ่าน', !C.check(m).some(x => x.code === 'B7'));
+m.stairs = []; check('B7 ชั้นบนไม่มีบันไดขึ้นถึง → เตือน', C.check(m).some(x => x.code === 'B7' && x.sev === 'warn'));
+check('B7 ไม่ตรวจอาคารอยู่อาศัย', !C.check(two(), { buildingType: 'residential' }).some(x => x.code === 'B7'));
+R = C.siteCheck(clone(), { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }] });
+check('ข้อ 43 อาคารสาธารณะ ชายคา +3.01 ยื่นเลยแนวอาคาร 0.80 ม. → ไม่ผ่าน', st(R, 'ข้อ 43') === 'fail');
+R = C.siteCheck(clone(), { boundary: SB, use: 'res', roads: [{ edge: 0, width: 8 }] });
+check('ข้อ 43 บ้านชั้นเดียว ถนน 8 ม. → ไม่บังคับ (ข้อ 41 ไม่กำหนด)', st(R, 'ข้อ 43') === 'na');
+m = clone(); m.slabs.push({ id: 'BAL', kind: 'cast', t: 0.1, top: 0.3, use: 'ระเบียง', polygon: pg(-4, 0, 0, 4) });
+R = C.siteCheck(m, { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }] });
+check('ข้อ 50 ระเบียงห่างเขต 1.00 ม. < 2 ม. → ไม่ผ่าน', st(R, 'ข้อ 50') === 'fail' && R.find(x => x.code === 'ข้อ 50').detail.includes('BAL'));
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);
