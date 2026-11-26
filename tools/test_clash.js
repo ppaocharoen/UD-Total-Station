@@ -10,7 +10,9 @@ const has = (r, code, sev, ...ids) => r.some(x => x.code === code && x.sev === s
 let r = C.check(base);
 check('ตัวอย่าง: ท่อ V-1 ลอดคานหลังคา B1-ROOF-04', has(r, 'A1', 'warn', 'V-1', 'B1-ROOF-04'));
 check('ตัวอย่าง: ท้องคาน B1-ROOF-07 (+2.90) ต่ำกว่าฝ้า (+3.00)', has(r, 'B2', 'warn', 'B1-ROOF-07', 'FN-CL1') || has(r, 'B2', 'warn', 'FN-CL1'));
-check('ตัวอย่าง: ไม่มี error', !r.some(x => x.sev === 'error'), r.filter(x => x.sev === 'error').map(x => x.title).join(' / '));
+check('ตัวอย่าง: ไม่มี error (นอกจาก D1 ไม่มีห้องส้วมผู้พิการ — ถูกตามกฎหมาย)', !r.some(x => x.sev === 'error' && x.code !== 'D1'), r.filter(x => x.sev === 'error').map(x => x.title).join(' / '));
+check('ตัวอย่าง: D1 ไม่มีห้องส้วมผู้พิการ', r.some(x => x.code === 'D1' && x.sev === 'error'));
+check('ตัวอย่าง อาคารอยู่อาศัย: ไม่ตรวจกลุ่ม D', !C.check(base, { buildingType: 'residential' }).some(x => /^D/.test(x.code)));
 check('ตัวอย่าง: ระยะดิ่งสำนักงาน 3.00 ม. ผ่าน', !r.some(x => x.code === 'B3'));
 check('แนวท่อประมาณไม่ขึ้นเป็น error/warn', r.filter(x => x.ids.some(i => /^(PP|EL)-/.test(i))).every(x => x.sev === 'info'));
 
@@ -187,5 +189,29 @@ check('ข้อ 43 บ้านชั้นเดียว ถนน 8 ม. →
 m = clone(); m.slabs.push({ id: 'BAL', kind: 'cast', t: 0.1, top: 0.3, use: 'ระเบียง', polygon: pg(-4, 0, 0, 4) });
 R = C.siteCheck(m, { boundary: SB, use: 'public', roads: [{ edge: 0, width: 8 }] });
 check('ข้อ 50 ระเบียงห่างเขต 1.00 ม. < 2 ม. → ไม่ผ่าน', st(R, 'ข้อ 50') === 'fail' && R.find(x => x.code === 'ข้อ 50').detail.includes('BAL'));
+
+// M5 ก้อน 2b: สิ่งอำนวยความสะดวกผู้พิการ 2548 + ฉบับที่ 2 (2564)
+const t12 = () => JSON.parse(JSON.stringify(T12)), dOf = (v, c) => C.check(v).filter(x => x.code === c);
+r = C.check(T12);
+check('ท12: D มีแค่ทางลาดไม่มีราว (ข้อสังเกต) + รายการตรวจในแบบ', r.filter(x => /^D/.test(x.code)).map(x => x.code + x.sev).sort().join() === 'D0info,D3warn', r.filter(x => /^D/.test(x.code)).map(x => x.code + ':' + x.title).join(' / '));
+let v = t12(); v.slabs.find(x => x.id === 'S-DIS').polygon = [[4.25, 0.95], [6.45, 0.95], [6.45, 2.2], [4.25, 2.2]];
+check('D2 ห้องผู้พิการเล็กลง → วงหมุน < 1.50', dOf(v, 'D2').some(x => x.sev === 'error' && x.title.includes('หมุน')));
+v = t12(); v.opening_types.DR2.desc = 'ประตูบานเปิด ช่อง 0.90'; v.opening_types.DR2.w = 0.9;
+check('D2 ประตูบานเปิด สุทธิ 0.80 < 0.86 + ต้องเลื่อน/เปิดออก', dOf(v, 'D2').some(x => x.sev === 'error' && x.title.includes('0.80')) && dOf(v, 'D2').some(x => x.sev === 'warn' && x.title.includes('บานเลื่อน')));
+v = t12(); v.opening_types.DR2.desc = 'ประตูบานเลื่อน สุทธิ 0.88';
+check('D2 ประตู 0.88 ผ่าน 2564 ต่ำกว่า 2548 → info', dOf(v, 'D2').some(x => x.sev === 'info' && x.title.includes('0.88')));
+v = t12(); v.finishes.find(f => f.id === 'FF-DIS').z = 0.28; check('D2 พื้นต่างระดับ 3 ซม. → error', dOf(v, 'D2').some(x => x.sev === 'error' && x.title.includes('3.0 ซม.')));
+v.finishes.find(f => f.id === 'FF-DIS').z = 0.265; check('D2 ต่างระดับ 1.5 ซม. (ผ่าน 2548) → ข้อสังเกต', dOf(v, 'D2').some(x => x.sev === 'warn' && x.title.includes('1.5 ซม.')));
+v = t12(); v.finishes = v.finishes.filter(f => !/ราว/.test(f.spec || '')); check('D2 ไม่มีราวจับ → error', dOf(v, 'D2').some(x => x.sev === 'error' && x.title.includes('ราวจับ')));
+v = t12(); v.slabs = v.slabs.filter(x => x.id !== 'S-DIS'); v.mep.plumbing.fixtures.forEach(f => { f.room = String(f.room || '').replace('คนพิการ', 'X'); });
+check('D1 ลบห้องผู้พิการ → error', dOf(v, 'D1').length === 1);
+v = t12(); v.slabs.find(x => x.id === 'S-RAMP').ramp.low = -0.02; check('D3 ทางลาดชัน 1:10 → error', dOf(v, 'D3').some(x => x.sev === 'error' && x.detail.includes('1:10')));
+v = t12(); v.slabs.find(x => x.id === 'S-RAMP').polygon = [[2.4, -1.1], [5.4, -1.1], [5.4, -0.1], [2.4, -0.1]]; v.slabs.find(x => x.id === 'S-RAMP').ramp.low = -0.03;
+check('D3 ทางลาดยาว 3.00 ไม่มีราว (ไม่ผ่านทั้ง 2548) → error', dOf(v, 'D3').some(x => x.sev === 'error' && x.title.includes('ราวจับ')));
+v = t12(); v.finishes.push({ id: 'RL', kind: 'other', spec: 'ราวจับสแตนเลส Ø 1½"', room: 'ทางลาด', note: 'สองด้านทางลาด' });
+check('D3 มีราวทางลาด → ไม่เตือน', !dOf(v, 'D3').length);
+m = two(); check('D4 อาคาร 2 ชั้นไม่มีลิฟต์/ทางลาด → error', C.check(m).some(x => x.code === 'D4'));
+check('D5 บันได 16.5/25 ซม. รวม 41.5 < 43 → error', C.check(m).some(x => x.code === 'D5' && x.detail.includes('41.5')));
+check('ปิดการตรวจผู้พิการ opts.access=false', !C.check(m, { access: false }).some(x => /^D/.test(x.code)));
 console.log(ok ? '\nทั้งหมดผ่าน' : '\nมีที่ไม่ผ่าน');
 process.exit(ok ? 0 : 1);
