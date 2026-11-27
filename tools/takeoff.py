@@ -185,8 +185,8 @@ def r2(x):
 
 
 def round_pieces(n):
-    """ท่อน: เศษ < 0.5 ปัดลง ≥ 0.5 ปัดขึ้น (หลักเกณฑ์ 6.2)"""
-    return int(math.floor(n + 0.5))
+    """ท่อน: เศษปัดขึ้นเป็นท่อนเต็มเสมอ (6.387 → 7) — Earth 27 พ.ย. 2569 (เดิมเศษ < 0.5 ปัดลง) · เท่ากับ UD Cost Hub takeoff-v1.js"""
+    return int(math.ceil(round(n, 6)))
 
 
 def dist2(a, b):
