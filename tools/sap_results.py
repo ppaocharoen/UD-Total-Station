@@ -12,6 +12,9 @@
     at_* = ระยะจากปลาย i (ม.) ตามสถานีของ SAP
   - by_combo: {id: {combo: {"i": [P, M2, M3], "j": [P, M2, M3]}}}  เฉพาะเสา คสล. (type column) — แรงพร้อมกันที่ปลายเสา
     รายชุดผสม ให้หน้าออกแบบตรวจทุกชุด (M4b 28 พ.ย. 2569) · i = สถานีแรก, j = สถานีสุดท้าย
+  - steel_combo: {id: {combo: [[station, P, V2, V3, T, M2, M3], ...]}}  ชิ้นเหล็ก (M6 28 พ.ย. 2569) — แรงพร้อมกันรายชุดผสม
+    เก็บเฉพาะสถานีวิกฤตของแต่ละชุด: ปลาย i, ปลาย j, P/M2/M3 มากสุดและน้อยสุด, |M3|/M3max+|M2|/M2max สูงสุด, |V2|, |V3| สูงสุด
+    (ซ้ำกันเก็บครั้งเดียว · เรียงตามสถานี) ให้หน้าออกแบบตรวจ ASD ทุกชุด
   - reactions: {joint: {case/combo: [F1, F2, F3, M1, M2, M3]}}  ทุก case และ combo
   - displacements: {joint: {combo: [U1, U2, U3]}}  เฉพาะชุดผสม (หรือทุก case ถ้าไม่มีชุดผสม)
   - model_hash: จากไฟล์ประกอบ .sap.json ที่ตัวส่งออกเขียนไว้ (ถ้าไม่มีใช้ hash ปัจจุบันพร้อมเตือน)
@@ -26,6 +29,32 @@ sys.path.insert(0, HERE)
 from validate import model_hash  # noqa: E402
 
 COMP = ["P", "V2", "V3", "T", "M2", "M3"]
+STEEL = {"steel_column", "steel_beam", "rafter", "purlin", "ridge", "hip", "valley", "truss_chord", "truss_web", "brace", "sag_rod"}
+
+
+def steel_rows(rows):
+    """สถานีวิกฤตของชิ้นเหล็กในชุดผสมเดียว: rows = [(station, [P, V2, V3, T, M2, M3])] → [[st, P, V2, V3, T, M2, M3]]"""
+    if not rows:
+        return []
+    rows = sorted(rows, key=lambda x: x[0])
+    keep = {0, len(rows) - 1}
+    mx = [max(abs(v[k]) for _, v in rows) or 1.0 for k in range(6)]
+    idx = range(len(rows))
+    for k in (0, 4, 5):           # P M2 M3: ค่ามากสุดและน้อยสุด (เครื่องหมายบอกปีกที่รับแรงอัด)
+        keep.add(max(idx, key=lambda i: rows[i][1][k]))
+        keep.add(min(idx, key=lambda i: rows[i][1][k]))
+    for k in (1, 2):              # V2 V3: ค่าสัมบูรณ์
+        keep.add(max(idx, key=lambda i: abs(rows[i][1][k])))
+    keep.add(max(range(len(rows)), key=lambda i: abs(rows[i][1][5]) / mx[5] + abs(rows[i][1][4]) / mx[4]))
+    out, seen = [], set()
+    for i in sorted(keep):
+        st, v = rows[i]
+        key = (round(st, 4), tuple(round(x, 2) for x in v))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append([round(st, 4)] + [round(x, 2) for x in v])
+    return out
 
 
 def read_tables(path):
@@ -78,6 +107,8 @@ def build(m, tables, sidecar=None):
     env = {}
     unknown = set()
     cols = {x["id"] for x in m.get("members", []) if x.get("type") == "column"}
+    steel = {x["id"] for x in m.get("members", []) if x.get("type") in STEEL}
+    srows = {}  # (frame, combo) -> [(station, [P..M3])]
     ends = {}   # (frame, combo) -> {"i": (station, row), "j": (station, row)}
     for r in ef:
         f = r["Frame"]
@@ -90,6 +121,8 @@ def build(m, tables, sidecar=None):
             st = float(r["Station"]); e2 = ends.setdefault((f, r["OutputCase"]), {})
             if "i" not in e2 or st < e2["i"][0]: e2["i"] = (st, r)
             if "j" not in e2 or st > e2["j"][0]: e2["j"] = (st, r)
+        if f in steel and not r.get("StepType"):
+            srows.setdefault((f, r["OutputCase"]), []).append((float(r["Station"]), [float(r[c]) for c in COMP]))
         # ชุดผสมแบบ envelope ใน SAP มี StepType Max/Min; แบบ linear add มีบรรทัดเดียว
         e = env.setdefault(f, {})
         for c in COMP:
@@ -107,6 +140,9 @@ def build(m, tables, sidecar=None):
     by_combo = {}
     for (f, c), e2 in sorted(ends.items()):
         by_combo.setdefault(f, {})[c] = {k: [r4(e2[k][1][x]) for x in ("P", "M2", "M3")] for k in ("i", "j")}
+    steel_combo = {}
+    for (f, c), rows in sorted(srows.items()):
+        steel_combo.setdefault(f, {})[c] = steel_rows(rows)
     if unknown:
         warn.append("ชิ้นส่วนใน SAP ที่ไม่มีใน .bm.json (ไม่ได้อ่าน): " + ", ".join(sorted(unknown)[:10]))
     from sap_export import Exporter
@@ -144,6 +180,8 @@ def build(m, tables, sidecar=None):
            "model_hash": h, "stale": h != h_now, "cases_used": use, "members": env, "reactions": reac}
     if by_combo:
         res["by_combo"] = by_combo
+    if steel_combo:
+        res["steel_combo"] = steel_combo
     if merged:
         res["merged"] = merged
     if disp:
@@ -151,6 +189,21 @@ def build(m, tables, sidecar=None):
     if not res["source"]:
         res.pop("source")
     return res, warn
+
+
+def dump_model(m, path):
+    """เขียน .bm.json (indent=1 ตามเดิม) แต่แถว steel_combo อยู่บรรทัดเดียว — ไม่ให้ไฟล์บวมเป็นแสนบรรทัด"""
+    res = m.get("results") or {}
+    sc = res.get("steel_combo")
+    if sc:
+        res["steel_combo"] = {f: {c: ["@@%s@@" % json.dumps(r, separators=(",", ":")) for r in rows] for c, rows in d.items()}
+                              for f, d in sc.items()}
+    txt = json.dumps(m, ensure_ascii=False, indent=1)
+    if sc:
+        res["steel_combo"] = sc
+        import re
+        txt = re.sub(r'"@@(\[[^"]*\])@@"', r"\1", txt)
+    open(path, "w", encoding="utf-8").write(txt)
 
 
 def main():
@@ -176,7 +229,7 @@ def main():
         print("  ! " + w)
     if a.write:
         m["results"] = res
-        json.dump(m, open(a.model, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+        dump_model(m, a.model)
         print("เขียน results ลง", a.model)
 
 

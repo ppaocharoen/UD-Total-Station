@@ -69,6 +69,28 @@ for cid, d in bc.items():
         ok &= min(vals) >= env_[comp]["min"] - 1e-3 and max(vals) <= env_[comp]["max"] + 1e-3
 check("by_combo อยู่ในกรอบ envelope", ok)
 
+# M6 (28 พ.ย. 2569): แรงพร้อมกันรายชุดของชิ้นเหล็ก — ครบทุกชิ้นเหล็ก มีปลาย i/j และค่าสุดตรง envelope
+from sap_results import STEEL, steel_rows, dump_model  # noqa: E402
+sc = res.get("steel_combo") or {}
+stids = [x["id"] for x in m["members"] if x.get("type") in STEEL]
+check("steel_combo ครบทุกชิ้นเหล็ก", stids and set(sc) == set(stids), sorted(set(stids) - set(sc))[:5])
+ok = True
+for fid, d in sc.items():
+    env_ = res["members"][fid]
+    for k, comp in enumerate(("P", "V2", "V3", "T", "M2", "M3")):
+        vals = [row[k + 1] for rows in d.values() for row in rows]
+        if comp in ("P", "M2", "M3"):
+            ok &= abs(max(vals) - env_[comp]["max"]) < 0.01 and abs(min(vals) - env_[comp]["min"]) < 0.01
+        elif comp != "T":
+            ok &= abs(max(map(abs, vals)) - max(abs(env_[comp]["max"]), abs(env_[comp]["min"]))) < 0.01
+check("steel_combo ค่าสุดตรง envelope (P M2 M3 มาก/น้อยสุด · |V2| |V3|)", ok)
+rr = steel_rows([(0.0, [1, 0, 0, 0, 0, 0]), (1.0, [1, 5, 0, 0, 0, 9]), (2.0, [1, -2, 0, 0, 3, 1]), (3.0, [1, 0, 0, 0, 0, 0])])
+check("steel_rows เก็บปลาย + ค่าสุด", [r[0] for r in rr] == [0.0, 1.0, 2.0, 3.0], rr)
+import tempfile  # noqa: E402
+_m = {"results": {"steel_combo": {"X": {"c": [[0.0, 1.5, 2, 3, 4, 5, 6]]}}}}
+_p = os.path.join(tempfile.mkdtemp(), "x.json"); dump_model(_m, _p)
+check("dump_model แถวเหล็กบรรทัดเดียว อ่านกลับได้", json.load(open(_p)) == _m and "[0.0,1.5,2,3,4,5,6]" in open(_p).read())
+
 m2 = json.loads(json.dumps(m))
 m2["results"] = res
 r = validate(m2)

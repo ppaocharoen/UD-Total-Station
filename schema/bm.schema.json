@@ -2669,6 +2669,24 @@
           },
           "description": "{node: {combo: [Fx..Mz]}}"
         },
+        "steel_combo": {
+          "type": "object",
+          "description": "ชิ้นเหล็ก: {member: {combo: [[station ม., P, V2, V3, T, M2, M3], ...]}} แรงพร้อมกันที่สถานีวิกฤต (ปลาย i/j, P/M2/M3 มาก-น้อยสุด, |V| สูงสุด) — tools/sap_results.py",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 7,
+                "maxItems": 7
+              }
+            }
+          }
+        },
         "displacements": {
           "type": "object",
           "additionalProperties": {
