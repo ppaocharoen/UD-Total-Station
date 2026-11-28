@@ -3,7 +3,7 @@
  * ใช้ตัวแปรร่วมจาก app.js: S, $, $$, esc, fmt, toast, download, autosave, buildLayers
  */
 'use strict';
-const DSG_DEF = () => ({ crit: { F: 0.45, mode: 1, fy: 4000, fyv: 2400, cov: 2.5, dias: [12, 16, 20, 25], slabFy: 2400, slabCov: 2, slabDias: [9, 12], colCov: 3, colDias: [12, 16, 20], ftCov: 7.5, qa: '', gamma: 1800, ftDias: [12, 16], plateFy: 2400, pileFc: 350 }, beams: {}, slabs: {}, cols: {}, foots: {}, piles: {}, plates: {}, stairs: {}, stairsManual: [], retains: {}, retainsManual: [], sel: '' });
+const DSG_DEF = () => ({ crit: { F: 0.45, mode: 1, fy: 4000, fyv: 2400, cov: 2.5, dias: [12, 16, 20, 25], slabFy: 2400, slabCov: 2, slabDias: [9, 12], colCov: 3, colDias: [12, 16, 20], ftCov: 7.5, qa: '', gamma: 1800, ftDias: [12, 16], plateFy: 2400, pileFc: 350, gbNoT: 0 }, beams: {}, slabs: {}, cols: {}, foots: {}, piles: {}, plates: {}, stairs: {}, stairsManual: [], retains: {}, retainsManual: [], sel: '' });
 const SLAB_DIAS = fy => fy <= 2400 ? [9, 12, 15] : [10, 12, 16];
 function dsg() {
   const b = S.boq; if (!b.dsg) b.dsg = DSG_DEF();
@@ -54,7 +54,10 @@ function dsgInput(bm) {
   const pick = k => (u[k] !== undefined && u[k] !== '') ? +u[k] : (sp[k] !== undefined ? sp[k] : null);
   const f = { Mpos: pick('Mpos'), Mneg: pick('Mneg'), V: pick('V'), T: pick('T') || 0 };
   const src = ['Mpos', 'Mneg', 'V', 'T'].some(k => u[k] !== undefined && u[k] !== '') ? 'กรอกเอง' : bm.sap ? 'SAP' : '';
-  return { f, type: +(u.type || bm.auto), src, has: f.Mpos !== null || f.Mneg !== null };
+  // M4b ก้อน 5: ตัวเลือกโครงการ "ไม่คิดแรงบิดคานคอดิน" — ตัดเฉพาะ T จาก SAP ของคานคอดิน (T ที่กรอกเองยังใช้)
+  let noT = null;
+  if (bm.kind === 'tie_beam' && +dsg().crit.gbNoT && !(u.T !== undefined && u.T !== '') && f.T) { noT = f.T; f.T = 0; }
+  return { f, type: +(u.type || bm.auto), src, has: f.Mpos !== null || f.Mneg !== null, noT };
 }
 function dsgRun(bm) {
   const c = dsg().crit, inp = dsgInput(bm); if (!inp.has) return null;
@@ -106,6 +109,7 @@ function renderDesign() {
       <label>เหล็กแผ่นเพลท Fy (ksc)<select data-dc="plateFy">${opt(2400, c.plateFy, '2,400 (SS400 / Fe-24)')}${opt(3000, c.plateFy, '3,000 (Fe-30)')}</select></label>
       <label>หน่วยน้ำหนักดินถม γ (กก./ลบ.ม.)<input data-dc="gamma" inputmode="decimal" value="${esc(c.gamma)}"></label>
       <label>f'c เสาเข็ม (ksc)<input data-dc="pileFc" inputmode="decimal" value="${esc(c.pileFc || 350)}"></label>
+      <label>แรงบิดคานคอดิน (T จาก SAP)<select data-dc="gbNoT">${opt(0, +c.gbNoT || 0, 'คิด')}${opt(1, +c.gbNoT || 0, 'ไม่คิด (แรงบิดจากความต่อเนื่อง)')}</select></label>
       <div class="dsg-dias"><span>ขนาดเหล็กหลักที่ใช้</span>${[12, 16, 20, 25, 28].map(d => `<label class="ck"><input type="checkbox" data-dia="${d}" ${(c.dias || []).map(Number).includes(d) ? 'checked' : ''}>DB${d}</label>`).join('')}</div>
       <div class="dsg-dias"><span>ขนาดเหล็กพื้นที่ใช้</span>${SLAB_DIAS(+c.slabFy).map(d => `<label class="ck"><input type="checkbox" data-sdia="${d}" ${(c.slabDias || []).map(Number).includes(d) ? 'checked' : ''}>${RcWsd.barName(d, +c.slabFy)}</label>`).join('')}</div>
     </div>
@@ -121,7 +125,8 @@ function renderDesign() {
     <div class="table-wrap"><table class="boq dsg-tab"><tr><th>คาน</th><th>b×h (ม.)</th><th>L (ม.)</th><th>ประเภท</th><th>M+ กก.-ม.</th><th>M− กก.-ม.</th><th>V กก.</th><th>T กก.-ม.</th><th>เหล็กเสริม</th><th>ratio</th><th></th></tr>
     ${beams.map(bm => {
       const r = S.dsgOut[bm.id], u = D.beams[bm.id] || {}, inp = dsgInput(bm);
-      const cell = k => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-bf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (bm.sap ? df2(bm.sap[k], 0).replace(/,/g, '') : '')}" placeholder="-">`;
+      const cell = k => k === 'T' && inp.noT !== null ? `<input class="price" data-bf="T" inputmode="decimal" value="" placeholder="ไม่คิด" title="T จาก SAP ${df2(inp.noT, 0)} กก.-ม. ไม่คิดตามเกณฑ์ออกแบบ — กรอกเองเพื่อใช้ค่า">`
+        : `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-bf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (bm.sap ? df2(bm.sap[k], 0).replace(/,/g, '') : '')}" placeholder="-">`;
       return `<tr class="row ${D.sel === bm.id ? 'sel' : ''}" data-bm="${esc(bm.id)}"><td class="c-name"><b>${esc(bm.mark)}</b> <span class="hint">${esc(bm.id)}</span>${inp.src ? `<span class="src">${inp.src}</span>` : ''}</td>
         <td class="r" data-l="b×h (ม.)">${df2(bm.b)}×${df2(bm.h)}</td><td class="r" data-l="L (ม.)">${df2(bm.L)}</td>
         <td data-l="ประเภท"><select data-bf="type">${[1, 2, 3, 4].map(t => opt(t, inp.type, RcWsd.BEAM_TYPES_TH[t] + (t === bm.auto ? ' *' : ''))).join('')}</select></td>
@@ -389,6 +394,7 @@ function beamReport(bm, d) {
       ${row('Ec', "(2.323^1.5)·4270·√f'c", df2(C.Ec, 0), 'ksc')}${row('n, k, j, R', 'Es/Ec · 1/(1+fs/(n·fc)) · 1−k/3 · ½fc·k·j', `${df2(C.n, 3)} · ${df2(C.main.k, 4)} · ${df2(C.main.j, 4)} · ${df2(C.main.R, 3)}`, '', okTag(C.nOk))}
       ${row('b × h × L', '', `${df2(g.b)} × ${df2(g.h)} × ${df2(g.L)}`, 'ม.')}${row('ระยะหุ้ม', '', df2(g.cov, 1), 'ซม.')}
       ${row('M+ / M− / V / T', '', `${df2(f.Mpos, 0)} / ${df2(f.Mneg, 0)} / ${df2(f.V, 0)} / ${df2(f.T, 0)}`, 'กก.-ม., กก.')}
+      ${d.inp.noT !== null && d.inp.noT !== undefined ? row('แรงบิดคานคอดิน', 'ไม่คิด (เกณฑ์ออกแบบ: แรงบิดจากความต่อเนื่อง)', `T จาก SAP ${df2(d.inp.noT, 0)}`, 'กก.-ม.') : ''}
     </table>
     <h4>2. ตรวจขนาดหน้าตัด</h4><table class="dsg-calc">
       ${row('h min', fy >= 4000 ? `L/${div}` : `L/${div}·(0.4 + fy/7000)`, df2(hm.lim, 3), 'ม.', `≤ ${df2(g.h)} ${okTag(hm.ok)}`)}
