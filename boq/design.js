@@ -82,7 +82,7 @@ function renderDesign() {
   S.dsgFoot = {}; foots.forEach(x => { S.dsgFoot[x.id] = dsgFootRun(x); });
   S.dsgPile = {}; piles.forEach(x => { S.dsgPile[x.id] = dsgPileRun(x); });
   S.dsgStrap = {}; foots.forEach(x => { const pid = ((D.foots || {})[x.id] || {}).strap, y = pid && foots.find(f => f.id === pid && f.id !== x.id); if (y) { const r = dsgStrapRun(x, y); S.dsgStrap[x.id] = r; if (r.ext) { S.dsgFoot[x.id] = r.ext; S.dsgFoot[y.id] = r.int; } } });
-  dsgGroups(cols, foots);
+  dsgGroups(cols, foots, beams);
   const retains = dsgRetainList(); S.dsgRetain = {}; retains.forEach(x => { S.dsgRetain[x.id] = dsgRetainRun(x); });
   const plates = dsgPlateList(); S.dsgPlate = {}; plates.forEach(x => { S.dsgPlate[x.id] = dsgPlateRun(x); });
   const stairs = dsgStairList(); S.dsgStair = {}; stairs.forEach(x => { S.dsgStair[x.id] = dsgStairRun(x); });
@@ -204,11 +204,13 @@ function bindDesign(beams, slabs, cols, foots, plates, stairs, piles, retains) {
 function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains = []) {
   const m = S.model, c = dsg().crit, D = dsg(); m.design = m.design || {}; m.design.members = m.design.members || {};
   let n = 0, skip = 0; D.applied = D.applied || {};
+  const GO = dsgGrpOpt(), gOf = id => GO.apply && S.dsgGrp ? S.dsgGrp.groups.find(g => g.ids.includes(id) && !g.fails.length) : null;
   beams.forEach(bm => {
     const r = S.dsgOut[bm.id]; if (!r || !r.rebar) return; if (!r.ok) { skip++; return; }
-    m.design.members[bm.id] = D.applied[bm.id] = { method: 'WSD', rebar: r.rebar, pass: !!r.ok, ratio: Math.round(r.ratio * 1000) / 1000,
-      governing: [r.inp.src === 'SAP' && bm.sap && bm.sap.combo ? bm.sap.combo : r.inp.src, RcWsd.BEAM_TYPES_TH[r.inp.type]].filter(Boolean).join(' · '),
-      status: 'computed', src: `UD Total Station v${UD_VERSION.v} ออกแบบ WSD (fc ${df2(r.crit.fc, 0)} ksc, ${r.crit.main.grade}/${r.crit.stir.grade}, หุ้ม ${c.cov} ซม.)` };
+    const g = gOf(bm.id), gov = [r.inp.src === 'SAP' && bm.sap && bm.sap.combo ? bm.sap.combo : r.inp.src, RcWsd.BEAM_TYPES_TH[r.inp.type]].filter(Boolean).join(' · ');
+    m.design.members[bm.id] = D.applied[bm.id] = Object.assign({ method: 'WSD', rebar: g ? JSON.parse(JSON.stringify(g.cand)) : r.rebar, pass: !!r.ok,
+      ratio: Math.round((g ? g.util[bm.id] : r.ratio) * 1000) / 1000, governing: g ? `ชนิด ${g.name} (คุมโดย ${g.gov}) · ${gov}` : gov,
+      status: 'computed', src: `UD Total Station v${UD_VERSION.v} ออกแบบ WSD (fc ${df2(r.crit.fc, 0)} ksc, ${r.crit.main.grade}/${r.crit.stir.grade}, หุ้ม ${c.cov} ซม.)` }, g ? { group: g.name } : {});
     n++;
   });
   let ns = 0; m.design.slabs = m.design.slabs || {}; D.appliedSlabs = D.appliedSlabs || {};
@@ -219,7 +221,6 @@ function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains = []
     ns++;
   });
   let nc = 0, nf = 0; D.appliedSup = D.appliedSup || {}; m.design.supports = m.design.supports || {};
-  const GO = dsgGrpOpt(), gOf = id => GO.apply && S.dsgGrp ? S.dsgGrp.groups.find(g => g.ids.includes(id) && !g.fails.length) : null;
   (cols || []).forEach(x => {
     const o = S.dsgCol[x.id]; if (!o || !o.rebar) return; if (!o.ok) { skip++; return; }
     const g = gOf(x.id), k = g && g.cand, ck = g && dsgColChk(x, o, k);
@@ -814,7 +815,7 @@ function footReport(x, o) {
 // ------------------------------------------------------------------ จัดกลุ่มชนิด (M4b · Earth 28 พ.ย. 2569)
 // ออกแบบรายชิ้นจากแรงของตัวเอง (ข้างบน) → จัดเป็นชนิด: ชื่อในแบบ = กลุ่ม (ตรวจเหล็กในแบบด้วย) · ไม่มีชื่อ = ตามขนาด ≤ maxTypes ชนิด (lib/dsggroup.js)
 const COL_LAYOUTS = [[4, 4], [6, 4], [4, 6], [6, 6], [8, 6], [6, 8], [8, 8], [10, 8], [8, 10], [10, 10]];
-const GRP_CAT_TH = { C: 'เสา', PD: 'ตอม่อ', F: 'ฐานแผ่' };
+const GRP_CAT_TH = { B: 'คาน', GB: 'คานคอดิน', C: 'เสา', PD: 'ตอม่อ', F: 'ฐานแผ่' };
 function dsgGrpOpt() { const D = dsg(); D.grp = Object.assign({ maxTypes: 3, byMark: true, apply: true }, D.grp || {}); D.grp.assign = D.grp.assign || {}; return D.grp; }
 /** ตรวจเสา x ด้วยเหล็ก cand {dMain, nX, nY, dTie} กับแรงของเสา x ทุกชุด → {ok, ratio} */
 function dsgColChk(x, o, cand) {
@@ -838,10 +839,35 @@ function dsgFootChk(x, o, cand) {
   }
   return { ok, ratio, r: r0 };
 }
+/** ตรวจคานด้วยเหล็ก rb (รูปแบบ .bm.json) กับแรงของคานนั้น */
+function dsgBeamChk(bm, o, rb) { const r = RcWsd.beamCheckRebar(o.inp.f, o.g, o.crit, rb); return { ok: r.ok, ratio: r.ratio }; }
+/** น้ำหนักเหล็กคานต่อเมตรโดยประมาณ (ใช้เรียงชนิด): เหล็กยืนตามสัดส่วนความยาวแบบ takeoff + ปลอก */
+function dsgBeamKg(rb, b, h) {
+  const A = x => x ? +x[0] * RcWsd.barArea(+x[1]) : 0, st = rb.stirrup || [6, 0.2];
+  const lon = A(rb.top) + A(rb.bot) + A(rb.extra_top) * 2 / 3 + A(rb.extra_bot) * 0.75;
+  const stir = RcWsd.barArea(+st[0]) * (rb.double_stirrup ? 2 : 1) * 2 * (b + h) * 100 / (+st[1] * 100);
+  return (lon + stir) * 0.785;
+}
+/** แบบรวมรายส่วน (ค่ามากสุดของทุกชิ้น) — ใช้เมื่อไม่มีแบบของชิ้นใดผ่านทุกชิ้นในชนิด */
+function dsgBeamMerge(rbs) {
+  const dm = Math.max(...rbs.flatMap(r => [+r.top[1], +r.bot[1]])), Ad = RcWsd.barArea(dm), A = x => x ? +x[0] * RcWsd.barArea(+x[1]) : 0, nOf = a => Math.ceil(a / Ad - 1e-9);
+  const top = Math.max(2, ...rbs.map(r => nOf(A(r.top)))), bot = Math.max(2, ...rbs.map(r => nOf(A(r.bot))));
+  const supT = Math.max(...rbs.map(r => nOf(A(r.top) + A(r.extra_top)))), botT = Math.max(...rbs.map(r => nOf(A(r.bot) + A(r.extra_bot))));
+  const sd = Math.max(...rbs.map(r => +r.stirrup[0])), ss = Math.min(...rbs.map(r => +r.stirrup[1]));
+  const o = { top: [top, dm], bot: [bot, dm], stirrup: [sd, ss, ss] };
+  if (supT > top) o.extra_top = [supT - top, dm];
+  if (botT > bot) o.extra_bot = [botT - bot, dm];
+  if (rbs.some(r => r.double_stirrup)) o.double_stirrup = true;
+  return o;
+}
+const dsgColMerge = ks => { const m = { dMain: Math.max(...ks.map(k => k.dMain)), nX: Math.max(...ks.map(k => k.nX)), nY: Math.max(...ks.map(k => k.nY)), dTie: Math.max(...ks.map(k => k.dTie)) };
+  return Object.assign(m, { sTie: Math.min(...ks.map(k => k.sTie)) }); };
+const dsgFootMerge = ks => ({ dLong: Math.max(...ks.map(k => k.dLong)), sLong: Math.min(...ks.map(k => k.sLong)), dShort: Math.max(...ks.map(k => k.dShort)), sShort: Math.min(...ks.map(k => k.sShort)) });
 /** เหล็กในแบบ (design status from_drawing) → แบบที่ตรวจได้ · เสา 6/10 เส้นวางได้สองทิศ → ลองทั้งสอง */
 function dsgDrawCand(kind, x) {
-  const d = kind === 'col' ? ((S.model.design || {}).members || {})[x.id] : ((S.model.design || {}).supports || {})[x.id], fy = +dsg().crit.fy;
+  const d = kind === 'foot' ? ((S.model.design || {}).supports || {})[x.id] : ((S.model.design || {}).members || {})[x.id], fy = +dsg().crit.fy;
   if (!d || d.status !== 'from_drawing' || !d.rebar) return null;
+  if (kind === 'beam') return d.rebar.top && d.rebar.bot && d.rebar.stirrup ? { lays: [d.rebar], text: rbText(d.rebar, fy) } : null;
   if (kind === 'col') {
     const mn = d.rebar.main, st = d.rebar.stirrup || [6, 0.2]; if (!mn) return null;
     const lays = COL_LAYOUTS.filter(([a, b]) => a + b - 4 === +mn[0]).map(([nX, nY]) => ({ dMain: +mn[1], nX, nY, dTie: +st[0], sTie: +st[1] }));
@@ -850,9 +876,14 @@ function dsgDrawCand(kind, x) {
   const bx = d.rebar.bars_x, by = d.rebar.bars_y; if (!bx || !by || +bx[0] < 2 || +by[0] < 2) return null;
   return { lays: [{ dLong: +bx[1], sLong: x.By / (+bx[0] - 1), dShort: +by[1], sShort: x.Bx / (+by[0] - 1) }], text: `${bx[0]}-${RcWsd.barName(+bx[1], fy)} × ${by[0]}-${RcWsd.barName(+by[1], fy)}` };
 }
-function dsgGroups(cols, foots) {
+function dsgGroups(cols, foots, beams = []) {
   const G = dsgGrpOpt(), m = S.model, supN = new Set((m.supports || []).map(s => s.node)), mem = Object.fromEntries((m.members || []).map(x => [x.id, x]));
-  const ci = [], cx = {}, fi = [], fx = {};
+  const ci = [], cx = {}, fi = [], fx = {}, bi = [], bx = {};
+  beams.forEach(bm => {
+    const o = S.dsgOut[bm.id]; if (!o || !o.rebar || !o.ok) return;
+    bx[bm.id] = { x: bm, o };
+    bi.push({ id: bm.id, cat: bm.kind === 'tie_beam' ? 'GB' : 'B', size: `${df2(bm.b * 100, 0)}×${df2(bm.h * 100, 0)} ซม.`, mark: bm.mark || '', score: dsgBeamKg(o.rebar, bm.b, bm.h), cand: o.rebar });
+  });
   cols.forEach(x => {
     const o = S.dsgCol[x.id]; if (!o || !o.d || !o.ok) return;
     const mm = mem[x.id], cat = mm && (supN.has(mm.i) || supN.has(mm.j)) ? 'PD' : 'C';
@@ -865,23 +896,25 @@ function dsgGroups(cols, foots) {
     fi.push({ id: x.id, cat: 'F', size: `${df2(x.Bx)}×${df2(x.By)}×${df2(x.t)} ม.`, mark: x.mark || '', score: o.r.AL + o.r.AS, cand: { dLong: o.p.dLong, sLong: o.p.sLong, dShort: o.p.dShort, sShort: o.p.sShort } });
   });
   const opt = { maxTypes: +G.maxTypes || 3, byMark: G.byMark !== false, assign: G.assign };
-  const gc = DsgGroup.group(ci, (id, k) => dsgColChk(cx[id].x, cx[id].o, k), opt).map(g => Object.assign(g, { kind: 'col' }));
-  const gf = DsgGroup.group(fi, (id, k) => dsgFootChk(fx[id].x, fx[id].o, k), opt).map(g => Object.assign(g, { kind: 'foot' }));
-  for (const g of [...gc, ...gf]) {   // ตรวจเหล็กในแบบ (เส้นทาง ก.)
+  const gc = DsgGroup.group(ci, (id, k) => dsgColChk(cx[id].x, cx[id].o, k), Object.assign({ merge: dsgColMerge }, opt)).map(g => Object.assign(g, { kind: 'col' }));
+  const gb = DsgGroup.group(bi, (id, k) => dsgBeamChk(bx[id].x, bx[id].o, k), Object.assign({ merge: dsgBeamMerge, score: (k, its) => dsgBeamKg(k, bx[its[0].id].x.b, bx[its[0].id].x.h) }, opt)).map(g => Object.assign(g, { kind: 'beam' }));
+  const gf = DsgGroup.group(fi, (id, k) => dsgFootChk(fx[id].x, fx[id].o, k), Object.assign({ merge: dsgFootMerge }, opt)).map(g => Object.assign(g, { kind: 'foot' }));
+  for (const g of [...gb, ...gc, ...gf]) {   // ตรวจเหล็กในแบบ (เส้นทาง ก.)
     const texts = new Set(), bad = []; let n = 0;
     for (const id of g.ids) {
-      const e = g.kind === 'col' ? cx[id] : fx[id], dc = dsgDrawCand(g.kind, e.x); if (!dc) continue;
+      const e = (g.kind === 'col' ? cx : g.kind === 'beam' ? bx : fx)[id], dc = dsgDrawCand(g.kind, e.x); if (!dc) continue;
       n++; texts.add(dc.text);
-      if (!dc.lays.some(l => (g.kind === 'col' ? dsgColChk(e.x, e.o, l) : dsgFootChk(e.x, e.o, l)).ok)) bad.push(id);
+      if (!dc.lays.some(l => (g.kind === 'col' ? dsgColChk(e.x, e.o, l) : g.kind === 'beam' ? dsgBeamChk(e.x, e.o, l) : dsgFootChk(e.x, e.o, l)).ok)) bad.push(id);
     }
     g.draw = n ? { n, text: [...texts].join(' / '), bad } : null;
   }
-  const notIn = cols.filter(x => !cx[x.id] && S.dsgCol[x.id] && S.dsgCol[x.id].r).map(x => x.id).concat(foots.filter(x => !fx[x.id] && S.dsgFoot[x.id] && S.dsgFoot[x.id].r).map(x => x.id));
-  S.dsgGrp = { groups: [...gc, ...gf], cx, fx, notIn };
+  const notIn = beams.filter(x => !bx[x.id] && S.dsgOut[x.id] && S.dsgOut[x.id].rebar).map(x => x.id).concat(cols.filter(x => !cx[x.id] && S.dsgCol[x.id] && S.dsgCol[x.id].r).map(x => x.id).concat(foots.filter(x => !fx[x.id] && S.dsgFoot[x.id] && S.dsgFoot[x.id].r).map(x => x.id)));
+  S.dsgGrp = { groups: [...gb, ...gc, ...gf], bx, cx, fx, notIn };
   return S.dsgGrp;
 }
 function grpRebarText(g) {
   const fy = +dsg().crit.fy, k = g.cand;
+  if (g.kind === 'beam') return rbText(k, fy);
   if (g.kind === 'col') return `${k.nX + k.nY - 4}-${RcWsd.barName(k.dMain, fy)} · ปลอก RB ${k.dTie} @${k.sTie}`;
   const e = S.dsgGrp.fx[g.gov], r = dsgFootChk(e.x, e.o, k).r;
   return `แนว x ${r.nL}-${RcWsd.barName(k.dLong, fy)} @${+(+k.sLong).toFixed(3)} · แนว y ${r.nS}-${RcWsd.barName(k.dShort, fy)} @${+(+k.sShort).toFixed(3)}`;
@@ -894,10 +927,10 @@ function grpCard() {
     const chips = g.ids.map(id => `<span class="grp-chip">${esc(id)}${id === g.gov ? ' ★' : ''} <span class="hint">${df2(g.util[id], 2)}</span><select data-gmove="${esc(id)}" title="ย้ายไปชนิด">${[`<option value="">${G.assign[id] ? 'คืนอัตโนมัติ' : '⇄'}</option>`].concat(names(g.kind).map(nm => `<option value="${esc(nm)}" ${G.assign[id] === nm ? 'selected' : ''}>${esc(nm)}</option>`), ['<option value="__new">+ ชนิดใหม่…</option>']).join('')}</select></span>`).join(' ');
     const dr = g.draw ? (g.draw.bad.length ? `<span class="warnline">${esc(g.draw.text)} — ไม่พอ ${g.draw.bad.length}/${g.draw.n} ชิ้น: ${esc(g.draw.bad.join(', '))}</span>` : `${esc(g.draw.text)} <span class="pill ok">พอ ${g.draw.n} ชิ้น</span>`) : '<span class="hint">-</span>';
     return `<tr><td class="c-name"><b>${esc(g.name)}</b>${g.fromMark ? ' <span class="src">ตามแบบ</span>' : g.fixed ? ' <span class="src">ตั้งเอง</span>' : ''}</td><td>${GRP_CAT_TH[g.cat] || g.cat}</td><td>${esc(g.size)}${g.sizes.length > 1 ? '<span class="warnline">ขนาดไม่เท่ากันในชนิดเดียวกัน</span>' : ''}</td><td class="r">${g.ids.length}</td>
-      <td class="dsg-rb">${grpRebarText(g)}${g.fails.length ? `<span class="warnline">ไม่ผ่าน: ${esc(g.fails.join(', '))} — แยกชนิดหรือเพิ่มเหล็ก</span>` : ''}</td><td class="r">${df2(umax, 2)}</td><td class="dsg-rb">${dr}</td><td class="grp-ids">${chips}</td></tr>`;
+      <td class="dsg-rb">${grpRebarText(g)}${g.merged ? '<span class="hint">รวมรายส่วน (ไม่มีแบบของชิ้นใดผ่านทุกชิ้น)</span>' : ''}${g.fails.length ? `<span class="warnline">ไม่ผ่าน: ${esc(g.fails.join(', '))} — แยกชนิดหรือเพิ่มเหล็ก</span>` : ''}</td><td class="r">${df2(umax, 2)}</td><td class="dsg-rb">${dr}</td><td class="grp-ids">${chips}</td></tr>`;
   }).join('');
-  return `<div class="card"><h2>ชนิดเสา/ตอม่อ/ฐานราก (จัดกลุ่ม) <span class="hint">${R.groups.length} ชนิด</span></h2>
-    <p class="hint">ออกแบบแต่ละชิ้นจากแรงของตัวเองก่อน แล้วจัดเป็นชนิด · ชิ้นที่มีชื่อในแบบ (เช่น C1, F2) ใช้ชื่อในแบบเป็นกลุ่ม และตรวจว่าเหล็กในแบบพอทุกชิ้นไหม · ไม่มีชื่อ = ตามขนาดเดียวกัน แบ่งตามปริมาณเหล็กไม่เกินจำนวนชนิดที่ตั้ง ให้เหล็กเผื่อรวมน้อยสุด · เหล็กของชนิด = แบบที่เหล็กน้อยสุดซึ่งผ่านทุกชิ้นในชนิด (★ = ชิ้นที่คุม · ตัวเลขข้างชื่อชิ้น = อัตราส่วนใช้งานเมื่อใช้เหล็กของชนิด)</p>
+  return `<div class="card"><h2>ชนิดคาน/เสา/ตอม่อ/ฐานราก (จัดกลุ่ม) <span class="hint">${R.groups.length} ชนิด</span></h2>
+    <p class="hint">ออกแบบแต่ละชิ้นจากแรงของตัวเองก่อน แล้วจัดเป็นชนิด · ชิ้นที่มีชื่อในแบบ (เช่น B1, C1, F2) ใช้ชื่อในแบบเป็นกลุ่ม และตรวจว่าเหล็กในแบบพอทุกชิ้นไหม · ไม่มีชื่อ = ตามขนาดเดียวกัน แบ่งตามปริมาณเหล็กไม่เกินจำนวนชนิดที่ตั้ง ให้เหล็กเผื่อรวมน้อยสุด · เหล็กของชนิด = แบบที่เหล็กน้อยสุดซึ่งผ่านทุกชิ้นในชนิด (★ = ชิ้นที่คุม · ตัวเลขข้างชื่อชิ้น = อัตราส่วนใช้งานเมื่อใช้เหล็กของชนิด)</p>
     <div class="grp-opt"><label>จำนวนชนิดสูงสุดต่อกลุ่มขนาด <input data-grp="maxTypes" inputmode="numeric" value="${esc(G.maxTypes)}"></label>
       <label class="ck"><input type="checkbox" data-grp="byMark" ${G.byMark !== false ? 'checked' : ''}> ใช้ชื่อชนิดในแบบเป็นกลุ่ม</label>
       <label class="ck"><input type="checkbox" data-grp="apply" ${G.apply ? 'checked' : ''}> เขียนเหล็กลงโมเดลตามชนิด (ชนิดที่ผ่านทุกชิ้น)</label></div>

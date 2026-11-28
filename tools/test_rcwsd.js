@@ -144,6 +144,19 @@ console.log(`  ฐาน: ${fd.p.Bx}×${fd.p.By}×${fd.p.t} DB${fd.p.dLong}@${fd
   check('ฐานหลายชุด ขนาด ≥ ทุกชุดเดี่ยว', fsg.every(x => fm.p.Bx >= x.p.Bx - 1e-9 && fm.p.t >= x.p.t - 1e-9), JSON.stringify(fsg.map(x => [x.p.Bx, x.p.t])));
 }
 
+// M4b: ตรวจคานด้วยเหล็กที่กำหนด = ผลของ beamDesign เมื่อใส่เหล็กที่ beamDesign เลือก · เหล็กน้อยลงต้องไม่ผ่าน
+{
+  const cr = W.criteria({ fcp: 210, F: 0.45, mode: 1, fy: 4000, fyv: 2400 }); let nb = 0;
+  for (const f of [{ Mpos: 1500, Mneg: 1850, V: 4200, T: 0 }, { Mpos: 1200, Mneg: 1800, V: 2500, T: 80 }, { Mpos: 4000, Mneg: 6000, V: 7000, T: 0 }, { Mpos: 300, Mneg: 0, V: 600, T: 0 }])
+    for (const g of [{ b: 0.2, h: 0.4, L: 4.5, type: 3, cov: 3 }, { b: 0.2, h: 0.4, L: 4, type: 2, cov: 3 }, { b: 0.25, h: 0.5, L: 5, type: 1, cov: 3 }, { b: 0.2, h: 0.4, L: 1.5, type: 4, cov: 3 }]) {
+      const d = W.beamDesign(f, g, cr, { dias: [12, 16, 20] }); if (!d.rebar) continue; nb++;
+      const c = W.beamCheckRebar(f, g, cr, d.rebar);
+      check(`คานตรวจเหล็กที่กำหนด ${nb}`, c.ok === d.ok && near(c.ratio, d.ratio), `${c.ok}/${d.ok} ${c.ratio}/${d.ratio}`);
+    }
+  const f = { Mpos: 4000, Mneg: 6000, V: 7000, T: 0 }, g = { b: 0.2, h: 0.4, L: 4.5, type: 3, cov: 3 };
+  check('คานเหล็กน้อยไม่ผ่าน', !W.beamCheckRebar(f, g, cr, { top: [2, 12], bot: [2, 12], stirrup: [6, 0.2] }).ok);
+}
+
 // บันไดท้องเรียบ (Stair1–3 ฉบับแก้)
 require('./rcwsd_stair_cases.json').cases.forEach((cs, i) => {
   const p = cs.input, e = cs.expect, cr = W.criteria(p), r = W.slabStair(p, cr);

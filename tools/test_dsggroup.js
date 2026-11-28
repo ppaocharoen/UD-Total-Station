@@ -30,6 +30,9 @@ check('ย้ายเอง: a,g อยู่ C20 ใช้เหล็กข�
 // แบบที่ผ่านทุกชิ้นไม่ใช่ตัวเหล็กมากสุดเสมอ (ทิศเหล็ก): x ต้องการทิศ X, y ต้องการทิศ Y → ไม่มีแบบเดียวผ่าน → fails
 const dir = [{ id: 'x', cat: 'C', size: 's', score: 5, cand: { As: 5, d: 'X' } }, { id: 'y', cat: 'C', size: 's', score: 6, cand: { As: 6, d: 'Y' } }];
 g = G.group(dir, (id, c) => ({ ok: c.d === id.toUpperCase(), ratio: 1 }), { maxTypes: 1 });
+const gm = G.group([{ id: 'x', cat: 'B', size: 's', score: 5, cand: { t: 3, s: 2 } }, { id: 'y', cat: 'B', size: 's', score: 6, cand: { t: 2, s: 4 } }],
+  (id, c) => ({ ok: id === 'x' ? c.t >= 3 : c.s >= 4, ratio: id === 'x' ? 3 / c.t : 4 / c.s }), { maxTypes: 1, merge: cs => ({ t: Math.max(...cs.map(c => c.t)), s: Math.max(...cs.map(c => c.s)) }), score: c => c.t + c.s });
+check('แบบรวมรายส่วนเมื่อไม่มีแบบเดี่ยวผ่าน', gm.length === 1 && gm[0].merged && !gm[0].fails.length && gm[0].cand.t === 3 && gm[0].cand.s === 4, JSON.stringify(gm));
 check('ไม่มีแบบผ่านทุกชิ้น → ใช้เหล็กมากสุด + รายชื่อไม่ผ่าน', g.length === 1 && g[0].cand.d === 'Y' && g[0].fails.join() === 'x', JSON.stringify(g));
 // หมวดต่างกันไม่ปนกัน
 g = G.group([{ id: 'p', cat: 'PD', size: '30×30', score: 3, cand: { As: 3 } }, { id: 'q', cat: 'C', size: '30×30', score: 3, cand: { As: 3 } }], (id, c) => ({ ok: true, ratio: 1 }));
