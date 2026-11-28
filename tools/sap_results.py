@@ -10,6 +10,8 @@
   - members: {id: {P, V2, V3, T, M2, M3: {max, min, at_max, at_min, combo_max, combo_min}}}
     ห่อหุ้มจากชุดผสม (combos ใน .bm.json) ถ้ามี; ถ้าไม่มีชุดผสมเลยใช้ทุก load case
     at_* = ระยะจากปลาย i (ม.) ตามสถานีของ SAP
+  - by_combo: {id: {combo: {"i": [P, M2, M3], "j": [P, M2, M3]}}}  เฉพาะเสา คสล. (type column) — แรงพร้อมกันที่ปลายเสา
+    รายชุดผสม ให้หน้าออกแบบตรวจทุกชุด (M4b 28 พ.ย. 2569) · i = สถานีแรก, j = สถานีสุดท้าย
   - reactions: {joint: {case/combo: [F1, F2, F3, M1, M2, M3]}}  ทุก case และ combo
   - displacements: {joint: {combo: [U1, U2, U3]}}  เฉพาะชุดผสม (หรือทุก case ถ้าไม่มีชุดผสม)
   - model_hash: จากไฟล์ประกอบ .sap.json ที่ตัวส่งออกเขียนไว้ (ถ้าไม่มีใช้ hash ปัจจุบันพร้อมเตือน)
@@ -75,6 +77,8 @@ def build(m, tables, sidecar=None):
 
     env = {}
     unknown = set()
+    cols = {x["id"] for x in m.get("members", []) if x.get("type") == "column"}
+    ends = {}   # (frame, combo) -> {"i": (station, row), "j": (station, row)}
     for r in ef:
         f = r["Frame"]
         if f not in members:
@@ -82,6 +86,10 @@ def build(m, tables, sidecar=None):
             continue
         if r["OutputCase"] not in use:
             continue
+        if f in cols and not r.get("StepType"):
+            st = float(r["Station"]); e2 = ends.setdefault((f, r["OutputCase"]), {})
+            if "i" not in e2 or st < e2["i"][0]: e2["i"] = (st, r)
+            if "j" not in e2 or st > e2["j"][0]: e2["j"] = (st, r)
         # ชุดผสมแบบ envelope ใน SAP มี StepType Max/Min; แบบ linear add มีบรรทัดเดียว
         e = env.setdefault(f, {})
         for c in COMP:
@@ -96,6 +104,9 @@ def build(m, tables, sidecar=None):
         for d in f.values():
             for k in ("max", "min", "at_max", "at_min"):
                 d[k] = r4(d[k])
+    by_combo = {}
+    for (f, c), e2 in sorted(ends.items()):
+        by_combo.setdefault(f, {})[c] = {k: [r4(e2[k][1][x]) for x in ("P", "M2", "M3")] for k in ("i", "j")}
     if unknown:
         warn.append("ชิ้นส่วนใน SAP ที่ไม่มีใน .bm.json (ไม่ได้อ่าน): " + ", ".join(sorted(unknown)[:10]))
     from sap_export import Exporter
@@ -131,6 +142,8 @@ def build(m, tables, sidecar=None):
         warn.append("ไม่พบไฟล์ .sap.json — ใช้ hash ปัจจุบัน ต้องแน่ใจว่าวิเคราะห์จากโมเดลล่าสุด")
     res = {"source": sidecar.get("s2k") if sidecar else None, "analyzed_at": datetime.now().isoformat(timespec="seconds"),
            "model_hash": h, "stale": h != h_now, "cases_used": use, "members": env, "reactions": reac}
+    if by_combo:
+        res["by_combo"] = by_combo
     if merged:
         res["merged"] = merged
     if disp:

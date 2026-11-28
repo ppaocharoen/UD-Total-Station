@@ -56,6 +56,19 @@ mm_ = res["members"]["B1-ROOF-01"]["M3"]
 check("โมเมนต์คานหลังคา B1-ROOF-01", abs(mm_["min"] + 336.8149) < 1e-3 and abs(mm_["max"] - 209.0206) < 1e-3,
       json.dumps(mm_, ensure_ascii=False))
 
+
+# M4b (28 พ.ย. 2569): แรงรายชุดผสมที่ปลายเสา — ต้องอยู่ในกรอบ envelope และค่าสุดของ envelope ต้องพบที่ปลายเสา
+bc = res.get("by_combo") or {}
+colids = [x["id"] for x in m["members"] if x.get("type") == "column"]
+check("by_combo ครบทุกเสา", colids and set(bc) == set(colids), sorted(set(colids) - set(bc))[:5])
+ok = True
+for cid, d in bc.items():
+    env_ = res["members"][cid]
+    for comp, k in (("P", 0), ("M2", 1), ("M3", 2)):
+        vals = [v[e][k] for v in d.values() for e in ("i", "j")]
+        ok &= min(vals) >= env_[comp]["min"] - 1e-3 and max(vals) <= env_[comp]["max"] + 1e-3
+check("by_combo อยู่ในกรอบ envelope", ok)
+
 m2 = json.loads(json.dumps(m))
 m2["results"] = res
 r = validate(m2)
