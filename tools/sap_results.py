@@ -15,6 +15,9 @@
   - steel_combo: {id: {combo: [[station, P, V2, V3, T, M2, M3], ...]}}  ชิ้นเหล็ก (M6 28 พ.ย. 2569) — แรงพร้อมกันรายชุดผสม
     เก็บเฉพาะสถานีวิกฤตของแต่ละชุด: ปลาย i, ปลาย j, P/M2/M3 มากสุดและน้อยสุด, |M3|/M3max+|M2|/M2max สูงสุด, |V2|, |V3| สูงสุด
     (ซ้ำกันเก็บครั้งเดียว · เรียงตามสถานี) ให้หน้าออกแบบตรวจ ASD ทุกชุด
+  - frame_joints: {id: [joint, ...]}  ชิ้นเหล็กที่ SAP แบ่งเป็นหลาย element (จุดต่อกับชิ้นอื่น เช่น แปบนจันทัน) เรียงจากปลาย i → j
+    จากตาราง Objects And Elements - Frames (ไม่บังคับ) · ใช้หาระยะค้ำยัน/ความยาวโก่งเดาะ และจุดวัดการโก่งตัว
+  - aux_joints: {joint: [x, y, z]}  จุดต่อที่ SAP สร้างเอง (ไม่มีใน nodes) จาก Objects And Elements - Joints — มีการเคลื่อนที่ใน displacements ด้วย
   - reactions: {joint: {case/combo: [F1, F2, F3, M1, M2, M3]}}  ทุก case และ combo
   - displacements: {joint: {combo: [U1, U2, U3]}}  เฉพาะชุดผสม (หรือทุก case ถ้าไม่มีชุดผสม)
   - model_hash: จากไฟล์ประกอบ .sap.json ที่ตัวส่งออกเขียนไว้ (ถ้าไม่มีใช้ hash ปัจจุบันพร้อมเตือน)
@@ -61,7 +64,10 @@ def read_tables(path):
     import openpyxl
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     out = {}
+    skip = {"Element Stresses - Frames", "Element Joint Forces - Frames", "Assembled Joint Masses"}   # ไม่ใช้ — ข้ามให้อ่านเร็ว
     for ws in wb.worksheets:
+        if ws.title.strip() in skip:
+            continue
         rows = list(ws.iter_rows(values_only=True))
         if len(rows) < 3:
             continue
@@ -160,11 +166,31 @@ def build(m, tables, sidecar=None):
         key = r["OutputCase"] + ("" if not r.get("StepType") else "/" + str(r["StepType"]))
         reac.setdefault(j, {})[key] = [r4(r[k]) for k in ("F1", "F2", "F3", "M1", "M2", "M3")]
 
+    # จุดแบ่ง element ของชิ้นเหล็ก (M6)
+    fjoints, aux = {}, {}
+    oj, of = tables.get("Objects And Elements - Joints"), tables.get("Objects And Elements - Frames")
+    if oj and of:
+        xyz = {r["JointElem"]: [r4(r["GlobalX"]), r4(r["GlobalY"]), r4(r["GlobalZ"])] for r in oj["rows"]}
+        ncoord = {n["id"]: [n["x"], n["y"], n["z"]] for n in m.get("nodes", [])}
+        segs = {}
+        for r in of["rows"]:
+            if r["FrameObject"] in steel:
+                segs.setdefault(r["FrameObject"], set()).update((r["ElemJtI"], r["ElemJtJ"]))
+        mem = {x["id"]: x for x in m.get("members", [])}
+        for f, js in segs.items():
+            if len(js) <= 2:
+                continue
+            p0 = ncoord.get(mem[f]["i"]) or xyz.get(mem[f]["i"])
+            pts = [(sum((a - b) ** 2 for a, b in zip(xyz.get(j) or ncoord.get(j), p0)), j) for j in js if (xyz.get(j) or ncoord.get(j))]
+            fjoints[f] = [j for _, j in sorted(pts)]
+            for j in fjoints[f]:
+                if j not in nodes and j in xyz:
+                    aux[j] = xyz[j]
     disp = {}
     jd = tables.get("Joint Displacements")
     if jd:
         for r in jd["rows"]:
-            if r["Joint"] in nodes and r["OutputCase"] in use:
+            if (r["Joint"] in nodes or r["Joint"] in aux) and r["OutputCase"] in use:
                 key = r["OutputCase"] + ("" if not r.get("StepType") else "/" + str(r["StepType"]))
                 disp.setdefault(r["Joint"], {})[key] = [round(float(r[k]), 6) for k in ("U1", "U2", "U3")]
 
@@ -182,6 +208,10 @@ def build(m, tables, sidecar=None):
         res["by_combo"] = by_combo
     if steel_combo:
         res["steel_combo"] = steel_combo
+    if fjoints:
+        res["frame_joints"] = fjoints
+    if aux:
+        res["aux_joints"] = aux
     if merged:
         res["merged"] = merged
     if disp:
@@ -192,17 +222,25 @@ def build(m, tables, sidecar=None):
 
 
 def dump_model(m, path):
-    """เขียน .bm.json (indent=1 ตามเดิม) แต่แถว steel_combo อยู่บรรทัดเดียว — ไม่ให้ไฟล์บวมเป็นแสนบรรทัด"""
+    """เขียน .bm.json (indent=1 ตามเดิม) แต่แถว steel_combo / displacements / aux_joints อยู่บรรทัดเดียว — ไม่ให้ไฟล์บวมเป็นแสนบรรทัด"""
+    import re
     res = m.get("results") or {}
-    sc = res.get("steel_combo")
-    if sc:
-        res["steel_combo"] = {f: {c: ["@@%s@@" % json.dumps(r, separators=(",", ":")) for r in rows] for c, rows in d.items()}
-                              for f, d in sc.items()}
-    txt = json.dumps(m, ensure_ascii=False, indent=1)
-    if sc:
-        res["steel_combo"] = sc
-        import re
-        txt = re.sub(r'"@@(\[[^"]*\])@@"', r"\1", txt)
+    keep = {}
+    mark = lambda r: "@@%s@@" % json.dumps(r, separators=(",", ":"))
+    if res.get("steel_combo"):
+        keep["steel_combo"] = res["steel_combo"]
+        res["steel_combo"] = {f: {c: [mark(r) for r in rows] for c, rows in d.items()} for f, d in keep["steel_combo"].items()}
+    if res.get("displacements"):
+        keep["displacements"] = res["displacements"]
+        res["displacements"] = {j: {c: mark(v) for c, v in d.items()} for j, d in keep["displacements"].items()}
+    if res.get("aux_joints"):
+        keep["aux_joints"] = res["aux_joints"]
+        res["aux_joints"] = {j: mark(v) for j, v in keep["aux_joints"].items()}
+    try:
+        txt = json.dumps(m, ensure_ascii=False, indent=1)
+    finally:
+        res.update(keep)
+    txt = re.sub(r'"@@(\[[^"]*\])@@"', r"\1", txt)
     open(path, "w", encoding="utf-8").write(txt)
 
 

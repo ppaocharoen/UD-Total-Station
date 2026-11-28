@@ -207,5 +207,14 @@ check("ลม: แรงบนแปทิศ Local 2 · แรงบนเส�
 check("ลม: กลุ่มลมเป็น Wind ใน SAP · ชุดผสม 50", sum("DesignType=Wind" in r for r in Tw["LOAD PATTERN DEFINITIONS"]) == 16
       and len({re.search(r"ComboName=(\S+)", r).group(1) for r in Tw["COMBINATION DEFINITIONS"]}) == len(t12w["combos"]))
 
+# M6 (28 พ.ย. 2569): ผล ท12 มีจุดแบ่ง element ของชิ้นเหล็ก + การเคลื่อนที่ของจุดที่ SAP สร้างเอง
+_r = t12["results"]
+_nodes = {n["id"] for n in t12["nodes"]}
+_fj = _r.get("frame_joints") or {}
+check("ท12 frame_joints จันทัน/แป", "RF-05c" in _fj and len(_fj["PL-R1-05"]) == 15, len(_fj))
+check("ท12 จุดใน frame_joints มีพิกัดและการเคลื่อนที่ครบทุกชุด",
+      all((j in _nodes or j in _r["aux_joints"]) and len(_r["displacements"].get(j, {})) == len(_r["cases_used"]) for js in _fj.values() for j in js))
+check("ท12 steel_combo ครบ 102 ชิ้น × 50 ชุด", len(_r["steel_combo"]) == 102 and all(len(v) == 50 for v in _r["steel_combo"].values()))
+
 print("\nทั้งหมดผ่าน" if ok else "\nมีที่ไม่ผ่าน")
 sys.exit(0 if ok else 1)

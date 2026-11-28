@@ -2669,6 +2669,28 @@
           },
           "description": "{node: {combo: [Fx..Mz]}}"
         },
+        "frame_joints": {
+          "type": "object",
+          "description": "ชิ้นเหล็กที่ SAP แบ่ง element: {member: [joint จากปลาย i → j]} (จุดต่อกับชิ้นอื่น) — ใช้หาระยะค้ำยันและจุดวัดการโก่งตัว",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "aux_joints": {
+          "type": "object",
+          "description": "จุดต่อที่ SAP สร้างเอง (ไม่มีใน nodes): {joint: [x, y, z]}",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          }
+        },
         "steel_combo": {
           "type": "object",
           "description": "ชิ้นเหล็ก: {member: {combo: [[station ม., P, V2, V3, T, M2, M3], ...]}} แรงพร้อมกันที่สถานีวิกฤต (ปลาย i/j, P/M2/M3 มาก-น้อยสุด, |V| สูงสุด) — tools/sap_results.py",
