@@ -85,7 +85,7 @@ function renderDesign() {
   S.dsgFoot = {}; foots.forEach(x => { S.dsgFoot[x.id] = dsgFootRun(x); });
   S.dsgPile = {}; piles.forEach(x => { S.dsgPile[x.id] = dsgPileRun(x); });
   S.dsgStrap = {}; foots.forEach(x => { const pid = ((D.foots || {})[x.id] || {}).strap, y = pid && foots.find(f => f.id === pid && f.id !== x.id); if (y) { const r = dsgStrapRun(x, y); S.dsgStrap[x.id] = r; if (r.ext) { S.dsgFoot[x.id] = r.ext; S.dsgFoot[y.id] = r.int; } } });
-  dsgGroups(cols, foots, beams);
+  dsgGroups(cols, foots, beams, piles);
   const retains = dsgRetainList(); S.dsgRetain = {}; retains.forEach(x => { S.dsgRetain[x.id] = dsgRetainRun(x); });
   const plates = dsgPlateList(); S.dsgPlate = {}; plates.forEach(x => { S.dsgPlate[x.id] = dsgPlateRun(x); });
   const stairs = dsgStairList(); S.dsgStair = {}; stairs.forEach(x => { S.dsgStair[x.id] = dsgStairRun(x); });
@@ -244,7 +244,8 @@ function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains = []
   (piles || []).forEach(x => {
     const o = S.dsgPile[x.id]; if (!o || !o.rebar) return; if (!o.ok) { skip++; return; }
     D.appliedPiles = D.appliedPiles || {}; D.appliedPiles[x.id] = o.spec; dsgPileSpec(m, x.id, o.spec, o.r.n, o.r.pileInfo.code);
-    m.design.supports[x.id] = D.appliedSup[x.id] = { method: 'WSD', rebar: o.rebar, pass: !!o.ok, governing: o.label, status: 'computed',
+    const g = gOf(x.id), gr = g && dsgPileChk(x, o, g.cand).r, rb = g ? pileRebar(gr, Object.assign({}, o.p, g.cand)).rebar : o.rebar;
+    m.design.supports[x.id] = D.appliedSup[x.id] = { method: 'WSD', rebar: rb, pass: !!o.ok, governing: g ? `ชนิด ${g.name} (คุมโดย ${g.gov}) · ${o.label}` : o.label, status: 'computed', ...(g ? { group: g.name } : {}),
       src: `UD Total Station v${UD_VERSION.v} ออกแบบฐานรากเสาเข็ม WSD (${o.r.n} ต้น ${o.r.pileInfo.code} รับ ${df2(o.p.cap, 0)} กก./ต้น, ${o.crit.main.grade}, หุ้ม ${c.ftCov} ซม.)` };
     nf++;
   });
@@ -821,7 +822,7 @@ function footReport(x, o) {
 // ------------------------------------------------------------------ จัดกลุ่มชนิด (M4b · Earth 28 พ.ย. 2569)
 // ออกแบบรายชิ้นจากแรงของตัวเอง (ข้างบน) → จัดเป็นชนิด: ชื่อในแบบ = กลุ่ม (ตรวจเหล็กในแบบด้วย) · ไม่มีชื่อ = ตามขนาด ≤ maxTypes ชนิด (lib/dsggroup.js)
 const COL_LAYOUTS = [[4, 4], [6, 4], [4, 6], [6, 6], [8, 6], [6, 8], [8, 8], [10, 8], [8, 10], [10, 10]];
-const GRP_CAT_TH = { B: 'คาน', GB: 'คานคอดิน', C: 'เสา', PD: 'ตอม่อ', F: 'ฐานแผ่' };
+const GRP_CAT_TH = { B: 'คาน', GB: 'คานคอดิน', C: 'เสา', PD: 'ตอม่อ', F: 'ฐานแผ่', FP: 'ฐานเข็ม' };
 function dsgGrpOpt() { const D = dsg(); D.grp = Object.assign({ maxTypes: 3, byMark: true, apply: true }, D.grp || {}); D.grp.assign = D.grp.assign || {}; return D.grp; }
 /** ตรวจเสา x ด้วยเหล็ก cand {dMain, nX, nY, dTie} กับแรงของเสา x ทุกชุด → {ok, ratio} */
 function dsgColChk(x, o, cand) {
@@ -869,9 +870,22 @@ function dsgBeamMerge(rbs) {
 const dsgColMerge = ks => { const m = { dMain: Math.max(...ks.map(k => k.dMain)), nX: Math.max(...ks.map(k => k.nX)), nY: Math.max(...ks.map(k => k.nY)), dTie: Math.max(...ks.map(k => k.dTie)) };
   return Object.assign(m, { sTie: Math.min(...ks.map(k => k.sTie)) }); };
 const dsgFootMerge = ks => ({ dLong: Math.max(...ks.map(k => k.dLong)), sLong: Math.min(...ks.map(k => k.sLong)), dShort: Math.max(...ks.map(k => k.dShort)), sShort: Math.min(...ks.map(k => k.sShort)) });
+/** ตรวจฐานเข็ม x ด้วยเหล็ก cand ({dL, sL, dS, sS} หรือ 3 ต้น {dL, nBar}) บนรูปทรงที่ออกแบบของ x เอง ทุกชุด → {ok, ratio, r} */
+function dsgPileChk(x, o, cand) {
+  let ok = true, ratio = 0, r0 = null;
+  for (const st of (o.inp.multi ? o.inp.sets : [o.inp.f])) {
+    if (!(+st.P > 0)) continue;
+    const r = PileCap.pileCapCheck(Object.assign({}, o.p, cand, { P: +st.P, Mx: +st.Mx || 0, My: +st.My || 0 }), o.crit);
+    r0 = r0 || r; ok = ok && r.ok; ratio = Math.max(ratio, PileCap.util(r));
+  }
+  return { ok, ratio, r: r0 };
+}
+const dsgPileMerge = ks => ks[0].nBar !== undefined ? { dL: Math.max(...ks.map(k => k.dL)), nBar: Math.max(...ks.map(k => k.nBar)) }
+  : { dL: Math.max(...ks.map(k => k.dL)), sL: Math.min(...ks.map(k => k.sL)), dS: Math.max(...ks.map(k => k.dS)), sS: Math.min(...ks.map(k => k.sS)) };
+const dsgPileCand = (n, p) => n === 3 ? { dL: +p.dL, nBar: +p.nBar } : { dL: +p.dL, sL: +p.sL, dS: +p.dS, sS: +p.sS };
 /** เหล็กในแบบ (design status from_drawing) → แบบที่ตรวจได้ · เสา 6/10 เส้นวางได้สองทิศ → ลองทั้งสอง */
 function dsgDrawCand(kind, x) {
-  const d = kind === 'foot' ? ((S.model.design || {}).supports || {})[x.id] : ((S.model.design || {}).members || {})[x.id], fy = +dsg().crit.fy;
+  const d = kind === 'foot' || kind === 'pile' ? ((S.model.design || {}).supports || {})[x.id] : ((S.model.design || {}).members || {})[x.id], fy = +dsg().crit.fy;
   if (!d || d.status !== 'from_drawing' || !d.rebar) return null;
   if (kind === 'beam') return d.rebar.top && d.rebar.bot && d.rebar.stirrup ? { lays: [d.rebar], text: rbText(d.rebar, fy) } : null;
   if (kind === 'col') {
@@ -879,12 +893,21 @@ function dsgDrawCand(kind, x) {
     const lays = COL_LAYOUTS.filter(([a, b]) => a + b - 4 === +mn[0]).map(([nX, nY]) => ({ dMain: +mn[1], nX, nY, dTie: +st[0], sTie: +st[1] }));
     return lays.length ? { lays, text: `${mn[0]}-${RcWsd.barName(+mn[1], fy)} · RB ${st[0]} @${st[1]}` } : null;
   }
+  if (kind === 'pile') {   // นับจำนวนเหล็กย้อนสูตรชีตฐานเข็ม: n = (B − 2c)/s + 1 · 1 ต้น: ปลอกรอบ (t − 2c)/s + 1
+    const o = S.dsgPile[x.id], cov = +dsg().crit.ftCov / 100; if (!o || !o.r) return null;
+    const n = o.r.n, rb = d.rebar, sp = (B, k) => +((B - 2 * cov) / (k - 1) - 1e-6).toFixed(4);
+    if (n === 3) { const b = rb.bands; return b && +b[1] ? { lays: [{ dL: +b[2], nBar: +b[1] }], text: `แถบละ ${b[1]}-${RcWsd.barName(+b[2], fy)}` } : null; }
+    const bx = rb.bars_x, by = rb.bars_y; if (!bx || +bx[0] < 2) return null;
+    if (n === 1) { const rg = rb.rings; return rg && +rg[0] >= 2 ? { lays: [{ dL: +bx[1], sL: sp(o.r.Bx, +bx[0]), dS: +rg[1], sS: sp(o.p.t, +rg[0]) }], text: `${bx[0]}-${RcWsd.barName(+bx[1], fy)} สองทาง · ปลอกรอบ ${rg[0]}-${RcWsd.barName(+rg[1], fy)}` } : null; }
+    if (!by || +by[0] < 2) return null;
+    return { lays: [{ dL: +bx[1], sL: sp(o.r.By, +bx[0]), dS: +by[1], sS: sp(o.r.Bx, +by[0]) }], text: `${bx[0]}-${RcWsd.barName(+bx[1], fy)} × ${by[0]}-${RcWsd.barName(+by[1], fy)}` };
+  }
   const bx = d.rebar.bars_x, by = d.rebar.bars_y; if (!bx || !by || +bx[0] < 2 || +by[0] < 2) return null;
   return { lays: [{ dLong: +bx[1], sLong: x.By / (+bx[0] - 1), dShort: +by[1], sShort: x.Bx / (+by[0] - 1) }], text: `${bx[0]}-${RcWsd.barName(+bx[1], fy)} × ${by[0]}-${RcWsd.barName(+by[1], fy)}` };
 }
-function dsgGroups(cols, foots, beams = []) {
+function dsgGroups(cols, foots, beams = [], piles = []) {
   const G = dsgGrpOpt(), m = S.model, supN = new Set((m.supports || []).map(s => s.node)), mem = Object.fromEntries((m.members || []).map(x => [x.id, x]));
-  const ci = [], cx = {}, fi = [], fx = {}, bi = [], bx = {};
+  const ci = [], cx = {}, fi = [], fx = {}, bi = [], bx = {}, px = {};
   beams.forEach(bm => {
     const o = S.dsgOut[bm.id]; if (!o || !o.rebar || !o.ok) return;
     bx[bm.id] = { x: bm, o };
@@ -901,27 +924,36 @@ function dsgGroups(cols, foots, beams = []) {
     fx[x.id] = { x, o };
     fi.push({ id: x.id, cat: 'F', size: `${df2(x.Bx)}×${df2(x.By)}×${df2(x.t)} ม.`, mark: x.mark || '', score: o.r.AL + o.r.AS, cand: { dLong: o.p.dLong, sLong: o.p.sLong, dShort: o.p.dShort, sShort: o.p.sShort } });
   });
+  piles.forEach(x => {   // M4b ก้อน 5: ฐานเข็มจัดชนิดตามจำนวนเข็ม ชนิดเข็ม และขนาดฐาน (ชื่อชนิดต่อเลข F กับฐานแผ่)
+    const o = S.dsgPile[x.id]; if (!o || !o.r || !o.ok || !o.p) return;
+    const r = o.r; px[x.id] = { x, o };
+    fi.push({ id: x.id, cat: 'FP', size: `${r.n} ต้น ${r.pileInfo.code} · ${r.n === 3 ? 'สามเหลี่ยม ' + df2(r.side) : df2(r.Bx) + '×' + df2(r.By)}×${df2(o.p.t)} ม.`, mark: x.mark || '',
+      score: r.n === 3 ? r.AL : (r.AL || 0) + (r.n === 1 ? (r.ARing || 0) : (r.AS || 0)), cand: dsgPileCand(r.n, o.p) });
+  });
   const opt = { maxTypes: +G.maxTypes || 3, byMark: G.byMark !== false, assign: G.assign };
   const gc = DsgGroup.group(ci, (id, k) => dsgColChk(cx[id].x, cx[id].o, k), Object.assign({ merge: dsgColMerge }, opt)).map(g => Object.assign(g, { kind: 'col' }));
   const gb = DsgGroup.group(bi, (id, k) => dsgBeamChk(bx[id].x, bx[id].o, k), Object.assign({ merge: dsgBeamMerge, score: (k, its) => dsgBeamKg(k, bx[its[0].id].x.b, bx[its[0].id].x.h) }, opt)).map(g => Object.assign(g, { kind: 'beam' }));
-  const gf = DsgGroup.group(fi, (id, k) => dsgFootChk(fx[id].x, fx[id].o, k), Object.assign({ merge: dsgFootMerge }, opt)).map(g => Object.assign(g, { kind: 'foot' }));
+  const gf = DsgGroup.group(fi, (id, k) => fx[id] ? dsgFootChk(fx[id].x, fx[id].o, k) : dsgPileChk(px[id].x, px[id].o, k),
+    Object.assign({ merge: ks => ks[0].dLong !== undefined ? dsgFootMerge(ks) : dsgPileMerge(ks), prefix: { FP: 'F' } }, opt)).map(g => Object.assign(g, { kind: g.cat === 'FP' ? 'pile' : 'foot' }));
   for (const g of [...gb, ...gc, ...gf]) {   // ตรวจเหล็กในแบบ (เส้นทาง ก.)
     const texts = new Set(), bad = []; let n = 0;
     for (const id of g.ids) {
-      const e = (g.kind === 'col' ? cx : g.kind === 'beam' ? bx : fx)[id], dc = dsgDrawCand(g.kind, e.x); if (!dc) continue;
+      const e = (g.kind === 'col' ? cx : g.kind === 'beam' ? bx : g.kind === 'pile' ? px : fx)[id], dc = dsgDrawCand(g.kind, e.x); if (!dc) continue;
       n++; texts.add(dc.text);
-      if (!dc.lays.some(l => (g.kind === 'col' ? dsgColChk(e.x, e.o, l) : g.kind === 'beam' ? dsgBeamChk(e.x, e.o, l) : dsgFootChk(e.x, e.o, l)).ok)) bad.push(id);
+      if (!dc.lays.some(l => (g.kind === 'col' ? dsgColChk(e.x, e.o, l) : g.kind === 'beam' ? dsgBeamChk(e.x, e.o, l) : g.kind === 'pile' ? dsgPileChk(e.x, e.o, l) : dsgFootChk(e.x, e.o, l)).ok)) bad.push(id);
     }
     g.draw = n ? { n, text: [...texts].join(' / '), bad } : null;
   }
   const notIn = beams.filter(x => !bx[x.id] && S.dsgOut[x.id] && S.dsgOut[x.id].rebar).map(x => x.id).concat(cols.filter(x => !cx[x.id] && S.dsgCol[x.id] && S.dsgCol[x.id].r).map(x => x.id).concat(foots.filter(x => !fx[x.id] && S.dsgFoot[x.id] && S.dsgFoot[x.id].r).map(x => x.id)));
-  S.dsgGrp = { groups: [...gb, ...gc, ...gf], bx, cx, fx, notIn };
+  piles.filter(x => !px[x.id] && S.dsgPile[x.id] && S.dsgPile[x.id].r).forEach(x => notIn.push(x.id));
+  S.dsgGrp = { groups: [...gb, ...gc, ...gf], bx, cx, fx, px, notIn };
   return S.dsgGrp;
 }
 function grpRebarText(g) {
   const fy = +dsg().crit.fy, k = g.cand;
   if (g.kind === 'beam') return rbText(k, fy);
   if (g.kind === 'col') return `${k.nX + k.nY - 4}-${RcWsd.barName(k.dMain, fy)} · ปลอก RB ${k.dTie} @${k.sTie}`;
+  if (g.kind === 'pile') { const e = S.dsgGrp.px[g.gov], o = e.o, r = dsgPileChk(e.x, o, k).r; const q = Object.assign({}, o.p, k); return pileRbText(Object.assign({ r, p: q }, pileRebar(r, q)), fy); }
   const e = S.dsgGrp.fx[g.gov], r = dsgFootChk(e.x, e.o, k).r;
   return `แนว x ${r.nL}-${RcWsd.barName(k.dLong, fy)} @${+(+k.sLong).toFixed(3)} · แนว y ${r.nS}-${RcWsd.barName(k.dShort, fy)} @${+(+k.sShort).toFixed(3)}`;
 }
@@ -1092,8 +1124,9 @@ function dsgPileSpec(m, id, spec, n, code) {
 function dsgPileInput(x) {
   const u = (dsg().piles || {})[x.id] || {}, has = k => u[k] !== undefined && u[k] !== '', sp = x.sap || {}, pl = x.piles || {};
   const pick = k => has(k) ? +u[k] : (sp[k] !== undefined ? sp[k] : null);
+  const own = ['P', 'Mx', 'My'].some(has), multi = !own && !!(x.sets && x.sets.length);
   return {
-    f: { P: pick('P'), Mx: pick('Mx') || 0, My: pick('My') || 0 }, src: ['P', 'Mx', 'My'].some(has) ? 'กรอกเอง' : x.sap ? 'SAP' : '',
+    f: { P: pick('P'), Mx: pick('Mx') || 0, My: pick('My') || 0 }, multi, sets: multi ? x.sets : null, src: own ? 'กรอกเอง' : multi ? `SAP ${x.sets.length} ชุด` : x.sap ? 'SAP' : '',
     n: has('n') ? +u.n : (+pl.n || 0), pile: has('pile') ? +u.pile : dsgPileGuess(x.piles), cap: has('cap') ? +u.cap : (+pl.capacity || 0),
     len: has('len') ? +u.len : (+pl.length || 21), Dn: has('Dn') ? +u.Dn : 0,
     bn: has('bn') ? +u.bn : (pl.bars ? +pl.bars[0] : 0), bd: has('bd') ? +u.bd : (pl.bars ? +pl.bars[1] : 0),
@@ -1103,22 +1136,24 @@ function dsgPileInput(x) {
 }
 function dsgPileRun(x) {
   const c = dsg().crit, inp = dsgPileInput(x);
-  if (!(inp.f.P > 0)) return { need: 'ใส่แรง P', inp };
-  if (!(inp.cap > 0)) return { need: 'ใส่กำลังเสาเข็มต่อต้น (ผลสำรวจดิน)', inp };
+  const uw = x.uplift && inp.src !== 'กรอกเอง' ? `แรงยกที่ฐาน ${df2(x.uplift.T, 0)} กก. (${x.uplift.tag}) — ตรวจเข็มรับแรงดึง/น้ำหนักฐานต้านแรงยกเอง (Excel ฐานเข็มไม่มีข้อนี้)` : '';
+  if (!inp.multi && !(inp.f.P > 0)) return { need: 'ใส่แรง P', inp, warn: uw };
+  if (!(inp.cap > 0)) return { need: 'ใส่กำลังเสาเข็มต่อต้น (ผลสำรวจดิน)', inp, warn: uw };
   const crit = RcWsd.criteria({ fcp: x.fcp, F: +c.F, mode: +c.mode, fy: +c.fy, fyv: +c.fyv });
   const p = { n: inp.n || 1, cov: +c.ftCov, t: x.t || 0.5, Df: x.Df, P: inp.f.P, Mx: inp.f.Mx, My: inp.f.My, gamma: +c.gamma, pier: 1, bx: x.bx, by: x.by,
     pile: inp.pile, len: inp.len, fcPile: +c.pileFc || 350, cap: inp.cap, Dnx: inp.Dn, Dny: inp.Dn };
   if (inp.n === 1 || inp.n === 2) { p.Bx = x.Bx; p.By = x.By; }
   const dias = [...new Set((c.ftDias || []).map(Number).concat([20, 25]))].sort((a, b) => a - b);   // ฐานเข็มเหล็กมาก: ขยายถึง DB25 เมื่อขนาดเล็กไม่พอ
-  const d = PileCap.pileCapDesign(p, crit, { dias, lockN: !!inp.n });
+  // M4b ก้อน 5: ผล SAP = ทุกชุดผสม (เหมือนฐานแผ่) · กรอกเอง = ชุดเดียว
+  const d = inp.multi ? PileCap.pileCapDesignMulti(p, inp.sets, crit, { dias, lockN: !!inp.n }) : PileCap.pileCapDesign(p, crit, { dias, lockN: !!inp.n });
+  if (!d) return { need: 'ไม่มีชุดแรงกดลง', inp, warn: uw };
+  if (d.gov) { inp.f = { P: d.gov.P, Mx: +d.gov.Mx || 0, My: +d.gov.My || 0 }; inp.gov = d.gov.tag; }
+  const tw = d.tension ? `เข็มรับแรงดึง ${df2(d.tension.T, 0)} กก./ต้น (${d.tension.tag}) — ตรวจกำลังรับแรงดึงของเข็มและเหล็กเดือยเอง` : (!inp.multi && d.r.Hmin < 0 ? `เข็มรับแรงดึง ${df2(-d.r.Hmin, 0)} กก./ต้น — ตรวจกำลังรับแรงดึงของเข็มและเหล็กเดือยเอง` : '');
   const r = d.r, n = r.n, notes = [];
   if (Math.abs(r.Bx - x.Bx) > 0.005 || Math.abs(r.By - x.By) > 0.005 || Math.abs(d.p.t - x.t) > 0.005) notes.push(`ขนาดฐานตามระยะเข็ม ${n === 3 ? `สามเหลี่ยมด้าน ${df2(r.side)}` : `${df2(r.Bx)}×${df2(r.By)}`}×${df2(d.p.t)} ม. (โมเดล ${df2(x.Bx)}×${df2(x.By)}×${df2(x.t)}) — แก้ในโมเดล`);
   if (x.piles && +x.piles.n && +x.piles.n !== n) notes.push(`จำนวนเข็มที่ออกแบบ ${n} ต้น ต่างจากโมเดล ${x.piles.n} ต้น — แก้ในโมเดล`);
   if (r.warn) notes.push(r.warn);
-  const dl = d.p.dL, ds = n === 1 ? dl : d.p.dS;
-  const bandL = n === 3 ? Math.round((r.Dnx + 2 * 1.3 * r.pileInfo.w) * 100) / 100 : 0;   // แถบ 3 ต้น: ระยะเข็ม + 2×1.3D
-  const rebar = n === 3 ? { bands: [3, r.nL, dl, bandL] } : { bars_x: [r.nL, dl], bars_y: [n === 1 ? r.nL : r.nS, ds] };
-  if (n === 1 && r.nRing) rebar.rings = [r.nRing, d.p.dS || 12];   // ปลอกรอบ (ชีต 1 Pile)
+  const { rebar, bandL } = pileRebar(r, d.p);
   const pl = r.pileInfo, spec = { kind: pl.kind, length: inp.len, capacity: inp.cap };
   if (pl.kind === 'bored') {
     spec.size = pl.w; spec.type = 'เข็มเจาะ ' + pl.code;
@@ -1126,7 +1161,15 @@ function dsgPileRun(x) {
     if (inp.td && inp.ts) spec.tie = [inp.td, inp.ts];
     if (inp.dn && inp.dd && inp.dl) spec.dowel = [inp.dn, inp.dd, inp.dl];
   }
-  return { r, ok: d.ok, error: d.error || '', sug: notes.join(' · '), d, crit, inp, p: d.p, label: `ฐานรากเสาเข็ม ${n} ต้น`, rebar, bandL, spec };
+  return { r, ok: d.ok, error: d.error || '', sug: notes.join(' · '), warn: [uw, tw].filter(Boolean).join(' · '), d, crit, inp, p: d.p, label: `ฐานรากเสาเข็ม ${n} ต้น`, rebar, bandL, spec };
+}
+/** เหล็กเสริมฐานเข็ม (รูปแบบ .bm.json) จากผลตรวจ r และค่าที่ใช้ p {dL, dS} */
+function pileRebar(r, p) {
+  const n = r.n, dl = p.dL, ds = n === 1 ? dl : p.dS;
+  const bandL = n === 3 ? Math.round((r.Dnx + 2 * 1.3 * r.pileInfo.w) * 100) / 100 : 0;   // แถบ 3 ต้น: ระยะเข็ม + 2×1.3D
+  const rebar = n === 3 ? { bands: [3, r.nL, dl, bandL] } : { bars_x: [r.nL, dl], bars_y: [n === 1 ? r.nL : r.nS, ds] };
+  if (n === 1 && r.nRing) rebar.rings = [r.nRing, p.dS || 12];   // ปลอกรอบ (ชีต 1 Pile)
+  return { rebar, bandL };
 }
 function pileRbText(o, fy) {
   const r = o.r, p = o.p, bn = d => RcWsd.barName(d, fy);
@@ -1138,21 +1181,21 @@ function pileCard(piles) {
   const D = dsg(), c = D.crit, opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
   const dn = piles.filter(x => S.dsgPile[x.id] && S.dsgPile[x.id].r), pass = dn.filter(x => S.dsgPile[x.id].ok).length;
   return `<div class="card"><h2>ฐานรากเสาเข็ม <span class="hint">${dn.length}/${piles.length} ฐานออกแบบได้ · ผ่าน ${pass}</span></h2>
-    <p class="hint">กำลังเสาเข็มต่อต้นกรอกตามผลสำรวจชั้นดิน (ระบบตรวจไม่ให้เกินกำลังคอนกรีต 0.375 f'c·A ของฐานและของเข็ม) · ระยะเข็มตั้งต้น 3D · จำนวนเข็มว่าง = ระบบเลือกจำนวนน้อยสุดที่รับได้ · ขนาดฐานคิดจากระยะเข็ม + ขอบ 1.3D + ระยะหุ้ม · f'c เข็ม ${df2(c.pileFc || 350, 0)} ksc</p>
+    <p class="hint">แรงจาก SAP ตรวจทุกชุดผสมที่จุดรองรับ (F3→P, M1→Mx, M2→My) แสดงชุดวิกฤต · เข็มรับแรงดึง/ฐานมีแรงยกขึ้นเตือน · กรอก P/Mx/My เอง = ใช้ค่าที่กรอกชุดเดียว · กำลังเสาเข็มต่อต้นกรอกตามผลสำรวจชั้นดิน (ระบบตรวจไม่ให้เกินกำลังคอนกรีต 0.375 f'c·A ของฐานและของเข็ม) · ระยะเข็มตั้งต้น 3D · จำนวนเข็มว่าง = ระบบเลือกจำนวนน้อยสุดที่รับได้ · ขนาดฐานคิดจากระยะเข็ม + ขอบ 1.3D + ระยะหุ้ม · f'c เข็ม ${df2(c.pileFc || 350, 0)} ksc</p>
     ${piles.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>ฐาน</th><th>จำนวนเข็ม</th><th>ชนิดเข็ม</th><th>ยาว (ม.)</th><th>รับ กก./ต้น</th><th>P กก.</th><th>Mx กก.-ม.</th><th>My กก.-ม.</th><th>เหล็กเสริม</th><th></th></tr>
     ${piles.map(x => {
       const o = S.dsgPile[x.id], u = (D.piles || {})[x.id] || {}, inp = dsgPileInput(x);
       const has = k => u[k] !== undefined && u[k] !== '';
       const cell = (k, def = '') => `<input class="price${has(k) ? ' ov' : ''}" data-qf="${k}" inputmode="decimal" value="${has(k) ? esc(u[k]) : def}" placeholder="-">`;
       const pcell = (k, v) => `<input class="price sm${has(k) ? ' ov' : ''}" data-qf="${k}" inputmode="decimal" value="${v ? esc(v) : ''}" placeholder="-">`;
-      const sapv = k => x.sap ? df2(x.sap[k], 0).replace(/,/g, '') : '';
+      const sapv = k => inp.multi ? '' : x.sap ? df2(x.sap[k], 0).replace(/,/g, '') : '';
       return `<tr class="row ${D.sel === 'pc:' + x.id ? 'sel' : ''}" data-pc="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">${esc(x.id)}</span>${inp.src ? `<span class="src">${inp.src}</span>` : ''}</td>
         <td data-l="จำนวนเข็ม"><select data-qf="n">${opt('', has('n') ? u.n : (x.piles && x.piles.n) || '', 'อัตโนมัติ')}${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(k => opt(k, has('n') ? u.n : (x.piles && x.piles.n) || '', k + ' ต้น')).join('')}</select></td>
         <td data-l="ชนิดเข็ม"><select data-qf="pile">${PileCap.PILES.map(y => opt(y.id, inp.pile, y.name)).join('')}</select></td>
         <td data-l="ยาว (ม.)">${cell('len', x.piles && x.piles.length ? x.piles.length : '')}</td>
         <td data-l="รับ กก./ต้น">${cell('cap', x.piles && x.piles.capacity ? x.piles.capacity : '')}</td>
-        <td data-l="P กก.">${cell('P', sapv('P'))}</td><td data-l="Mx กก.-ม.">${cell('Mx', sapv('Mx'))}</td><td data-l="My กก.-ม.">${cell('My', sapv('My'))}</td>
-        <td class="dsg-rb">${o.r ? `<b>${o.r.n} ต้น</b> · ฐาน ${o.r.n === 3 ? 'สามเหลี่ยม' : df2(o.r.Bx) + '×' + df2(o.r.By)}×${df2(o.p.t)} ม.<br>${esc(pileRbText(o, +c.fy))}` + (o.error || o.sug ? `<span class="warnline">${esc([o.error, o.sug].filter(Boolean).join(' · '))}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}</td>
+        <td data-l="P กก.">${inp.multi && !has('P') ? `<input class="price" data-qf="P" inputmode="decimal" value="" placeholder="${df2(inp.f.P, 0).replace(/,/g, '')}" title="ชุดวิกฤต — กรอกเพื่อใช้ค่าที่กรอกชุดเดียว">` : cell('P', sapv('P'))}</td><td data-l="Mx กก.-ม.">${inp.multi && !has('Mx') ? `<input class="price" data-qf="Mx" inputmode="decimal" value="" placeholder="${df2(inp.f.Mx, 0).replace(/,/g, '')}">` : cell('Mx', sapv('Mx'))}</td><td data-l="My กก.-ม.">${inp.multi && !has('My') ? `<input class="price" data-qf="My" inputmode="decimal" value="" placeholder="${df2(inp.f.My, 0).replace(/,/g, '')}">` : cell('My', sapv('My'))}</td>
+        <td class="dsg-rb">${o.r ? `<b>${o.r.n} ต้น</b> · ฐาน ${o.r.n === 3 ? 'สามเหลี่ยม' : df2(o.r.Bx) + '×' + df2(o.r.By)}×${df2(o.p.t)} ม.<br>${esc(pileRbText(o, +c.fy))}` + (o.inp && o.inp.gov ? `<span class="hint">วิกฤต ${esc(o.inp.gov)}</span>` : '') + (o.error || o.sug ? `<span class="warnline">${esc([o.error, o.sug].filter(Boolean).join(' · '))}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}${o.warn ? `<span class="warnline">${esc(o.warn)}</span>` : ''}</td>
         <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`
         + (PileCap.pileOf(inp.pile).kind === 'bored' ? `<tr class="row pc-sub ${D.sel === 'pc:' + x.id ? 'sel' : ''}" data-pc="${esc(x.id)}"><td class="c-name hint">เหล็กเข็มเจาะ</td><td colspan="9" data-l="สเปกเข็ม"><div class="dsg-bored">
           <span class="g">เหล็กยืน ${pcell('bn', inp.bn)}-DB ${pcell('bd', inp.bd)}</span>
@@ -1181,7 +1224,7 @@ function pileReport(x, o) {
   const row = (a, eq, v, u = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${u}</td><td>${tag}</td></tr>`;
   const ck = k => (r.checks.find(c => c.code === k) || {}).ok;
   const pl = r.pileInfo, size = n === 3 ? `สามเหลี่ยมด้าน ${df2(r.side)} ตัดมุม ${df2(r.clip)}` : `${df2(r.Bx)} × ${df2(r.By)}`;
-  const head = `<div class="card dsg-rep"><div class="dsg-head"><b>${n} pile footings Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>ฐาน <b>${esc(x.mark)}</b> (${esc(x.id)}) · แรงจาก${esc(o.inp.src || '-')}${x.sap && o.inp.src === 'SAP' ? ' ชุด ' + esc(x.sap.combo) : ''}</div>`;
+  const head = `<div class="card dsg-rep"><div class="dsg-head"><b>${n} pile footings Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>ฐาน <b>${esc(x.mark)}</b> (${esc(x.id)}) · แรงจาก${esc(o.inp.src || '-')}${o.inp.gov ? ' · ชุดวิกฤต ' + esc(o.inp.gov) : x.sap && o.inp.src === 'SAP' ? ' ชุด ' + esc(x.sap.combo) : ''}</div>${o.warn ? `<p class="d-ng">${esc(o.warn)}</p>` : ''}`;
   const s1 = `<h4>1. ข้อมูล</h4><div class="dsg-sec-row">${pileSvg(r)}<table class="dsg-calc">
       ${row("f'c / fc / fs", C.main.grade, `${df2(C.fcp, 0)} / ${df2(C.fc, 2)} / ${df2(C.main.fs, 0)}`, 'ksc')}${row('R, j', '', `${df2(C.main.R, 3)} · ${df2(C.main.j, 4)}`, '')}
       ${row('เสาเข็ม', `${pl.name} ยาว ${df2(p.len, 1)} ม. · f'c ${df2(p.fcPile, 0)} ksc`, `${n} ต้น`, '')}
