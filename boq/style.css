@@ -724,3 +724,10 @@ canvas.mt-sw{border:1px solid var(--text3);border-radius:3px;flex:none;image-ren
 .mte-prev canvas{width:100%;height:auto;border:1px solid var(--text3);border-radius:4px;display:block;margin-bottom:2px}
 .mte-prev #mte-cv2{margin-top:10px}
 @media (max-width:760px){.mte-grid{grid-template-columns:1fr}.mt-ibtn{max-width:none}}
+
+/* M4b ชนิดเสา/ตอม่อ/ฐานราก */
+.grp-opt { display: flex; flex-wrap: wrap; gap: 6px 20px; align-items: center; margin: 6px 0 10px; }
+.grp-opt input[data-grp=maxTypes] { width: 4em; }
+.grp-ids { min-width: 260px; }
+.grp-chip { display: inline-flex; align-items: center; gap: 3px; margin: 1px 6px 1px 0; white-space: nowrap; }
+.grp-chip select { font-size: 11px; padding: 0 2px; height: 20px; width: auto; min-width: 0; max-width: 7em; }
