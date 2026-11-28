@@ -175,5 +175,12 @@ const cs = W.criteria({ fcp: 240, mode: 1, fy: 2400, fyv: 2400 });
   console.log(`  พื้น ${i} ${k}: ${d.dm}@${d.sA} / ${d.dt}@${d.sB}`, d.ok ? 'ผ่าน' : d.error);
 });
 check('พื้นบางเกิน', !W.slabDesign('one', { L: 4.5, t: 0.1, cov: 2, SDL: 100, LL: 400, type: 1 }, cs).ok);
+{ // M4b ก้อน 6: คานลึก = เตือนอย่างเดียว เมื่อ crit.deepWarn (คานคอดินช่วงสั้น)
+  const c0 = W.criteria({ fcp: 210, F: 0.45, mode: 1, fy: 4000, fyv: 2400 }), g = { b: 0.2, h: 0.4, L: 0.6, type: 2, cov: 2.5 }, f = { Mpos: 1100, Mneg: 0, V: 200, T: 0 };
+  const a = W.beamDesign(f, g, c0, { dias: [12, 16] }), b = W.beamDesign(f, g, Object.assign({}, c0, { deepWarn: true }), { dias: [12, 16] });
+  check('คานลึกไม่ผ่านตามปกติ', !a.ok);
+  check('คานลึก deepWarn ผ่าน + เตือน', b.ok && b.sup.warn.some(w => /คานลึก/.test(w)) && b.sup.checks.find(c => c.code === 'deep').warn);
+  check('deepWarn เหล็กเท่าเดิม', JSON.stringify(a.rebar) === JSON.stringify(b.rebar));
+}
 console.log((ok ? 'PASS' : 'FAIL') + ` rcwsd ${n} ข้อ`);
 process.exit(ok ? 0 : 1);

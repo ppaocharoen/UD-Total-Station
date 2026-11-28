@@ -61,7 +61,8 @@ function dsgInput(bm) {
 }
 function dsgRun(bm) {
   const c = dsg().crit, inp = dsgInput(bm); if (!inp.has) return null;
-  const crit = dsgCrit(bm.fcp), g = { b: bm.b, h: bm.h, L: bm.L, type: inp.type, cov: +c.cov };
+  // M4b ก้อน 6: คานคอดินช่วงสั้น h/L เกินเกณฑ์คานลึก = เตือนอย่างเดียว (Earth 28 พ.ย. 2569)
+  const crit = Object.assign(dsgCrit(bm.fcp), { deepWarn: bm.kind === 'tie_beam' }), g = { b: bm.b, h: bm.h, L: bm.L, type: inp.type, cov: +c.cov };
   const d = RcWsd.beamDesign({ Mpos: inp.f.Mpos || 0, Mneg: inp.f.Mneg || 0, V: inp.f.V || 0, T: inp.f.T || 0 }, g, crit, { dias: (c.dias || []).map(Number).sort((a, b) => a - b) });
   return Object.assign(d, { crit, g, inp });
 }
@@ -131,7 +132,7 @@ function renderDesign() {
         <td class="r" data-l="b×h (ม.)">${df2(bm.b)}×${df2(bm.h)}</td><td class="r" data-l="L (ม.)">${df2(bm.L)}</td>
         <td data-l="ประเภท"><select data-bf="type">${[1, 2, 3, 4].map(t => opt(t, inp.type, RcWsd.BEAM_TYPES_TH[t] + (t === bm.auto ? ' *' : ''))).join('')}</select></td>
         <td data-l="M+ กก.-ม.">${cell('Mpos')}</td><td data-l="M− กก.-ม.">${cell('Mneg')}</td><td data-l="V กก.">${cell('V')}</td><td data-l="T กก.-ม.">${cell('T')}</td>
-        <td class="dsg-rb">${r ? esc(rbText(r.rebar, +c.fy)) + (r.error ? `<span class="warnline">${esc(r.error)}</span>` : '') : '<span class="hint">ยังไม่มีแรง</span>'}</td>
+        <td class="dsg-rb">${r ? esc(rbText(r.rebar, +c.fy)) + (r.error ? `<span class="warnline">${esc(r.error)}</span>` : '') + ((r.sup || {}).checks || []).filter(x => x.warn).map(x => `<span class="warnline">คานลึก h/L ${df2(x.val, 2)} > ${x.lim} — เตือน</span>`).join('') : '<span class="hint">ยังไม่มีแรง</span>'}</td>
         <td class="r" data-l="ratio">${r && r.rebar ? df2(r.ratio, 2) : ''}</td><td>${r ? (r.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
     }).join('')}</table></div>
     <p class="hint">* = ประเภทที่ระบบเดา · ratio = แรงที่ต้องรับ ÷ ที่หน้าตัดรับได้ (เหล็ก/หน่วยแรงเฉือน ค่ามากสุด) · เหล็กเสริมบนยาว 2/3 ช่วง เหล็กเสริมล่างยาว 0.75 ช่วง (ตามวิธีถอดปริมาณ)</p>
@@ -399,7 +400,7 @@ function beamReport(bm, d) {
     </table>
     <h4>2. ตรวจขนาดหน้าตัด</h4><table class="dsg-calc">
       ${row('h min', fy >= 4000 ? `L/${div}` : `L/${div}·(0.4 + fy/7000)`, df2(hm.lim, 3), 'ม.', `≤ ${df2(g.h)} ${okTag(hm.ok)}`)}
-      ${row('คานลึก', 'h/L', df2(dp.val, 2), '', `≤ ${dp.lim} ${okTag(dp.ok)}`)}
+      ${row('คานลึก', 'h/L', df2(dp.val, 2), '', `≤ ${dp.lim} ${dp.warn ? '<b class="d-ng">[เตือน — คานคอดินช่วงสั้น ตรวจกำลังตามปกติ]</b>' : okTag(dp.ok)}`)}
       ${row('คานแคบ', 'L/b', df2(r.Lb, 2), '', r.narrow ? '> 30 ลดกำลังโมเมนต์' : '≤ 30 [Ok.]')}
     </table>
     ${d.mid ? flexPart(d.mid, '3. หน้าตัดกลางช่วง (เหล็กล่างรับแรงดึง)', f.Mpos) : ''}
