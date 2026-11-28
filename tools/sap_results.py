@@ -17,6 +17,8 @@
     (ซ้ำกันเก็บครั้งเดียว · เรียงตามสถานี) ให้หน้าออกแบบตรวจ ASD ทุกชุด
   - frame_joints: {id: [joint, ...]}  ชิ้นเหล็กที่ SAP แบ่งเป็นหลาย element (จุดต่อกับชิ้นอื่น เช่น แปบนจันทัน) เรียงจากปลาย i → j
     จากตาราง Objects And Elements - Frames (ไม่บังคับ) · ใช้หาระยะค้ำยัน/ความยาวโก่งเดาะ และจุดวัดการโก่งตัว
+  - body: {ปลายชิ้น: [จุดบนแกนชิ้นรองรับ]}  ปลายชิ้นที่วางบน/ชนชิ้นอื่น ผูกด้วย Body constraint ตอนส่งออก (sap_export._contacts)
+    ใช้บอกว่าจันทันวางบนคาน/โครงถักตรงไหน (จุดรองรับของแนวชิ้น)
   - aux_joints: {joint: [x, y, z]}  จุดต่อที่ SAP สร้างเอง (ไม่มีใน nodes) จาก Objects And Elements - Joints — มีการเคลื่อนที่ใน displacements ด้วย
   - reactions: {joint: {case/combo: [F1, F2, F3, M1, M2, M3]}}  ทุก case และ combo
   - displacements: {joint: {combo: [U1, U2, U3]}}  เฉพาะชุดผสม (หรือทุก case ถ้าไม่มีชุดผสม)
@@ -152,7 +154,14 @@ def build(m, tables, sidecar=None):
     if unknown:
         warn.append("ชิ้นส่วนใน SAP ที่ไม่มีใน .bm.json (ไม่ได้อ่าน): " + ", ".join(sorted(unknown)[:10]))
     from sap_export import Exporter
-    merged = Exporter(m).merged      # ท่อนเสาในความลึกคานที่รวมเข้าตอม่อตอนส่งออก (ผลอยู่ที่ตอม่อ)
+    ex = Exporter(m)
+    merged = ex.merged      # ท่อนเสาในความลึกคานที่รวมเข้าตอม่อตอนส่งออก (ผลอยู่ที่ตอม่อ)
+    try:
+        ex.build()
+        body = {k: sorted(v) for k, v in sorted(ex.body.items())}   # ปลายชิ้นที่วางบนชิ้นอื่น → จุดบนแกนชิ้นรองรับ (Body constraint)
+    except Exception as e:   # noqa: BLE001
+        body = {}
+        warn.append("สร้างข้อมูลจุดผูก Body constraint ไม่ได้: %s" % e)
     nores = sorted(members - set(env) - set(merged))
     if nores:
         warn.append("ชิ้นส่วนที่ไม่มีผล: " + ", ".join(nores[:10]))
@@ -210,6 +219,8 @@ def build(m, tables, sidecar=None):
         res["steel_combo"] = steel_combo
     if fjoints:
         res["frame_joints"] = fjoints
+    if body:
+        res["body"] = body
     if aux:
         res["aux_joints"] = aux
     if merged:

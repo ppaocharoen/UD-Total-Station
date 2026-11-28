@@ -2679,6 +2679,16 @@
             }
           }
         },
+        "body": {
+          "type": "object",
+          "description": "ปลายชิ้นที่วางบน/ชนชิ้นอื่น → จุดบนแกนชิ้นรองรับ (Body constraint จาก sap_export)",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
         "aux_joints": {
           "type": "object",
           "description": "จุดต่อที่ SAP สร้างเอง (ไม่มีใน nodes): {joint: [x, y, z]}",
