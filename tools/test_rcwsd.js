@@ -125,6 +125,25 @@ const fd = W.footingDesign({ cov: 7.5, t: 0.3, Bx: 1.2, By: 1.2, Df: 1.5, P: 300
 check('ออกแบบฐาน ผ่าน', fd.ok, JSON.stringify({ p: fd.p, e: fd.error }));
 console.log(`  ฐาน: ${fd.p.Bx}×${fd.p.By}×${fd.p.t} DB${fd.p.dLong}@${fd.p.sLong} / DB${fd.p.dShort}@${fd.p.sShort}`);
 
+// M4b (28 พ.ย. 2569): ออกแบบจากแรงหลายชุด — ผ่านทุกชุด · เหล็กเท่าชุดที่หนักสุดเมื่อออกแบบทีละชุด · ชุดแรงดึงไม่ตรวจ
+{
+  const base = { L: 3, Bx: 20, By: 20, cov: 3, case: 1 };
+  const sets = [{ P: 15000, Mx: 300, My: 200, tag: 'P มาก' }, { P: 3000, Mx: 900, My: 100, tag: 'M มาก' }, { P: -500, Mx: 0, My: 0, tag: 'ดึง' }];
+  const mm = W.columnDesignMulti(base, sets, cc);
+  const singles = sets.slice(0, 2).map(x => W.columnDesign(Object.assign({}, base, x), cc));
+  check('เสาหลายชุด ผ่าน', mm.ok && mm.nSets === 2, JSON.stringify({ ok: mm.ok, n: mm.nSets }));
+  check('เสาหลายชุด เหล็ก = ชุดหนักสุด', near(mm.As, Math.max(...singles.map(x => x.As))), `${mm.As} / ${singles.map(x => x.As)}`);
+  check('เสาหลายชุด ชุดวิกฤต = M มาก (P น้อย)', mm.gov.tag === 'M มาก', mm.gov.tag);
+  check('เสาหลายชุด ทุกชุดผ่านด้วยเหล็กที่เลือก', sets.slice(0, 2).every(x => W.columnCheck(Object.assign({}, base, x, { dMain: mm.dMain, nX: mm.nX, nY: mm.nY, dTie: mm.dTie }), cc).ok));
+  check('เสาหลายชุด ไม่มีแรงอัด → null', W.columnDesignMulti(base, [{ P: -100 }], cc) === null);
+  const fb = { cov: 7.5, t: 0.3, Bx: 1.2, By: 1.2, Df: 1.5, qa: 15000, gamma: 1800, pier: 1, bx: 0.2, by: 0.2 };
+  const fsets = [{ P: 30000, Mx: 300, My: 300, tag: 'P มาก' }, { P: 9000, Mx: 2500, My: 200, tag: 'M มาก' }, { P: -1200, tag: 'ยก' }];
+  const fm = W.footingDesignMulti(fb, fsets, cc, { resize: true });
+  check('ฐานหลายชุด ผ่านทุกชุด', fm.ok && fsets.slice(0, 2).every(x => W.footingCheck(Object.assign({}, fm.p, x), cc).ok), JSON.stringify({ p: fm.p, e: fm.error }));
+  const fsg = fsets.slice(0, 2).map(x => W.footingDesign(Object.assign({}, fb, x), cc, { resize: true }));
+  check('ฐานหลายชุด ขนาด ≥ ทุกชุดเดี่ยว', fsg.every(x => fm.p.Bx >= x.p.Bx - 1e-9 && fm.p.t >= x.p.t - 1e-9), JSON.stringify(fsg.map(x => [x.p.Bx, x.p.t])));
+}
+
 // บันไดท้องเรียบ (Stair1–3 ฉบับแก้)
 require('./rcwsd_stair_cases.json').cases.forEach((cs, i) => {
   const p = cs.input, e = cs.expect, cr = W.criteria(p), r = W.slabStair(p, cr);

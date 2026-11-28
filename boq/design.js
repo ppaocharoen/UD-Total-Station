@@ -583,7 +583,7 @@ function groundReport(sl, o) {
 function dsgColList() {
   const m = S.model; if (!m) return [];
   const N = Object.fromEntries((m.nodes || []).map(n => [n.id, n])), sec = Object.fromEntries((m.sections || []).map(s => [s.id, s]));
-  const all = m.members || [], res = (m.results && m.results.members) || {};
+  const all = m.members || [], res = (m.results && m.results.members) || {}, byc = (m.results && m.results.by_combo) || {};
   const len = x => { const a = N[x.i], b = N[x.j]; return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z); };
   const rAt = (nid, self) => {
     const at = all.filter(y => (y.i === nid || y.j === nid) && sec[y.section] && sec[y.section].kind === 'rc_rect');
@@ -598,7 +598,17 @@ function dsgColList() {
       const P = r.P || {}, M2 = r.M2 || {}, M3 = r.M3 || {}, mx = e => Math.max(Math.abs(+e.max || 0), Math.abs(+e.min || 0));
       sap = { P: (+P.min || 0) < 0 ? -(+P.min) : Math.abs(+P.max || 0), Mx: mx(M2), My: mx(M3), combo: [P.combo_min, M2.combo_max, M3.combo_max].filter(Boolean).filter((v, i, A) => A.indexOf(v) === i).join(', ') };
     }
-    return { id: x.id, mark: x.mark || '', level: x.level || '', Bx: s.b * 100, By: s.h * 100, L: Math.abs(b.z - a.z), rT: rAt(top), rB: rAt(bot), sap, fcp: dsgFcp(x.id) };
+    // M4b: แรงพร้อมกันรายชุดผสม × ปลายเสา (SAP: P ลบ = อัด) · ชุดที่เป็นแรงดึงไม่ออกแบบ แต่เตือนค่ามากสุด
+    let sets = null, tension = null;
+    if (byc[x.id]) {
+      sets = [];
+      for (const [cb, e] of Object.entries(byc[x.id])) for (const k of ['i', 'j']) {
+        const v = e[k]; if (!v) continue;
+        const s1 = { P: -v[0], Mx: Math.abs(v[1]), My: Math.abs(v[2]), tag: `${cb} ปลาย${(k === 'i') === (x.i === bot) ? 'ล่าง' : 'บน'}` };
+        if (s1.P > 0) sets.push(s1); else if (s1.P < 0 && (!tension || -s1.P > tension.T)) tension = { T: -s1.P, tag: s1.tag };
+      }
+    }
+    return { id: x.id, mark: x.mark || '', level: x.level || '', Bx: s.b * 100, By: s.h * 100, L: Math.abs(b.z - a.z), rT: rAt(top), rB: rAt(bot), sap, sets, tension, fcp: dsgFcp(x.id) };
   });
 }
 function dsgColInput(x) {
@@ -606,10 +616,24 @@ function dsgColInput(x) {
   const pick = k => has(k) ? +u[k] : (sp[k] !== undefined ? sp[k] : null);
   const f = { P: pick('P'), Mx: pick('Mx') || 0, My: pick('My') || 0 };
   const auto = f.Mx > 0 && f.My > 0 ? 1 : 2;
-  return { f, case: +(u.case || auto), auto, src: ['P', 'Mx', 'My'].some(has) ? 'กรอกเอง' : x.sap ? 'SAP' : '' };
+  const own = ['P', 'Mx', 'My'].some(has), multi = !own && !!(x.sets && x.sets.length);
+  return { f, case: +(u.case || auto), auto, multi, sets: multi ? x.sets : null, src: own ? 'กรอกเอง' : multi ? `SAP ${x.sets.length} ชุด` : x.sap ? 'SAP' : '' };
 }
 function dsgColRun(x) {
   const c = dsg().crit, inp = dsgColInput(x);
+  const tw = x.tension && inp.src !== 'กรอกเอง' ? `รับแรงดึง ${df2(x.tension.T, 0)} กก. (${x.tension.tag}) — ตรวจเหล็กยืนรับแรงดึงและระยะฝังเข้าฐานเอง` : '';
+  if (inp.multi) {
+    if ([3, 4].includes(inp.case) && (x.rT === null && x.rB === null)) return { need: 'กรณีเซได้ต้องมีคานต่อที่ปลายเสา', inp };
+    const crit = RcWsd.criteria({ fcp: x.fcp, F: +c.F, mode: +c.mode, fy: +c.fy, fyv: +c.fyv });
+    const base = { L: x.L, Bx: x.Bx, By: x.By, cov: +c.colCov, case: inp.case, rT: x.rT || 0, rB: x.rB || 0 };
+    const d = RcWsd.columnDesignMulti(base, inp.sets, crit, (c.colDias || []).map(Number));
+    if (!d) return { need: 'ไม่มีชุดผสมที่เป็นแรงอัด', inp, warn: tw };
+    inp.f = { P: d.gov.P, Mx: d.gov.Mx, My: d.gov.My }; inp.gov = d.gov.tag;
+    return { r: d.r, ok: d.ok, error: d.error || '', warn: tw, d, crit, inp, p: Object.assign({}, base, inp.f), label: RcWsd.COL_CASE_TH[inp.case] + (d.r.slender ? ' · เสายาว' : ' · เสาสั้น'),
+      rebar: { main: [d.nX + d.nY - 4, d.dMain], stirrup: [d.dTie, d.sTie] } };
+  }
+  const mg = ((S.model.results || {}).merged || {})[x.id];
+  if (mg && inp.src !== 'กรอกเอง') return { need: `รวมกับตอม่อ ${mg} ใน SAP (ผลอยู่ที่ตอม่อ)`, inp };
   if (!(inp.f.P > 0)) return { need: 'ใส่แรงอัด P', inp };
   if ([3, 4].includes(inp.case) && (x.rT === null && x.rB === null)) return { need: 'กรณีเซได้ต้องมีคานต่อที่ปลายเสา', inp };
   const crit = RcWsd.criteria({ fcp: x.fcp, F: +c.F, mode: +c.mode, fy: +c.fy, fyv: +c.fyv });
@@ -622,16 +646,17 @@ function colCard(cols) {
   const D = dsg(), c = D.crit, opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
   const dn = cols.filter(x => S.dsgCol[x.id] && S.dsgCol[x.id].r), pass = dn.filter(x => S.dsgCol[x.id].ok).length;
   return `<div class="card"><h2>เสา คสล. <span class="hint">${dn.length}/${cols.length} ต้นออกแบบได้ · ผ่าน ${pass}</span></h2>
-    <p class="hint">P แรงอัด · Mx ดัดรอบแกน x (ด้านลึก h) · My ดัดรอบแกน y — จาก SAP ใช้ค่ามากสุดของ M2/M3 (ไม่ใช่ชุดเดียวกับ P จึงเผื่อไว้) แก้ได้ · เสาที่ L/B > 15 คิดเป็นเสายาว · ขนาดเหล็กยืนใช้ชุดเดียวกับคาน (เลือกได้ ${(c.colDias || []).map(d => 'DB' + d).join(' ')})</p>
+    <p class="hint">P แรงอัด · Mx ดัดรอบแกน x (ด้านลึก h) · My ดัดรอบแกน y — จาก SAP ตรวจทุกชุดผสมที่ปลายบน/ล่างของเสาแต่ละต้น (แรงพร้อมกัน) แสดงชุดวิกฤต · กรอกเองในช่องใดช่องหนึ่ง = ใช้ค่าที่กรอกชุดเดียว · เสาที่ L/B > 15 คิดเป็นเสายาว · ขนาดเหล็กยืนใช้ชุดเดียวกับคาน (เลือกได้ ${(c.colDias || []).map(d => 'DB' + d).join(' ')})</p>
     ${cols.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>เสา</th><th>b×h (ซม.)</th><th>L (ม.)</th><th>กรณี</th><th>P กก.</th><th>Mx กก.-ม.</th><th>My กก.-ม.</th><th>เหล็กเสริม</th><th></th></tr>
     ${cols.map(x => {
       const o = S.dsgCol[x.id], u = D.cols[x.id] || {}, inp = dsgColInput(x);
-      const cell = k => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-cf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (x.sap ? df2(x.sap[k], 0).replace(/,/g, '') : '')}" placeholder="-">`;
+      const shown = o && o.inp && o.inp.multi && o.d ? o.inp.f : x.sap;
+      const cell = k => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-cf="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (shown ? df2(shown[k], 0).replace(/,/g, '') : '')}" placeholder="-">`;
       return `<tr class="row ${D.sel === 'col:' + x.id ? 'sel' : ''}" data-cl="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">${esc(x.id)}</span>${inp.src ? `<span class="src">${inp.src}</span>` : ''}</td>
         <td class="r" data-l="b×h (ซม.)">${df2(x.Bx, 0)}×${df2(x.By, 0)}</td><td class="r" data-l="L (ม.)">${df2(x.L)}</td>
         <td data-l="กรณี"><select data-cf="case">${[1, 2, 3, 4, 5].map(k => opt(k, inp.case, RcWsd.COL_CASE_TH[k] + (k === inp.auto ? ' *' : ''))).join('')}</select></td>
         <td data-l="P กก.">${cell('P')}</td><td data-l="Mx กก.-ม.">${cell('Mx')}</td><td data-l="My กก.-ม.">${cell('My')}</td>
-        <td class="dsg-rb">${o.r ? `${o.d.nX + o.d.nY - 4}-${RcWsd.barName(o.d.dMain, +c.fy)} · ปลอก RB ${o.d.dTie} @${o.d.sTie}` + (o.error ? `<span class="warnline">${esc(o.error)}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}</td>
+        <td class="dsg-rb">${o.r ? `${o.d.nX + o.d.nY - 4}-${RcWsd.barName(o.d.dMain, +c.fy)} · ปลอก RB ${o.d.dTie} @${o.d.sTie}` + (o.inp.gov ? `<span class="hint">วิกฤต ${esc(o.inp.gov)}</span>` : '') + (o.error ? `<span class="warnline">${esc(o.error)}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}${o.warn ? `<span class="warnline">${esc(o.warn)}</span>` : ''}</td>
         <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
     }).join('')}</table></div>` : '<p class="hint">ไม่มีเสา คสล. ในโมเดล</p>'}
     <p class="hint">* = กรณีที่ระบบเดา (ดัดสองแกนเมื่อมีทั้ง Mx และ My) · กรณีเซได้ใช้สัดส่วนสติฟเนสคาน/เสาจากโมเดล</p>
@@ -644,7 +669,7 @@ function colReport(x, o) {
   const ck = k => (r.checks.find(c => c.code === k) || {}).ok;
   const zoneTh = { 1: 'กรณี I: e < ea (แรงอัดตามแกน)', 2: 'กรณี II: ea ≤ e ≤ eb (แรงอัดเป็นหลัก)', 3: 'กรณี III: e > eb (แรงดึงเป็นหลัก)' }[r.zone] || '-';
   const main = r.checks.find(c => ['pa', 'inter'].includes(c.code)) || {};
-  return `<div class="card dsg-rep"><div class="dsg-head"><b>Tied Columns Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>เสา <b>${esc(x.mark)}</b> (${esc(x.id)}) ${x.level ? 'ชั้น ' + esc(x.level) : ''} · ${esc(o.label)} · แรงจาก${esc(o.inp.src || '-')}</div>
+  return `<div class="card dsg-rep"><div class="dsg-head"><b>Tied Columns Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>เสา <b>${esc(x.mark)}</b> (${esc(x.id)}) ${x.level ? 'ชั้น ' + esc(x.level) : ''} · ${esc(o.label)} · แรงจาก${esc(o.inp.src || '-')}${o.inp.gov ? ' · ชุดวิกฤต ' + esc(o.inp.gov) + ` (ผ่าน ${o.d.nSets - o.d.nFail}/${o.d.nSets} ชุด)` : ''}</div>${o.warn ? `<p class="d-ng">${esc(o.warn)}</p>` : ''}
     <h4>1. ข้อมูล</h4><table class="dsg-calc">
       ${row("f'c / fy", C.main.grade, `${df2(C.fcp, 0)} / ${df2(fy, 0)}`, 'ksc')}${row('fs', '0.4 fy', df2(r.fs, 0), 'ksc')}${row('n', 'Es/Ec', df2(C.n, 3), '', okTag(C.nOk))}
       ${row('Bx × By × L', '', `${df2(p.Bx, 0)} × ${df2(p.By, 0)} ซม. × ${df2(p.L)} ม.`, '')}${row('P / Mx / My', '', `${df2(p.P, 0)} / ${df2(p.Mx, 0)} / ${df2(p.My, 0)}`, 'กก., กก.-ม.')}
@@ -671,24 +696,46 @@ function dsgFootList() {
   const N = Object.fromEntries((m.nodes || []).map(n => [n.id, n])), sec = Object.fromEntries((m.sections || []).map(s => [s.id, s]));
   const GL = ((m.levels || []).find(l => l.name === 'GL') || { z: 0 }).z, reac = (m.results && m.results.reactions) || {};
   const cols = (m.members || []).filter(x => x.type === 'column');
+  const useC = new Set((m.results && m.results.cases_used) || (m.combos || []).map(c => c.id));
   return (m.supports || []).filter(f => f.kind === 'spread' || f.kind === 'pile_cap').map(f => {
     const n = N[f.node] || {}, col = cols.find(c => [c.i, c.j].some(id => N[id] && Math.abs(N[id].x - n.x) < 1e-3 && Math.abs(N[id].y - n.y) < 1e-3));
     const cs = col && sec[col.section] && sec[col.section].kind === 'rc_rect' ? sec[col.section] : null;
-    let sap = null; const rr = reac[f.node];
+    let sap = null, sets = null, uplift = null; const rr = reac[f.node];
+    if (rr) {   // M4b: ทุกชุดผสม (ไม่รวม load case เดี่ยว) · F3 ลบ = แรงยก
+      sets = [];
+      for (const [cb, v] of Object.entries(rr)) {
+        if (!useC.has(cb)) continue;
+        const s1 = { P: +v[2] || 0, Mx: Math.abs(+v[3] || 0), My: Math.abs(+v[4] || 0), tag: cb };
+        if (s1.P > 0) sets.push(s1); else if (s1.P < 0 && (!uplift || -s1.P > uplift.T)) uplift = { T: -s1.P, tag: cb };
+      }
+      if (!sets.length && !uplift) sets = null;
+    }
     if (rr) { const best = Object.entries(rr).sort((a, b) => (+b[1][2] || 0) - (+a[1][2] || 0))[0]; if (best) sap = { P: Math.abs(+best[1][2] || 0), Mx: Math.abs(+best[1][3] || 0), My: Math.abs(+best[1][4] || 0), combo: best[0] }; }
     const mt = (m.materials || []).find(y => y.id === f.material && y.kind === 'concrete') || (m.materials || []).find(y => y.kind === 'concrete') || {};
-    return { id: f.id, mark: f.mark || '', kind: f.kind, Bx: +f.b, By: +f.d, t: +f.h, Df: GL - f.bottom, bx: cs ? cs.b : 0.2, by: cs ? cs.h : 0.2, sap, fcp: RcWsd.fcCyl(mt), piles: f.piles || null };
+    return { id: f.id, mark: f.mark || '', kind: f.kind, Bx: +f.b, By: +f.d, t: +f.h, Df: GL - f.bottom, bx: cs ? cs.b : 0.2, by: cs ? cs.h : 0.2, sap, sets, uplift, fcp: RcWsd.fcCyl(mt), piles: f.piles || null };
   });
 }
 function dsgFootInput(x) {
   const u = dsg().foots[x.id] || {}, has = k => u[k] !== undefined && u[k] !== '', sp = x.sap || {};
   const pick = k => has(k) ? +u[k] : (sp[k] !== undefined ? sp[k] : null);
-  return { f: { P: pick('P'), Mx: pick('Mx') || 0, My: pick('My') || 0 }, src: ['P', 'Mx', 'My'].some(has) ? 'กรอกเอง' : x.sap ? 'SAP' : '' };
+  const own = ['P', 'Mx', 'My'].some(has), multi = !own && !!(x.sets && x.sets.length);
+  return { f: { P: pick('P'), Mx: pick('Mx') || 0, My: pick('My') || 0 }, multi, sets: multi ? x.sets : null, src: own ? 'กรอกเอง' : multi ? `SAP ${x.sets.length} ชุด` : x.sap ? 'SAP' : '' };
 }
 function dsgFootRun(x) {
   const c = dsg().crit, inp = dsgFootInput(x);
-  if (!(+c.qa > 0)) return { need: 'ใส่ qa ในเกณฑ์ออกแบบ', inp };
-  if (!(inp.f.P > 0)) return { need: 'ใส่แรง P', inp };
+  const uw = x.uplift && inp.src !== 'กรอกเอง' ? `แรงยก ${df2(x.uplift.T, 0)} กก. (${x.uplift.tag}) — ตรวจน้ำหนักฐาน + ดินถมต้านแรงยกเอง (Excel ฐานรากไม่มีข้อนี้)` : '';
+  if (!(+c.qa > 0)) return { need: 'ใส่ qa ในเกณฑ์ออกแบบ', inp, warn: uw };
+  if (inp.multi) {
+    const crit = RcWsd.criteria({ fcp: x.fcp, F: +c.F, mode: +c.mode, fy: +c.fy, fyv: +c.fyv });
+    const base = { cov: +c.ftCov, t: x.t, Bx: x.Bx, By: x.By, Df: x.Df, qa: +c.qa, gamma: +c.gamma, pier: 1, bx: x.bx, by: x.by };
+    const dias = (c.ftDias || []).map(Number), d = RcWsd.footingDesignMulti(base, inp.sets, crit, { dias });
+    let sug = '';
+    if (!d.ok && /ฐานเล็ก|ฐานบาง/.test(d.error || '')) { const z = RcWsd.footingDesignMulti(base, inp.sets, crit, { dias, resize: true }); if (z.ok) sug = `แนะนำขนาด ${df2(z.p.Bx)}×${df2(z.p.By)}×${df2(z.p.t)} ม. (แก้ในโมเดล)`; }
+    inp.f = { P: d.gov.P, Mx: d.gov.Mx, My: d.gov.My }; inp.gov = d.gov.tag;
+    return { r: d.r, ok: d.ok, error: d.error || '', sug, warn: uw, d, crit, inp, p: d.p, label: 'ฐานแผ่',
+      rebar: { bars_x: [d.r.nL, d.p.dLong], bars_y: [d.r.nS, d.p.dShort] } };
+  }
+  if (!(inp.f.P > 0)) return { need: 'ใส่แรง P', inp, warn: uw };
   const crit = RcWsd.criteria({ fcp: x.fcp, F: +c.F, mode: +c.mode, fy: +c.fy, fyv: +c.fyv });
   const p = { cov: +c.ftCov, t: x.t, Bx: x.Bx, By: x.By, Df: x.Df, P: inp.f.P, Mx: inp.f.Mx, My: inp.f.My, qa: +c.qa, gamma: +c.gamma, pier: 1, bx: x.bx, by: x.by };
   const d = RcWsd.footingDesign(p, crit, { dias: (c.ftDias || []).map(Number) });
@@ -701,17 +748,18 @@ function footCard(foots) {
   const D = dsg(), c = D.crit;
   const dn = foots.filter(x => S.dsgFoot[x.id] && S.dsgFoot[x.id].r), pass = dn.filter(x => S.dsgFoot[x.id].ok).length;
   return `<div class="card"><h2>ฐานรากแผ่ <span class="hint">${dn.length}/${foots.length} ฐานออกแบบได้ · ผ่าน ${pass}</span></h2>
-    <p class="hint">${+c.qa > 0 ? `qa ${df2(c.qa, 0)} กก./ตร.ม.` : '<b class="d-ng">ยังไม่ได้ใส่ qa</b> (เกณฑ์ออกแบบด้านบน)'} · แรงจาก SAP ใช้ชุดที่ F3 มากสุดที่จุดรองรับ (P, M1→Mx, M2→My) แก้ได้ · น้ำหนักฐานและดินถมคิดให้ในแรงดันดิน · ขนาดฐานใช้ตามโมเดล ถ้าไม่ผ่านระบบแนะนำขนาดใหม่</p>
+    <p class="hint">${+c.qa > 0 ? `qa ${df2(c.qa, 0)} กก./ตร.ม.` : '<b class="d-ng">ยังไม่ได้ใส่ qa</b> (เกณฑ์ออกแบบด้านบน)'} · แรงจาก SAP ตรวจทุกชุดผสมที่จุดรองรับ (F3→P, M1→Mx, M2→My) แสดงชุดวิกฤต · ชุดที่เป็นแรงยกขึ้นเตือน · กรอกเอง = ใช้ค่าที่กรอกชุดเดียว · น้ำหนักฐานและดินถมคิดให้ในแรงดันดิน · ขนาดฐานใช้ตามโมเดล ถ้าไม่ผ่านระบบแนะนำขนาดใหม่</p>
     ${foots.length ? `<div class="table-wrap"><table class="boq dsg-tab"><tr><th>ฐาน</th><th>B×L×t (ม.)</th><th>Df (ม.)</th><th>ตอม่อ (ม.)</th><th>P กก.</th><th>Mx กก.-ม.</th><th>My กก.-ม.</th><th>เหล็กเสริม</th><th></th></tr>
     ${foots.map(x => {
       const o = S.dsgFoot[x.id], u = D.foots[x.id] || {}, inp = dsgFootInput(x);
-      const cell = k => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-ff="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (x.sap ? df2(x.sap[k], 0).replace(/,/g, '') : '')}" placeholder="-">`;
+      const shown = o && o.inp && o.inp.multi && o.d ? o.inp.f : x.sap;
+      const cell = k => `<input class="price${u[k] !== undefined && u[k] !== '' ? ' ov' : ''}" data-ff="${k}" inputmode="decimal" value="${u[k] !== undefined && u[k] !== '' ? esc(u[k]) : (shown ? df2(shown[k], 0).replace(/,/g, '') : '')}" placeholder="-">`;
       const partnerOf = Object.keys(S.dsgStrap || {}).find(k => ((D.foots || {})[k] || {}).strap === x.id);
       const strapSel = partnerOf ? `<span class="src">ฐานในของ strap ${esc(partnerOf)}</span>` : `<div class="dsg-cant">ชิดเขต ยึดกับ <select data-ff="strap">${['<option value="">—</option>'].concat(foots.filter(y => y.id !== x.id).map(y => `<option value="${esc(y.id)}" ${u.strap === y.id ? 'selected' : ''}>${esc(y.mark || '')} ${esc(y.id)}</option>`)).join('')}</select></div>`;
       return `<tr class="row ${D.sel === 'ft:' + x.id ? 'sel' : ''}" data-ft="${esc(x.id)}"><td class="c-name"><b>${esc(x.mark)}</b> <span class="hint">${esc(x.id)}</span>${inp && inp.src ? `<span class="src">${inp.src}</span>` : ''}${strapSel}</td>
         <td class="r" data-l="B×L×t (ม.)">${df2(x.Bx)}×${df2(x.By)}×${df2(x.t)}</td><td class="r" data-l="Df (ม.)">${df2(x.Df)}</td><td class="r" data-l="ตอม่อ (ม.)">${df2(x.bx)}×${df2(x.by)}</td>
         <td data-l="P กก.">${cell('P')}</td><td data-l="Mx กก.-ม.">${cell('Mx')}</td><td data-l="My กก.-ม.">${cell('My')}</td>
-        <td class="dsg-rb">${o.r ? (o.text ? esc(o.text) : `แนว x ${o.r.nL}-${RcWsd.barName(o.d.p.dLong, +c.fy)} @${o.d.p.sLong} · แนว y ${o.r.nS}-${RcWsd.barName(o.d.p.dShort, +c.fy)} @${o.d.p.sShort}`) + (o.error ? `<span class="warnline">${esc(o.error)}${o.sug ? ' · ' + esc(o.sug) : ''}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}</td>
+        <td class="dsg-rb">${o.r ? (o.text ? esc(o.text) : `แนว x ${o.r.nL}-${RcWsd.barName(o.d.p.dLong, +c.fy)} @${o.d.p.sLong} · แนว y ${o.r.nS}-${RcWsd.barName(o.d.p.dShort, +c.fy)} @${o.d.p.sShort}`) + (o.inp && o.inp.gov ? `<span class="hint">วิกฤต ${esc(o.inp.gov)}</span>` : '') + (o.error ? `<span class="warnline">${esc(o.error)}${o.sug ? ' · ' + esc(o.sug) : ''}</span>` : '') : `<span class="hint">${esc(o.need || '')}</span>`}${o.warn ? `<span class="warnline">${esc(o.warn)}</span>` : ''}</td>
         <td>${o.r ? (o.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>') : ''}</td></tr>`;
     }).join('')}</table></div>` : '<p class="hint">ไม่มีฐานรากแผ่ในโมเดล</p>'}
   </div>`;
@@ -722,7 +770,7 @@ function footReport(x, o) {
   const r = o.r, C = o.crit, p = o.p, fy = C.fy, pj = S.boq.project || {}, bn = d => RcWsd.barName(d, fy);
   const row = (a, eq, v, u = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${u}</td><td>${tag}</td></tr>`;
   const ck = k => (r.checks.find(c => c.code === k) || {}).ok;
-  return `<div class="card dsg-rep"><div class="dsg-head"><b>Spread footings Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>ฐาน <b>${esc(x.mark)}</b> (${esc(x.id)}) · แรงจาก${esc(o.inp.src || '-')}${x.sap && o.inp.src === 'SAP' ? ' ชุด ' + esc(x.sap.combo) : ''}</div>
+  return `<div class="card dsg-rep"><div class="dsg-head"><b>Spread footings Design (WSD)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>ฐาน <b>${esc(x.mark)}</b> (${esc(x.id)}) · แรงจาก${esc(o.inp.src || '-')}${o.inp.gov ? ' · ชุดวิกฤต ' + esc(o.inp.gov) : x.sap && o.inp.src === 'SAP' ? ' ชุด ' + esc(x.sap.combo) : ''}</div>${o.warn ? `<p class="d-ng">${esc(o.warn)}</p>` : ''}
     <h4>1. ข้อมูล</h4><table class="dsg-calc">
       ${row("f'c / fc / fs", C.main.grade, `${df2(C.fcp, 0)} / ${df2(C.fc, 2)} / ${df2(C.main.fs, 0)}`, 'ksc')}${row('R, j', '', `${df2(C.main.R, 3)} · ${df2(C.main.j, 4)}`, '')}
       ${row('Bx × By × t', '', `${df2(p.Bx)} × ${df2(p.By)} × ${df2(p.t)}`, 'ม.')}${row('Df / ตอม่อ', '', `${df2(p.Df)} / ${df2(p.bx)}×${df2(p.by)}`, 'ม.')}
