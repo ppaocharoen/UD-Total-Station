@@ -13,7 +13,7 @@
   - by_combo: {id: {combo: {"i": [P, M2, M3], "j": [P, M2, M3]}}}  เฉพาะเสา คสล. (type column) — แรงพร้อมกันที่ปลายเสา
     รายชุดผสม ให้หน้าออกแบบตรวจทุกชุด (M4b 28 พ.ย. 2569) · i = สถานีแรก, j = สถานีสุดท้าย
   - steel_combo: {id: {combo: [[station, P, V2, V3, T, M2, M3], ...]}}  ชิ้นเหล็ก (M6 28 พ.ย. 2569) — แรงพร้อมกันรายชุดผสม
-    เก็บเฉพาะสถานีวิกฤตของแต่ละชุด: ปลาย i, ปลาย j, P/M2/M3 มากสุดและน้อยสุด, |M3|/M3max+|M2|/M2max สูงสุด, |V2|, |V3| สูงสุด
+    เก็บเฉพาะสถานีวิกฤตของแต่ละชุด: ทุกจุดต่อใน frame_joints (ปลายท่อนก่อน + ต้นท่อนถัดไป), ปลาย i, ปลาย j, P/M2/M3 มากสุดและน้อยสุด, |M3|/M3max+|M2|/M2max สูงสุด, |V2|, |V3| สูงสุด
     (ซ้ำกันเก็บครั้งเดียว · เรียงตามสถานี) ให้หน้าออกแบบตรวจ ASD ทุกชุด
   - frame_joints: {id: [joint, ...]}  ชิ้นเหล็กที่ SAP แบ่งเป็นหลาย element (จุดต่อกับชิ้นอื่น เช่น แปบนจันทัน) เรียงจากปลาย i → j
     จากตาราง Objects And Elements - Frames (ไม่บังคับ) · ใช้หาระยะค้ำยัน/ความยาวโก่งเดาะ และจุดวัดการโก่งตัว
@@ -37,12 +37,16 @@ COMP = ["P", "V2", "V3", "T", "M2", "M3"]
 STEEL = {"steel_column", "steel_beam", "rafter", "purlin", "ridge", "hip", "valley", "truss_chord", "truss_web", "brace", "sag_rod"}
 
 
-def steel_rows(rows):
-    """สถานีวิกฤตของชิ้นเหล็กในชุดผสมเดียว: rows = [(station, [P, V2, V3, T, M2, M3])] → [[st, P, V2, V3, T, M2, M3]]"""
+def steel_rows(rows, at=()):
+    """สถานีวิกฤตของชิ้นเหล็กในชุดผสมเดียว: rows = [(station, [P, V2, V3, T, M2, M3])] → [[st, P, V2, V3, T, M2, M3]]
+    at = สถานีของจุดต่อ (ปลาย element) — เก็บทุกแถวที่สถานีนั้น (ทั้งปลายท่อนก่อนและต้นท่อนถัดไป) ใช้สร้างแผนภาพโมเมนต์/การโก่งรายช่วง"""
     if not rows:
         return []
     rows = sorted(rows, key=lambda x: x[0])
     keep = {0, len(rows) - 1}
+    for i, (st, _) in enumerate(rows):
+        if any(abs(st - a) < 2e-3 for a in at):
+            keep.add(i)
     mx = [max(abs(v[k]) for _, v in rows) or 1.0 for k in range(6)]
     idx = range(len(rows))
     for k in (0, 4, 5):           # P M2 M3: ค่ามากสุดและน้อยสุด (เครื่องหมายบอกปีกที่รับแรงอัด)
@@ -149,8 +153,6 @@ def build(m, tables, sidecar=None):
     for (f, c), e2 in sorted(ends.items()):
         by_combo.setdefault(f, {})[c] = {k: [r4(e2[k][1][x]) for x in ("P", "M2", "M3")] for k in ("i", "j")}
     steel_combo = {}
-    for (f, c), rows in sorted(srows.items()):
-        steel_combo.setdefault(f, {})[c] = steel_rows(rows)
     if unknown:
         warn.append("ชิ้นส่วนใน SAP ที่ไม่มีใน .bm.json (ไม่ได้อ่าน): " + ", ".join(sorted(unknown)[:10]))
     from sap_export import Exporter
@@ -189,12 +191,20 @@ def build(m, tables, sidecar=None):
         for f, js in segs.items():
             if len(js) <= 2:
                 continue
-            p0 = ncoord.get(mem[f]["i"]) or xyz.get(mem[f]["i"])
+            p0 = xyz.get(mem[f]["i"]) or ncoord.get(mem[f]["i"])
             pts = [(sum((a - b) ** 2 for a, b in zip(xyz.get(j) or ncoord.get(j), p0)), j) for j in js if (xyz.get(j) or ncoord.get(j))]
             fjoints[f] = [j for _, j in sorted(pts)]
             for j in fjoints[f]:
                 if j not in nodes and j in xyz:
                     aux[j] = xyz[j]
+    # สถานีของจุดต่อตามแนวชิ้น (ระยะจากปลาย i) — เก็บแรงที่ปลายทุกช่วง
+    jst = {}
+    if fjoints:
+        for f, js in fjoints.items():
+            a = xyz.get(js[0]) or ncoord.get(js[0])     # สถานี SAP วัดจากจุดแรกของชิ้นใน SAP (แปถูกย้ายลงระนาบจันทัน)
+            jst[f] = [sum((p - q) ** 2 for p, q in zip(xyz.get(j) or ncoord.get(j), a)) ** 0.5 for j in js]
+    for (f, c), rows in sorted(srows.items()):
+        steel_combo.setdefault(f, {})[c] = steel_rows(rows, jst.get(f, ()))
     disp = {}
     jd = tables.get("Joint Displacements")
     if jd:

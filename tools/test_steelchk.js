@@ -47,5 +47,34 @@ check('over sec รายชิ้น', B.members.find(e => e.id === 'RF-05c').s
 // เสนอหน้าตัด: ผ่านทุกชุดในตระกูลเดิม เบาสุด
 const sg = by('T1-D10').sug;
 check('เสนอหน้าตัดตระกูลกล่อง', sg && /^BOX/.test(sg.name) && sg.ratio <= 1, JSON.stringify(sg));
+
+// ---------- ก้อน 3b: แผนภาพโมเมนต์ จุดดัดกลับ Cb และการโก่งกลางช่วง ----------
+{
+  const R = m.results; let n = 0, bad = 0;
+  for (const l of L) {
+    if (!['rafter', 'purlin', 'steel_beam'].includes(l.type)) continue;
+    for (const c of R.cases_used) {
+      const D = C._lineDiagram(G, R, l, c);
+      for (const id of l.ids) {
+        const s0 = C._dot(C._sub(G.ends[id][0], G.xyz[l.a]), l.d), sg = C._dot(C._unit(C._sub(G.ends[id][1], G.ends[id][0])), l.d) > 0 ? 1 : -1;
+        for (const r of (R.steel_combo[id] || {})[c] || []) {
+          if (G.pts[id].some(p => Math.abs(p.s - r[0]) < 2e-3)) continue;   // แถวที่จุดต่อมีค่ากระโดด (โมเมนต์ส่งเข้าชิ้นที่มาต่อ)
+          const s = s0 + sg * r[0], d = D.find(e => e.id === id && s >= e.lo - 1e-6 && s <= e.hi + 1e-6);
+          n++; if (!d || Math.abs(d.f(s) - r[6]) > 0.5 + 0.02 * Math.abs(r[6])) bad++;
+        }
+      }
+    }
+  }
+  check('แผนภาพโมเมนต์จากปลายช่วง ตรงแถวกลางช่วงของ SAP ทุกแถว', n > 500 && bad === 0, `${bad}/${n}`);
+  // จันทันใต้ลมยก: ปีกล่างรับแรงอัดกลางช่วง → Lb = ระหว่างจุดดัดกลับ (< ช่วงจุดรองรับ 4.31) · Cb = 1 (โมเมนต์สูงสุดอยู่ในช่วง)
+  const w = by('RF-10c').res.worst;
+  check('RF-10c Lb ปีกล่าง = ระหว่างจุดดัดกลับ', w.Lb > 2 && w.Lb < 4.3 && /จุดดัดกลับ/.test(w.LbHow) && w.Cb === 1, JSON.stringify([w.Lb, w.LbHow, w.Cb]));
+  // ตรงจุดรองรับ (โมเมนต์ลบมากสุดที่ปลายช่วง) Cb = 1.75 + …
+  const rows = by('RF-05b').res.rows.filter(r => r.LbHow && /จุดดัดกลับ/.test(r.LbHow));
+  check('ปีกล่างที่จุดรองรับ Cb > 1.5', rows.some(r => r.Cb >= 1.5), rows.slice(0, 3).map(r => [r.Lb, r.Cb]));
+  // แป: การโก่งกลางช่วง = เฉลี่ยปลาย + 5qL⁴/384EI + (Ma+Mb)L²/16EI
+  const pl2 = by('PL-R1-02');
+  check('แปมีการโก่งกลางช่วง (ไม่มีจุดต่อระหว่างจันทัน)', pl2.defl && pl2.defl.worst.mid && pl2.defl.worst.d > 0.05 && pl2.defl.worst.d < 0.45, JSON.stringify(pl2.defl));
+}
 console.log(`PASS ${pass} · FAIL ${fail}`);
 process.exit(fail ? 1 : 0);
