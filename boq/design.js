@@ -90,6 +90,7 @@ function renderDesign() {
   const retains = dsgRetainList(); S.dsgRetain = {}; retains.forEach(x => { S.dsgRetain[x.id] = dsgRetainRun(x); });
   const plates = dsgPlateList(); S.dsgPlate = {}; plates.forEach(x => { S.dsgPlate[x.id] = dsgPlateRun(x); });
   const stairs = dsgStairList(); S.dsgStair = {}; stairs.forEach(x => { S.dsgStair[x.id] = dsgStairRun(x); });
+  const stl = dsgSteelRun(), stlG = stl ? dsgSteelGroups(stl) : null;
   const nRes = Object.keys((S.model.results && S.model.results.members) || {}).length;
   const opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
   const done = beams.filter(b => S.dsgOut[b.id]), pass = done.filter(b => S.dsgOut[b.id].ok).length;
@@ -145,14 +146,16 @@ function renderDesign() {
   ${pileCard(piles)}
   ${retainCard(retains)}
   ${plateCard(plates)}
-  <div id="dsg-report">${D.sel && D.sel.startsWith('rw:') && S.dsgRetain[D.sel.slice(3)] && S.dsgRetain[D.sel.slice(3)].r ? retainReport(retains.find(x => x.id === D.sel.slice(3)), S.dsgRetain[D.sel.slice(3)])
+  ${stlCard(stl, stlG)}
+  <div id="dsg-report">${D.sel && D.sel.startsWith('stl:') && stl && stl.byId[D.sel.slice(4)] ? stlReport(stl.byId[D.sel.slice(4)])
+    : D.sel && D.sel.startsWith('rw:') && S.dsgRetain[D.sel.slice(3)] && S.dsgRetain[D.sel.slice(3)].r ? retainReport(retains.find(x => x.id === D.sel.slice(3)), S.dsgRetain[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('pc:') && S.dsgPile[D.sel.slice(3)] && S.dsgPile[D.sel.slice(3)].r ? pileReport(piles.find(x => x.id === D.sel.slice(3)), S.dsgPile[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('st:') && S.dsgStair[D.sel.slice(3)] && S.dsgStair[D.sel.slice(3)].r ? stairReport(stairs.find(x => x.id === D.sel.slice(3)), S.dsgStair[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('pl:') && S.dsgPlate[D.sel.slice(3)] && S.dsgPlate[D.sel.slice(3)].r ? plateReport(plates.find(x => x.id === D.sel.slice(3)), S.dsgPlate[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('col:') && S.dsgCol[D.sel.slice(4)] && S.dsgCol[D.sel.slice(4)].r ? colReport(cols.find(x => x.id === D.sel.slice(4)), S.dsgCol[D.sel.slice(4)])
     : D.sel && D.sel.startsWith('ft:') && S.dsgFoot[D.sel.slice(3)] && S.dsgFoot[D.sel.slice(3)].r ? footReport(foots.find(x => x.id === D.sel.slice(3)), S.dsgFoot[D.sel.slice(3)])
     : D.sel && D.sel.startsWith('slab:') && S.dsgSlab[D.sel.slice(5)] && S.dsgSlab[D.sel.slice(5)].r ? slabReport(slabs.find(x => x.id === D.sel.slice(5)), S.dsgSlab[D.sel.slice(5)])
-    : D.sel && S.dsgOut[D.sel] ? beamReport(beams.find(b => b.id === D.sel), S.dsgOut[D.sel]) : '<div class="card hint">แตะแถวคาน พื้น เสา หรือฐานรากเพื่อดูรายการคำนวณ</div>'}</div>`;
+    : D.sel && S.dsgOut[D.sel] ? beamReport(beams.find(b => b.id === D.sel), S.dsgOut[D.sel]) : '<div class="card hint">แตะแถวคาน พื้น เสา ฐานราก หรือชิ้นเหล็กเพื่อดูรายการคำนวณ</div>'}</div>`;
   bindDesign(beams, slabs, cols, foots, plates, stairs, piles, retains);
 }
 function bindDesign(beams, slabs, cols, foots, plates, stairs, piles, retains) {
@@ -206,6 +209,7 @@ function bindDesign(beams, slabs, cols, foots, plates, stairs, piles, retains) {
   $('#dsg-write').onclick = () => dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains);
   $('#dsg-dl').onclick = () => { download(S.modelName.replace(/(\.bm)?\.json$/, '') + '.bm.json', JSON.stringify(S.model, null, 1)); };
   $('#dsg-print').onclick = () => dsgPrint(beams, slabs, cols, foots, plates, stairs, piles, retains);
+  bindSteel();
 }
 function dsgWrite(beams, slabs, cols, foots, plates, stairs, piles, retains = []) {
   const m = S.model, c = dsg().crit, D = dsg(); m.design = m.design || {}; m.design.members = m.design.members || {};
@@ -341,9 +345,17 @@ function dsgPrint(beams, slabs, cols, foots, plates, stairs, piles = [], retains
   const stl = sel ? stairs.filter(x => 'st:' + x.id === sel && S.dsgStair[x.id].r) : stairs.filter(x => S.dsgStair[x.id] && S.dsgStair[x.id].r);
   const rwl = sel ? retains.filter(x => 'rw:' + x.id === sel && S.dsgRetain[x.id].r) : retains.filter(x => S.dsgRetain[x.id] && S.dsgRetain[x.id].r);
   const pcl = sel ? piles.filter(x => 'pc:' + x.id === sel && S.dsgPile[x.id].r) : piles.filter(x => S.dsgPile[x.id] && S.dsgPile[x.id].r);
-  if (!bl.length && !sl.length && !cl.length && !fl.length && !pcl.length && !rwl.length && !pl.length && !stl.length) return toast('ยังไม่มีรายการคำนวณ');
+  // เหล็กรูปพรรณ: เลือกแถว = ชิ้นนั้น · ไม่เลือก = ตารางสรุป + ชิ้นคุมของแต่ละชนิด + ชิ้นที่ไม่ผ่าน (Earth 28 พ.ย. 2569)
+  const SA = dsgSteelRun(), SR = SA ? dsgSteelGroups(SA) : null;
+  let sml = [], ssum = '';
+  if (sel.startsWith('stl:')) { if (SA && SA.byId[sel.slice(4)]) sml = [SA.byId[sel.slice(4)]]; }
+  else if (!sel && SA && SA.members.some(e => e.res && e.res.rows)) {
+    const ids = new Set((SR ? SR.groups.map(g => g.gov) : []).concat(SA.members.filter(e => e.res && e.res.rows && !e.ok).map(e => e.id)));
+    sml = SA.members.filter(e => ids.has(e.id)); ssum = stlSumReport(SA, SR);
+  }
+  if (!bl.length && !sl.length && !cl.length && !fl.length && !pcl.length && !rwl.length && !pl.length && !stl.length && !sml.length) return toast('ยังไม่มีรายการคำนวณ');
   $('#dsg-printout').innerHTML = bl.map(b => beamReport(b, S.dsgOut[b.id])).join('') + sl.map(x => slabReport(x, S.dsgSlab[x.id])).join('')
-    + cl.map(x => colReport(x, S.dsgCol[x.id])).join('') + fl.map(x => footReport(x, S.dsgFoot[x.id])).join('') + pcl.map(x => pileReport(x, S.dsgPile[x.id])).join('') + rwl.map(x => retainReport(x, S.dsgRetain[x.id])).join('') + pl.map(x => plateReport(x, S.dsgPlate[x.id])).join('') + stl.map(x => stairReport(x, S.dsgStair[x.id])).join('');
+    + cl.map(x => colReport(x, S.dsgCol[x.id])).join('') + fl.map(x => footReport(x, S.dsgFoot[x.id])).join('') + pcl.map(x => pileReport(x, S.dsgPile[x.id])).join('') + rwl.map(x => retainReport(x, S.dsgRetain[x.id])).join('') + pl.map(x => plateReport(x, S.dsgPlate[x.id])).join('') + stl.map(x => stairReport(x, S.dsgStair[x.id])).join('') + ssum + sml.map(e => stlReport(e, true)).join('');
   document.body.classList.add('print-dsg');
   setTimeout(() => { window.print(); document.body.classList.remove('print-dsg'); }, 300);
 }
@@ -1414,4 +1426,209 @@ function stairReport(x, o) {
       ${row('แรงลงที่รองรับ', 'w·L/2', df2(r.Vb, 1), 'กก./ม.')}
     </table>
     <h4>สรุป ${okTag(o.ok)}</h4><p class="dsg-sum">เหล็กหลัก ${bn(o.d.dm)} @${o.d.sA} ม. · เหล็กกันร้าว ${bn(o.d.dt)} @${o.d.sB} ม.</p>${o.error ? `<p class="d-ng">${esc(o.error)}</p>` : ''}</div>`;
+}
+
+// ------------------------------------------------------------------ เหล็กรูปพรรณ ASD (M6 ก้อน 3c · AISC 89 · ตรวจซ้ำจากผล SAP)
+// ตกลงกับ Earth 28 พ.ย. 2569: SAP ยังเป็นตัวออกแบบหลัก · หน้านี้ตรวจซ้ำทุกชิ้นด้วยแรงพร้อมกันรายชุด เสนอหน้าตัดเบาสุดที่ผ่าน แล้วจัดชนิด
+// ไม่แก้หน้าตัดในโมเดล · ค่าที่แก้ (Lb, KL, หน้าตัด รายประเภท/รายชิ้น) เก็บใน dsg().steel
+const STL_CAT = { rafter: 'RF', purlin: 'P', ridge: 'RG', hip: 'HP', valley: 'VL', steel_beam: 'SB', steel_column: 'SC', truss_chord: 'TC', truss_web: 'TW', brace: 'BR', sag_rod: 'SR' };
+const STL_GRADES = [['Fe-24', 'Fe-24 (Fy 2,400)'], ['SS400', 'SS400 / SSC400 (Fy 2,450)'], ['Fe-30', 'Fe-30 (Fy 3,000)'], ['SM520', 'SM520 (Fy 3,550)']];
+const STL_KEYS = [['KLx', 'KLx'], ['KLy', 'KLy'], ['Lb', 'Lb ปีกบน'], ['LbNeg', 'Lb ปีกล่าง'], ['sec', 'หน้าตัด']];
+function dsgStl() {
+  const D = dsg(), T = D.steel = D.steel || {}, def = { grade: 'Fe-24', n: 240, sameShape: false, onlyFail: false };
+  for (const k in def) if (T[k] === undefined) T[k] = def[k];
+  T.byType = T.byType || {}; T.over = T.over || {}; return T;
+}
+/** ตรวจทุกชิ้นเหล็ก (แคช — analyze ใช้ ~1.5 วิ กับ ท12) → ผลของ SteelChk.analyze หรือ null ถ้าไม่มีชิ้นเหล็ก */
+function dsgSteelRun() {
+  const m = S.model, T = dsgStl();
+  if (!m || typeof SteelChk === 'undefined' || !(m.members || []).some(x => SteelChk.STEEL.includes(x.type))) return null;
+  const key = JSON.stringify([T.grade, +T.n || 240, !!T.sameShape, T.byType, T.over]), c = S._stl;
+  if (c && c.m === m && c.r === m.results && c.key === key) return c.A;
+  const A = SteelChk.analyze(m, { mat: T.grade, n: +T.n || 240, byType: T.byType, over: T.over, sameShape: !!T.sameShape });
+  A.byId = Object.fromEntries(A.members.map(e => [e.id, e]));
+  S._stl = { m, r: m.results, key, A }; S._stlG = null; return A;
+}
+/** ชื่อหน้าตัดในโมเดลของชิ้น (ที่ steelsec อ่านได้) */
+function dsgStlModelSec(id) {
+  const m = S.model, x = (m.members || []).find(y => y.id === id) || {}, sd = (m.sections || []).find(s => s.id === x.section) || {};
+  return [x.section, sd.name].filter(Boolean).find(n => SteelSec.props(String(n).replace(/^\[\]-?/, 'BOX'))) || x.section;
+}
+/** จัดชนิดเหล็ก: cand = หน้าตัดเบาสุดที่ผ่านของชิ้นเอง · score = กก./ม. · ตรวจ = แรงทุกชุดของชิ้นนั้นด้วยหน้าตัดของชนิด */
+function dsgSteelGroups(A) {
+  const G = dsgGrpOpt(), T = dsgStl(), key = JSON.stringify([G.maxTypes, G.byMark, G.assign, T.sameShape]);
+  if (S._stlG && S._stlG.A === A && S._stlG.key === key) return S._stlG.R;
+  const E = {}, items = [], skip = [], mk = {};
+  // ชื่อในแบบเป็นชื่อชิ้นประกอบ (เช่น โครงถัก T1 มีท่อนหลายขนาด) → ชื่อเดียวกันแต่หน้าตัดในโมเดลต่างกัน แยกกลุ่มตามหน้าตัด
+  A.members.forEach(e => { if (e.mark) (mk[e.type + '|' + e.mark] = mk[e.type + '|' + e.mark] || new Set()).add(dsgStlModelSec(e.id)); });
+  for (const e of A.members) {
+    if (!e.p || !e.res || !e.fl || !e.fl.length) { skip.push(e.id); continue; }
+    E[e.id] = e;
+    const sh = T.sameShape ? ` ${e.p.flat ? e.p.B + '×' + e.p.H : e.p.H + '×' + e.p.B}` : '';
+    items.push({ id: e.id, cat: STL_CAT[e.type] || e.type, size: (e.p.famName || e.p.fam) + sh, mark: e.mark ? (mk[e.type + '|' + e.mark].size > 1 ? `${e.mark} ${dsgStlModelSec(e.id)}` : e.mark) : '', score: +(e.sug ? e.sug.w : e.p.w), cand: e.sug ? e.sug.name : e.sec });
+  }
+  const groups = DsgGroup.group(items, (id, k) => SteelChk.trySec(E[id], k), { maxTypes: +G.maxTypes || 3, byMark: G.byMark !== false, assign: G.assign, key: k => k })
+    .map(g => Object.assign(g, { kind: 'stl', type: E[g.ids[0]].type }));
+  let wModel = 0, wGrp = 0;
+  for (const g of groups) {
+    const ms = new Set(), bad = [], q = SteelSec.props(String(g.cand).replace(/^\[\]-?/, 'BOX'));
+    g.w = q ? q.w : g.score; g.len = 0;
+    for (const id of g.ids) {
+      const e = E[id], s0 = dsgStlModelSec(id); ms.add(s0);
+      if (!SteelChk.trySec(e, s0).ok) bad.push(id);
+      const p0 = SteelSec.props(String(s0).replace(/^\[\]-?/, 'BOX'));
+      g.len += e.br.L; wModel += e.br.L * (p0 ? p0.w : 0); wGrp += e.br.L * g.w;
+    }
+    g.draw = { text: [...ms].join(' / '), bad, n: g.ids.length };
+  }
+  const R = { groups, skip, E, wModel, wGrp };
+  S._stlG = { A, key, R }; return R;
+}
+const stlEq = e => {
+  if (!e.res || !e.res.worst) return '';
+  const w = e.res.worst, d = e.defl && e.defl.worst.ratio > (e.res.ratio || 0) ? e.defl : null;
+  return d ? `การโก่งตัว${d.cant ? ' (ช่วงยื่น)' : ''}` : `${w.govern}${w.eq ? ' · ' + w.eq : ''}`;
+};
+function stlCard(A, R) {
+  if (!A) return '';
+  const T = dsgStl(), D = dsg(), G = dsgGrpOpt(), opt = (v, cur, t) => `<option value="${v}" ${String(v) === String(cur) ? 'selected' : ''}>${t}</option>`;
+  const ord = t => SteelChk.STEEL.indexOf(t), nat = (a, b) => a.localeCompare(b, 'en', { numeric: true });
+  const mem = A.members.slice().sort((a, b) => ord(a.type) - ord(b.type) || nat(a.id, b.id));
+  const chk = mem.filter(e => e.res && e.res.rows), nOk = chk.filter(e => e.ok).length, nNg = chk.length - nOk;
+  const types = [...new Set(mem.map(e => e.type))];
+  const tCell = (t, k) => { const v = (T.byType[t] || {})[k]; return `<input class="price${v !== undefined && v !== '' ? ' ov' : ''}" data-stt="${esc(t)}" data-sk="${k}" ${k === 'sec' ? '' : 'inputmode="decimal"'} value="${v !== undefined ? esc(v) : ''}" placeholder="${k === 'sec' ? 'ตามโมเดล' : 'อัตโนมัติ'}">`; };
+  const typeRows = types.map(t => {
+    const es = mem.filter(e => e.type === t), secs = [...new Set(es.map(e => dsgStlModelSec(e.id)))];
+    return `<tr><td class="c-name"><b>${esc(SteelChk.TYPE_TH[t] || t)}</b></td><td class="r">${es.length}</td><td>${esc(secs.join(', '))}</td>${STL_KEYS.map(([k]) => `<td data-l="${k}">${tCell(t, k)}</td>`).join('')}</tr>`;
+  }).join('');
+  const show = T.onlyFail ? mem.filter(e => e.res && e.ok === false) : mem;
+  const rows = show.map(e => {
+    const w = e.res && e.res.worst, d = e.defl, ov = e.ov || {}, sel = D.sel === 'stl:' + e.id;
+    const lb = w && w.Lb != null && (w.fbx || w.fby) ? `${df2(w.Lb)} / ${df2(w.Cb)}<br><span class="hint">${esc(w.LbHow || '')}</span>` : w && w.KLr ? `<span class="hint">KL/r ${df2(w.KLr, 0)}</span>` : '-';
+    return `<tr class="row ${sel ? 'sel' : ''}" data-sm="${esc(e.id)}"><td class="c-name"><b>${esc(e.mark)}</b> <span class="hint">${esc(e.id)}</span>${Object.keys(ov).length ? '<span class="src">แก้เอง</span>' : ''}</td>
+      <td data-l="ประเภท">${esc(e.typeTh)}</td><td data-l="หน้าตัด">${esc(e.sec)}${ov.sec ? ' <span class="src">แทน</span>' : ''}</td>
+      ${e.res && e.res.rows ? `<td class="r" data-l="อัตราส่วน">${df2(e.ratio)}</td><td data-l="คุมโดย">${esc(stlEq(e))}</td><td data-l="ชุดวิกฤต">${esc(w.combo || '')}${w.st != null ? ` <span class="hint">@${df2(w.st)} ม.</span>` : ''}</td>
+      <td data-l="Lb (ม.) / Cb">${lb}</td><td class="r" data-l="การโก่ง (ซม.)">${d ? `${df2(d.worst.d)} / ${df2(d.worst.allow)}${d.cant ? ' <span class="hint">ยื่น</span>' : ''}` : '-'}</td>
+      <td data-l="เสนอ">${e.sug ? `${esc(e.sug.name)} <span class="hint">${df2(e.sug.w)} กก./ม. · ${df2(e.sug.ratio)}</span>${e.sug.name === e.sec ? ' <span class="hint">(เดิม)</span>' : ''}` : '<span class="warnline">ไม่มีหน้าตัดในตระกูลที่ผ่าน</span>'}</td>
+      <td>${e.ok ? '<span class="pill ok">ผ่าน</span>' : '<span class="pill err">ไม่ผ่าน</span>'}</td>`
+      : `<td colspan="7"><span class="hint">${e.p ? 'ไม่มีแรงจาก SAP' : esc(((e.res || {}).worst || {}).warn || '')}</span></td>`}</tr>`;
+  }).join('');
+  const gName = cat => R.groups.filter(g => g.cat === cat).map(g => g.name);
+  const grows = R.groups.map(g => {
+    const umax = Math.max(...Object.values(g.util));
+    const chips = g.ids.map(id => `<span class="grp-chip">${esc(id)}${id === g.gov ? ' ★' : ''} <span class="hint">${df2(g.util[id], 2)}</span><select data-gmove="${esc(id)}" title="ย้ายไปชนิด">${[`<option value="">${G.assign[id] ? 'คืนอัตโนมัติ' : '⇄'}</option>`].concat(gName(g.cat).map(nm => `<option value="${esc(nm)}" ${G.assign[id] === nm ? 'selected' : ''}>${esc(nm)}</option>`), ['<option value="__new">+ ชนิดใหม่…</option>']).join('')}</select></span>`).join(' ');
+    const dr = g.draw.bad.length ? `<span class="warnline">${esc(g.draw.text)} — ไม่ผ่าน ${g.draw.bad.length}/${g.draw.n} ชิ้น: ${esc(g.draw.bad.join(', '))}</span>` : `${esc(g.draw.text)} <span class="pill ok">ผ่าน ${g.draw.n} ชิ้น</span>`;
+    return `<tr><td class="c-name"><b>${esc(g.name)}</b>${g.fromMark ? ' <span class="src">ตามแบบ</span>' : g.fixed ? ' <span class="src">ตั้งเอง</span>' : ''}</td><td>${esc(SteelChk.TYPE_TH[g.type] || g.type)}</td><td class="r">${g.ids.length}</td><td class="r">${df2(g.len)}</td>
+      <td class="dsg-rb">${esc(g.cand)} <span class="hint">${df2(g.w)} กก./ม.</span>${g.fails.length ? `<span class="warnline">ไม่ผ่าน: ${esc(g.fails.join(', '))} — แยกชนิดหรือแก้หน้าตัด</span>` : ''}</td><td class="r">${df2(umax, 2)}</td><td class="dsg-rb">${dr}</td><td class="grp-ids">${chips}</td></tr>`;
+  }).join('');
+  return `<div class="card"><h2>เหล็กรูปพรรณ ASD (AISC 89) <span class="hint">ตรวจ ${chk.length}/${mem.length} ชิ้น · ผ่าน ${nOk}${nNg ? ` · <b class="d-ng">ไม่ผ่าน ${nNg}</b>` : ''}</span></h2>
+    <p class="hint">ตรวจซ้ำจากผล SAP ทุกชุดผสม (แรงที่เกิดพร้อมกันที่ทุกจุดต่อ) · แรงอัด+ดัด H1 เต็ม (Cm 0.85) · แรงดึง+ดัด H2 · LTB ของ C ใช้ max(F1-6/7, F1-8) · Lb ปีกบน = ระยะจุดต่อ (แป) · Lb ปีกล่าง = จุดรองรับ↔จุดดัดกลับ พร้อม Cb จากแผนภาพโมเมนต์ · K = 1 · ผนังบางเกิน b/t เตือนอย่างเดียว · การโก่งตัวจากการเคลื่อนที่ของจุดใน SAP L/${esc(T.n)} (ช่วงยื่น 2L/${esc(T.n)}) · ไม่แก้หน้าตัดในโมเดล — ใช้เป็นข้อมูลแก้แบบ/โมเดล SAP เอง</p>
+    ${A.warn.length ? `<p class="d-ng">${A.warn.map(esc).join('<br>')}</p>` : ''}
+    <div class="form-grid dsg-crit">
+      <label>เกรดเหล็ก<select data-stc="grade">${STL_GRADES.map(([v, t]) => opt(v, T.grade, t)).join('')}</select></label>
+      <label>การโก่งตัวยอมให้ L/n<input data-stc="n" inputmode="numeric" value="${esc(T.n)}"></label>
+      <label>เสนอหน้าตัด<select data-stc="sameShape">${opt(0, T.sameShape ? 1 : 0, 'ตระกูลเดิม ทุกขนาด')}${opt(1, T.sameShape ? 1 : 0, 'ขนาดเดิม เปลี่ยนแค่ความหนา')}</select></label>
+    </div>
+    <h4>แก้ค่ารายประเภท <span class="hint">(ม. · ว่าง = อ่านจากโมเดล · ค่ารายชิ้นแก้ในรายการคำนวณของชิ้น · หน้าตัดแทน = ลองหน้าตัดอื่นโดยไม่แก้โมเดล)</span></h4>
+    <div class="table-wrap"><table class="boq dsg-tab"><tr><th>ประเภท</th><th>จำนวน</th><th>หน้าตัดในโมเดล</th>${STL_KEYS.map(([, t]) => `<th>${t}</th>`).join('')}</tr>${typeRows}</table></div>
+    <h4>รายชิ้น <span class="hint">${show.length} ชิ้น · แตะแถวเพื่อดูรายการคำนวณ</span> <label class="ck hint"><input type="checkbox" data-stc="onlyFail" ${T.onlyFail ? 'checked' : ''}> แสดงเฉพาะชิ้นที่ไม่ผ่าน</label></h4>
+    <div class="table-wrap"><table class="boq dsg-tab"><tr><th>ชิ้น</th><th>ประเภท</th><th>หน้าตัด</th><th>อัตราส่วน</th><th>คุมโดย</th><th>ชุดวิกฤต</th><th>Lb (ม.) / Cb</th><th>การโก่ง / ยอมให้ (ซม.)</th><th>เสนอ (เบาสุดที่ผ่าน)</th><th></th></tr>${rows}</table></div>
+    ${R && R.groups.length ? `<h4>ชนิดเหล็ก (จัดกลุ่ม) <span class="hint">${R.groups.length} ชนิด · น้ำหนักตามโมเดล ${df2(R.wModel, 1)} กก. → ตามชนิด ${df2(R.wGrp, 1)} กก.</span></h4>
+    <p class="hint">ชิ้นที่มีชื่อในแบบใช้ชื่อในแบบเป็นกลุ่ม · ไม่มีชื่อ = ตามประเภทและตระกูลหน้าตัด แบ่งตามน้ำหนักไม่เกินจำนวนชนิดที่ตั้งในการ์ดชนิดคาน/เสา · หน้าตัดของชนิด = หน้าตัดเบาสุดที่ผ่านทุกชิ้นในชนิด (★ = ชิ้นที่คุม · ตัวเลขข้างชื่อชิ้น = อัตราส่วนเมื่อใช้หน้าตัดของชนิด)</p>
+    <div class="table-wrap"><table class="boq dsg-tab"><tr><th>ชนิด</th><th>ประเภท</th><th>จำนวน</th><th>ยาวรวม (ม.)</th><th>หน้าตัดของชนิด</th><th>ใช้งานสูงสุด</th><th>หน้าตัดในโมเดล</th><th>ชิ้น (ย้ายชนิดได้)</th></tr>${grows}</table></div>` : ''}
+    ${R && R.skip.length ? `<p class="hint">ไม่ได้จัดกลุ่ม (ไม่มีแรง/อ่านหน้าตัดไม่ได้): ${esc(R.skip.join(', '))}</p>` : ''}
+  </div>`;
+}
+/** รายการคำนวณชิ้นเหล็ก · print = ไม่ใส่ช่องแก้ค่า */
+function stlReport(e, print) {
+  if (!e) return '';
+  const pj = S.boq.project || {}, p = e.p, T = dsgStl(), u = T.over[e.id] || {};
+  const row = (a, eq, v, un = '', tag = '') => `<tr><td>${a}</td><td class="eq">${eq}</td><td class="r">${v}</td><td>${un}</td><td>${tag}</td></tr>`;
+  const head = `<div class="card dsg-rep"><div class="dsg-head"><b>Steel Member Check — ASD (AISC 1989)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>ชิ้น <b>${esc(e.mark)}</b> (${esc(e.id)}) · ${esc(e.typeTh)} · ${esc(e.sec)}${e.ov && e.ov.sec ? ' (หน้าตัดแทน — ในโมเดล ' + esc(dsgStlModelSec(e.id)) + ')' : ''}</div>`;
+  const ovf = print ? '' : `<div class="dsg-crit form-grid stl-ov">${STL_KEYS.map(([k, t]) => `<label>${t}${k === 'sec' ? '' : ' (ม.)'}<input class="${u[k] !== undefined ? 'ov' : ''}" data-smo="${esc(e.id)}" data-sk="${k}" ${k === 'sec' ? '' : 'inputmode="decimal"'} value="${u[k] !== undefined ? esc(u[k]) : ''}" placeholder="${k === 'sec' ? esc(e.sec) : k === 'Lb' || k === 'LbNeg' ? 'อัตโนมัติ' : df2(e.br[k], 2)}"></label>`).join('')}</div><p class="hint">แก้ค่ารายชิ้น (ว่าง = ใช้ค่ารายประเภท/อ่านจากโมเดล) · Lb ที่กรอกเองใช้ Cb = 1</p>`;
+  if (!p) return head + ovf + `<p class="d-ng">อ่านหน้าตัด "${esc(e.sec)}" ไม่ได้</p></div>`;
+  if (!e.res || !e.res.rows) return head + ovf + '<p class="hint">ไม่มีแรงจาก SAP ของชิ้นนี้</p></div>';
+  const w = e.res.worst, f = e.fl[e.res.rows.indexOf(w)] || {}, mat = SteelASD.material(T.grade);
+  const s1 = `<h4>1. หน้าตัดและวัสดุ</h4><table class="dsg-calc">
+    ${row('หน้าตัด', `${esc(p.famName || p.fam)} · ${p.src === 'table' ? 'ตาราง RC_Design' : 'คำนวณผนังบาง'}${p.flat ? ' · วางแบน (สลับแกน)' : ''}`, esc(p.name), '', '')}
+    ${row('A / w', '', `${df2(p.A)} / ${df2(p.w)}`, 'ตร.ซม., กก./ม.')}
+    ${row('Ix / Iy', 'แกน x = แกน 3 ของ SAP', `${df2(p.Ix, 1)} / ${df2(p.Iy, 1)}`, 'ซม.⁴')}
+    ${row('Sx / Sy', '', `${df2(p.Sx)} / ${df2(p.Sy)}`, 'ซม.³')}
+    ${row('rx / ry' + (p.rT ? ' / rT' : ''), '', `${df2(p.rx)} / ${df2(p.ry)}${p.rT ? ' / ' + df2(p.rT) : ''}`, 'ซม.')}
+    ${row('Fy / Fu / E', esc(mat.grade), `${df2(mat.Fy, 0)} / ${df2(mat.Fu, 0)} / ${df2(mat.E, 0)}`, 'ksc')}
+  </table>${p.tableNote ? `<p class="d-note">${esc(p.tableNote)}</p>` : ''}`;
+  const src = k => (u[k] !== undefined ? 'กำหนดเอง (รายชิ้น)' : (T.byType[e.type] || {})[k] !== undefined ? 'กำหนดเอง (รายประเภท)' : '');
+  const s2 = `<h4>2. ความยาวและระยะค้ำ (K = 1)</h4><table class="dsg-calc">
+    ${row('L', 'ความยาวชิ้น', df2(e.br.L), 'ม.')}
+    ${row('KLx / KLy', src('KLx') || src('KLy') || 'ระหว่างจุดต่อ', `${df2(e.opt.Lx)} / ${df2(e.opt.Ly)}`, 'ม.')}
+    ${row('Lb ปีกบน', src('Lb') || 'ระหว่างจุดต่อ (แป/ชิ้นที่มาต่อ)', df2(e.lbo.Lb != null ? e.lbo.Lb : e.br.Lb), 'ม.')}
+    ${row('Lb ปีกล่าง', src('LbNeg') || 'จุดรองรับ↔จุดดัดกลับ รายชุด (ค่าตั้งต้น = ช่วงจุดรองรับ)', df2(e.lbo.LbNeg != null ? e.lbo.LbNeg : e.br.LbNeg), 'ม.')}
+  </table>`;
+  const comp = w.fa != null, ten = w.ft != null, bend = w.fbx || w.fby;
+  const s3 = `<h4>3. ตรวจชุดวิกฤต ${esc(w.combo || '')}${w.st != null ? ` ที่ ${df2(w.st)} ม. จากปลาย i` : ''}</h4><table class="dsg-calc">
+    ${row('แรง', 'P (+ดึง −อัด) · M3 · M2 · V2 · V3', `${df2(f.P, 0)} · ${df2(f.Mx, 1)} · ${df2(f.My, 1)} · ${df2(f.V2, 0)} · ${df2(f.V3, 0)}`, 'กก., กก.-ม.')}
+    ${comp ? row('fa / Fa', `fa = P/A · Fa (E2-1/E2-2) KL/r = ${df2(w.KLr, 1)}, Cc = ${df2(w.Cc, 1)}`, `${df2(w.fa)} / ${df2(w.Fa)}`, 'ksc', df2(w.fa / w.Fa, 3)) : ''}
+    ${ten ? row('ft / Ft', `ft = P/A · Ft = min(0.6Fy, 0.5Fu·Ae/Ag) · L/r = ${df2(w.Lr, 1)}`, `${df2(w.ft)} / ${df2(w.Ft)}`, 'ksc', df2(w.ft / w.Ft, 3)) : ''}
+    ${bend ? row('fbx / Fbx', `fbx = Mx/Sx · ${esc(w.FbxHow || '')}`, `${df2(w.fbx)} / ${df2(w.Fbx)}`, 'ksc', df2(w.fbx / w.Fbx, 3)) : ''}
+    ${bend ? row('Lb / Cb', esc(w.LbHow || ''), `${df2(w.Lb)} / ${df2(w.Cb)}`, 'ม.') : ''}
+    ${bend ? row('fby / Fby', `fby = My/Sy · ${esc(w.FbyHow || '')}`, `${df2(w.fby)} / ${df2(w.Fby)}`, 'ksc', df2(w.fby / w.Fby, 3)) : ''}
+    ${w.eq === 'H1-1/H1-2' ? row('H1-1', `fa/Fa + Cmx·fbx/((1−fa/F′ex)·Fbx) + Cmy·fby/((1−fa/F′ey)·Fby) · Cm ${w.Cmx} · F′ex ${df2(w.Fex, 0)} · F′ey ${df2(w.Fey, 0)}`, df2(w.H1_1, 3), '', okTag(w.H1_1 <= 1)) + row('H1-2', 'fa/(0.6Fy) + fbx/Fbx + fby/Fby', df2(w.H1_2, 3), '', okTag(w.H1_2 <= 1)) : ''}
+    ${w.eq === 'H1-3' ? row('H1-3', 'fa/Fa ≤ 0.15 → fa/Fa + fbx/Fbx + fby/Fby', df2(w.ratios.comb, 3), '', okTag(w.ratios.comb <= 1)) : ''}
+    ${w.eq === 'H2-1' ? row('H2-1', 'ft/Ft + fbx/Fbx + fby/Fby', df2(w.ratios.comb, 3), '', okTag(w.ratios.comb <= 1)) : ''}
+    ${w.eq === 'fbx/Fbx + fby/Fby' ? row('แรงดัด', 'fbx/Fbx + fby/Fby', df2(w.ratios.bend, 3), '', okTag(w.ratios.bend <= 1)) : ''}
+    ${w.eq === 'fa/Fa' || w.eq === 'P/Pt' ? row('แรงตามแกน', esc(w.eq), df2(w.ratios.axial, 3), '', okTag(w.ratios.axial <= 1)) : ''}
+    ${row('fv / Fv', 'fv = V/Av · Fv = 0.4Fy', `${df2(w.fv)} / ${df2(w.Fv)}`, 'ksc', okTag(w.ratios.shear <= 1))}
+    ${w.ratios.slender != null ? row('ความชะลูด', comp ? 'KL/r ≤ ' + (e.opt.slendComp || 200) : 'L/r ≤ ' + e.opt.slendTen, df2(w.ratios.slender, 3), '', okTag(w.ratios.slender <= 1)) : ''}
+  </table>${(w.warn || []).length ? `<p class="d-note">${w.warn.map(esc).join('<br>')}</p>` : ''}`;
+  const d = e.defl;
+  const s4 = `<h4>4. การโก่งตัว</h4>` + (d ? `<table class="dsg-calc">
+    ${row(d.cant ? 'ช่วงยื่น' : 'ช่วง', `${esc(d.from)} → ${esc(d.to)}`, df2(d.span), 'ม.')}
+    ${row('Δ / ยอมให้', `${d.cant ? '2L' : 'L'}/${esc(T.n)} · ชุด ${esc(d.worst.combo)}${d.worst.mid ? ' · กลางช่วงคำนวณ 5qL⁴/384EI + (Ma+Mb)L²/16EI' : ' · การเคลื่อนที่ของจุดเทียบเส้นตรงระหว่างจุดรองรับ'}${d.scaled ? ` · ปรับตาม Ix (×${df2(d.scaled, 3)})` : ''}`, `${df2(d.worst.d, 3)} / ${df2(d.worst.allow, 3)}`, 'ซม.', okTag(d.worst.ratio <= 1))}
+  </table>` : '<p class="hint">ไม่ตรวจ (ไม่ใช่ชิ้นรับแรงดัดหลัก หรือช่วงสั้นกว่า 0.30 ม.)</p>');
+  const best = {}; e.res.rows.forEach((r, i) => { if (!best[r.combo] || r.ratio > best[r.combo].r.ratio) best[r.combo] = { r, f: e.fl[i] }; });
+  const top = Object.values(best).sort((a, b) => b.r.ratio - a.r.ratio).slice(0, 6);
+  const s5 = `<h4>5. ชุดผสมที่อัตราส่วนสูงสุด (${top.length} จาก ${Object.keys(best).length} ชุด)</h4><div class="table-wrap"><table class="boq dsg-tab"><tr><th>ชุด</th><th>ที่ (ม.)</th><th>P</th><th>M3</th><th>M2</th><th>V2</th><th>Lb / Cb</th><th>สมการ</th><th>อัตราส่วน</th></tr>
+    ${top.map(({ r, f: q }) => `<tr><td>${esc(r.combo)}</td><td class="r">${df2(r.st)}</td><td class="r">${df2(q.P, 0)}</td><td class="r">${df2(q.Mx, 1)}</td><td class="r">${df2(q.My, 1)}</td><td class="r">${df2(q.V2, 0)}</td><td class="r">${r.Lb != null && (r.fbx || r.fby) ? df2(r.Lb) + ' / ' + df2(r.Cb) : '-'}</td><td>${esc(r.eq || '')}</td><td class="r">${df2(r.ratio, 3)}</td></tr>`).join('')}</table></div>`;
+  const sum = `<h4>สรุป ${okTag(e.ok)}</h4><p class="dsg-sum">อัตราส่วนสูงสุด ${df2(e.ratio, 3)} (${esc(stlEq(e))}) · ${e.sug ? `หน้าตัดเบาสุดที่ผ่าน ${esc(e.sug.name)} ${df2(e.sug.w)} กก./ม. อัตราส่วน ${df2(e.sug.ratio, 3)}` : 'ไม่มีหน้าตัดในตระกูลที่ผ่าน'}${S._stlG && S._stlG.R ? (g => g ? ` · ชนิด ${esc(g.name)} ใช้ ${esc(g.cand)} (${df2(g.util[e.id], 3)})` : '')(S._stlG.R.groups.find(g => g.ids.includes(e.id))) : ''}</p>`;
+  return head + ovf + s1 + s2 + s3 + s4 + s5 + sum + '</div>';
+}
+/** ตารางสรุปสำหรับพิมพ์ */
+function stlSumReport(A, R) {
+  const pj = S.boq.project || {}, T = dsgStl();
+  const mem = A.members.filter(e => e.res && e.res.rows);
+  return `<div class="card dsg-rep"><div class="dsg-head"><b>สรุปตรวจเหล็กรูปพรรณ ASD (AISC 1989)</b> · ${esc(pj.name || S.model.meta.name || '')}<br>${esc(SteelASD.material(T.grade).grade)} · การโก่งตัว L/${esc(T.n)} · ${mem.length} ชิ้น ผ่าน ${mem.filter(e => e.ok).length}</div>
+    <table class="dsg-calc"><tr><td>ชิ้น</td><td>ประเภท · หน้าตัด</td><td class="r">อัตราส่วน</td><td>ชุดวิกฤต</td><td></td></tr>
+    ${mem.map(e => `<tr><td>${esc(e.mark)} ${esc(e.id)}</td><td class="eq">${esc(e.typeTh)} · ${esc(e.sec)} · ${esc(stlEq(e))}</td><td class="r">${df2(e.ratio, 3)}</td><td>${esc(e.res.worst.combo || '')}</td><td>${okTag(e.ok)}</td></tr>`).join('')}</table>
+    ${R && R.groups.length ? `<h4>ชนิดเหล็ก</h4><table class="dsg-calc"><tr><td>ชนิด</td><td>ประเภท · ชิ้น</td><td class="r">หน้าตัด</td><td>ใช้งานสูงสุด</td><td></td></tr>
+    ${R.groups.map(g => `<tr><td>${esc(g.name)}</td><td class="eq">${esc(SteelChk.TYPE_TH[g.type] || g.type)} · ${g.ids.length} ชิ้น (คุม ${esc(g.gov)})</td><td class="r">${esc(g.cand)}</td><td>${df2(Math.max(...Object.values(g.util)), 3)}</td><td>${okTag(!g.fails.length)}</td></tr>`).join('')}</table>` : ''}</div>`;
+}
+function bindSteel() {
+  const T = dsgStl(), D = dsg(), re = () => { autosave(); renderDesign(); };
+  const num = v => { const s = String(v).trim().replace(/,/g, ''); return s === '' ? undefined : Math.abs(+s); };
+  const setOv = (o, k, el) => {
+    const raw = el.value.trim();
+    if (k === 'sec') {
+      if (!raw) { delete o.sec; return true; }
+      if (!SteelSec.props(raw.replace(/^\[\]-?/, 'BOX'))) { toast(`อ่านหน้าตัด "${raw}" ไม่ได้ — ใช้รูปแบบ C100x50x20x2.3 · 2C100x50x20x2.3 · BOX50x25x2.0 · WF150x75x5x7`); el.value = o.sec || ''; return false; }
+      o.sec = raw.replace(/^\[\]-?/, 'BOX'); return true;
+    }
+    const v = num(raw); if (v === undefined || !isFinite(v) || v <= 0) delete o[k]; else o[k] = v; return true;
+  };
+  $$('#dsg-body [data-stc]').forEach(el => el.onchange = () => {
+    const k = el.dataset.stc;
+    if (k === 'onlyFail') T.onlyFail = el.checked; else if (k === 'sameShape') T.sameShape = el.value === '1'; else if (k === 'n') T.n = Math.max(60, Math.round(+el.value) || 240); else T[k] = el.value;
+    re();
+  });
+  $$('#dsg-body [data-stt]').forEach(el => el.onchange = () => {
+    const t = el.dataset.stt, o = T.byType[t] = T.byType[t] || {};
+    if (setOv(o, el.dataset.sk, el)) { if (!Object.keys(o).length) delete T.byType[t]; re(); }
+  });
+  $$('#dsg-body [data-smo]').forEach(el => el.onchange = () => {
+    const id = el.dataset.smo, o = T.over[id] = T.over[id] || {};
+    if (setOv(o, el.dataset.sk, el)) { if (!Object.keys(o).length) delete T.over[id]; D.sel = 'stl:' + id; re(); }
+  });
+  $$('#dsg-body tr[data-sm]').forEach(tr => tr.addEventListener('click', e => {
+    if (['INPUT', 'SELECT', 'OPTION', 'LABEL'].includes(e.target.tagName)) return;
+    D.sel = 'stl:' + tr.dataset.sm; renderDesign(); const r = $('#dsg-report'); if (r) r.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }));
 }
